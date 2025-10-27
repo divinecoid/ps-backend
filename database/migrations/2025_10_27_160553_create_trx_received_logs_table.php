@@ -11,12 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('mdx_warehouses', function (Blueprint $table) {
+        Schema::create('trx_received_logs', function (Blueprint $table) {
             $table->id();
-            $table->string('code')->unique();
-            $table->string('name')->unique();
-            $table->integer('priority');            
-            $table->softDeletes();
+            $table->foreignId('request_id')->constrained('trx_requests')->onDelete('restrict');
+            $table->bigInteger('quantity');
+            $table->timestamps('received_date');
             $table->timestamps();
         });
     }
@@ -26,6 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('mdx_warehouses');
+        Schema::dropIfExists('trx_received_logs');
     }
 };

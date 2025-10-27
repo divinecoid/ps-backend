@@ -16,9 +16,10 @@ return new class extends Migration
             $table->string('serial_number')->unique();
             $table->foreignId('product_id')->constrained('mdx_products')->onDelete('restrict');
             $table->foreignId('factory_id')->constrained('mdx_factories')->onDelete('restrict');
-            $table->foreignId('warehouse_id')->constrained('mdx_warehouses')->onDelete('restrict');
             $table->foreignId('rack_id')->constrained('mdx_racks')->onDelete('restrict');
             $table->foreignId('cmt_id')->constrained('mdx_cmts')->onDelete('restrict');
+            $table->string('barcode_group')->unique();
+            $table->integer('quantity');
             $table->timestamps();
         });
     }
