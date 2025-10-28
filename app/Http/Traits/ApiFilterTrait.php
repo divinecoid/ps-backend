@@ -69,4 +69,9 @@ trait ApiFilterTrait
             'data'=>null
         ],$code);
     }
+
+    public function getMaxTokens()
+    {
+        return getenv("PER_USER_TOKENS") ?: 5;
+    }
 }

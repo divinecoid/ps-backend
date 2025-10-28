@@ -3,16 +3,20 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Http\Traits\ApiFilterTrait;
+use App\Models\Auth\RefreshToken;
+use App\Models\MasterData\User;
 use Exception;
-use Hash;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Client\ConnectionException;
-use Log;
-use Request;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class LoginController extends Controller
 {
+    use ApiFilterTrait;
     public function login(Request $request)
     {
         try {
@@ -22,7 +26,7 @@ class LoginController extends Controller
             ]);
 
             $user = User::where('name', $request->username)->first();
-            if (!$user || Hash::check($request->password, $user->password)) {
+            if (!$user || !Hash::check($request->password, $user->password)) {
                 return response()-> json([
                     'success' => false,
                     'message' => 'Invalid username or password'
@@ -31,11 +35,31 @@ class LoginController extends Controller
             
             
             //clear expired token
-            // $user->ref
+            $user->refreshTokens()->where('expires_at', '<', now())->delete();
 
+            $activeTokens = $user->refreshTokens()->where('revoked', false)->count();
+            if ($activeTokens >= $this->getMaxTokens()) {
+                $oldestToken = $user->refreshTokens()->where('revoked', false)->oldest()->first();
+                if ($oldestToken) {
+                    $oldestToken->delete();
+                }
+            }
 
+            $accessToken = JWTAuth::fromUser($user);
+            
 
+            $refreshToken = RefreshToken::createToken($user);
 
+            $payload = JWTAuth::setToken($accessToken)->getPayload();
+            Log::info('JWT Payload:', $payload->toArray());
+
+            return response()->json([
+                'success'=>true,
+                'message'=>"OK",
+                'token'=>$accessToken,
+                'refresh_token'=>$refreshToken->token,
+                'token_type'=>'Bearer'
+            ]);
 
         } catch (ConnectionException $e) {
             Log::error('Database connection error' . $e->getMessage());
