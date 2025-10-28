@@ -52,7 +52,7 @@ trait ApiFilterTrait
     }
 
 
-    public function successResponse($data, $message)
+    public function successResponse($data, $message="Success")
     {
         return response()->json([
             'success'=>true,
@@ -61,7 +61,7 @@ trait ApiFilterTrait
         ]);
     }
 
-    public function errorResponse($message, $code=400)
+    public function errorResponse($code=400, $message="Error")
     {
         return response()->json([
             'success'=>false,
