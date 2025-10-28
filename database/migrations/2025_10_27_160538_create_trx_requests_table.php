@@ -18,7 +18,7 @@ return new class extends Migration
             $table->bigInteger('start');
             $table->bigInteger('end');
             $table->bigInteger('retrieved_qty');
-            $table->timestamps('request_date');
+            $table->timestamp('request_date');
             $table->timestamps();
         });
     }
