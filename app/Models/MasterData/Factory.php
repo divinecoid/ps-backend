@@ -5,8 +5,8 @@ namespace App\Models\MasterData;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class Inventories extends Model
+class Factory extends Model
 {
-    /** @use HasFactory<\Database\Factories\MasterData\InventoriesFactory> */
+    /** @use HasFactory<\Database\Factories\MasterData\FactoryFactory> */
     use HasFactory;
 }

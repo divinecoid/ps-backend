@@ -5,8 +5,8 @@ namespace App\Models\MasterData;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class Sizes extends Model
+class Size extends Model
 {
-    /** @use HasFactory<\Database\Factories\MasterData\SizesFactory> */
+    /** @use HasFactory<\Database\Factories\MasterData\SizeFactory> */
     use HasFactory;
 }

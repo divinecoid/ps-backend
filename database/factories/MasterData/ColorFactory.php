@@ -1,13 +1,13 @@
 <?php
 
-namespace Database\Factories\Transactions;
+namespace Database\Factories\MasterData;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Transactions\ScannedItems>
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\MasterData\Color>
  */
-class ScannedItemsFactory extends Factory
+class ColorFactory extends Factory
 {
     /**
      * Define the model's default state.
