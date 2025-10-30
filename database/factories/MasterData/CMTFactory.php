@@ -1,13 +1,13 @@
 <?php
 
-namespace Database\Factories\Transactions;
+namespace Database\Factories\MasterData;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Transactions\OrderItems>
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\MasterData\CMT>
  */
-class OrderItemsFactory extends Factory
+class CMTFactory extends Factory
 {
     /**
      * Define the model's default state.

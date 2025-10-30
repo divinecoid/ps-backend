@@ -5,8 +5,8 @@ namespace App\Models\MasterData;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class Products extends Model
+class Product extends Model
 {
-    /** @use HasFactory<\Database\Factories\MasterData\ProductsFactory> */
+    /** @use HasFactory<\Database\Factories\MasterData\ProductFactory> */
     use HasFactory;
 }

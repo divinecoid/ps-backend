@@ -5,8 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class OnlineStores extends Model
+class Order extends Model
 {
-    /** @use HasFactory<\Database\Factories\OnlineStoresFactory> */
+    /** @use HasFactory<\Database\Factories\OrderFactory> */
     use HasFactory;
 }

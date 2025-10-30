@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('mdx_scanneditems', function (Blueprint $table) {
+        Schema::create('trx_scanneditems', function (Blueprint $table) {
             $table->id();
             $table->foreignId('inventories_id')->constrained('mdx_inventories')->onDelete('restrict');
             $table->foreignId('rack_id')->constrained('mdx_racks')->onDelete('restrict');
@@ -26,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('mdx_scanneditems');
+        Schema::dropIfExists('trx_scanneditems');
     }
 };

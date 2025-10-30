@@ -5,8 +5,8 @@ namespace App\Models\Transactions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class ReceivedLogs extends Model
+class Request extends Model
 {
-    /** @use HasFactory<\Database\Factories\Transactions\ReceivedLogsFactory> */
+    /** @use HasFactory<\Database\Factories\Transactions\RequestFactory> */
     use HasFactory;
 }
