@@ -25,7 +25,7 @@ class LoginController extends Controller
                 'password' => 'required|string'
             ]);
 
-            $user = User::where('name', $request->username)->first();
+            $user = User::where('username', $request->username)->first();
             if (!$user || !Hash::check($request->password, $user->password)) {
                 return response()-> json([
                     'success' => false,
