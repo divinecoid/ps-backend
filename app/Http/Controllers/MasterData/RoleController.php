@@ -13,39 +13,37 @@ class RoleController extends Controller
 
     private function structure()
     {
-        return fn($role) => [
-            'id' => $role->id,
-            'name' => $role->name,
-            'description' => $role->description,
+        return fn($data) => [
+            'id' => $data->id,
+            'name' => $data->name,
+            'description' => $data->description,
         ];
     }
 
     public function index(Request $request)
     {
-        $result = $this->baseIndex(
+        return $this->baseIndex(
             $request,
             Role::class,
             [],
             ['name'],
             $this->structure()
         );
-        return $result;
     }
 
     public function show($id)
     {
-        $user = $this->baseShow(
+        return $this->baseShow(
             Role::class,
             $id,
             [],
             $this->structure()
         );
-        return $user;
     }
 
     public function store(Request $request)
     {
-        $result = $this->baseStore(
+        return $this->baseStore(
             $request,
             Role::class,
             [
@@ -54,30 +52,27 @@ class RoleController extends Controller
             ],
             null
         );
-        return $result;
     }
 
     public function update(Request $request, $id)
     {
-        $result = $this->baseUpdate(
+        return $this->baseUpdate(
             $request,
             Role::class,
             $id,
             [
-                'name' => "sometimes|required|string|unique:mdx_roles,name|max:255,unique:mdx_roles,name,{$id}",
+                'name' => "sometimes|required|string|max:255,unique:mdx_roles,name,{$id}",
                 'description' => "sometimes|nullable|string|max:500",
             ],
             null
         );
-        return $result;
     }
 
     public function destroy($id)
     {
-        $result = $this->baseDelete(
+        return $this->baseDelete(
             Role::class,
             $id
         );
-        return $result;
     }
 }

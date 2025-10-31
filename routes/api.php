@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\MasterData\MarketplaceController;
 use App\Http\Controllers\MasterData\RoleController;
 use App\Http\Controllers\MasterData\UserController;
 
@@ -25,4 +26,11 @@ Route::prefix('user')->middleware('checkrole:admin')->group(function () {
     Route::post('/', [UserController::class, 'store']);
     Route::patch('{id}', [UserController::class, 'update']);
     Route::delete('{id}', [UserController::class, 'destroy']);
+});
+Route::prefix('marketplace')->middleware('checkrole:admin')->group(function () {
+    Route::get('/', [MarketplaceController::class, 'index']);
+    Route::get('{id}', [MarketplaceController::class, 'show']);
+    Route::post('/', [MarketplaceController::class, 'store']);
+    Route::patch('{id}', [MarketplaceController::class, 'update']);
+    Route::delete('{id}', [MarketplaceController::class, 'destroy']);
 });

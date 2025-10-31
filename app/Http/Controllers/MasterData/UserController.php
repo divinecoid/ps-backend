@@ -14,14 +14,14 @@ class UserController extends Controller
 
     private function structure()
     {
-        return fn($user) => [
-            'id' => $user->id,
-            'name' => $user->name,
-            'username' => $user->username,
-            'email' => $user->email,
-            'roles' => $user->roles->map(fn($role) => [
-                'id' => $role->id,
-                'name' => $role->name
+        return fn($data) => [
+            'id' => $data->id,
+            'name' => $data->name,
+            'username' => $data->username,
+            'email' => $data->email,
+            'roles' => $data->roles->map(fn($r) => [
+                'id' => $r->id,
+                'name' => $r->name
             ])
         ];
     }
@@ -40,18 +40,17 @@ class UserController extends Controller
 
     public function show($id)
     {
-        $user = $this->baseShow(
+        return $this->baseShow(
             User::class,
             $id,
             ['roles'],
             $this->structure()
         );
-        return $user;
     }
 
     public function store(Request $request)
     {
-        $result = $this->baseStore(
+        return $this->baseStore(
             $request,
             User::class,
             [
@@ -67,13 +66,12 @@ class UserController extends Controller
                 $user->roles()->attach($req->role_id);
             }
         );
-        return $result;
     }
 
 
     public function update(Request $request, $id)
     {
-        $result = $this->baseUpdate(
+        return $this->baseUpdate(
             $request,
             User::class,
             $id,
@@ -87,15 +85,13 @@ class UserController extends Controller
                 $user->password = Hash::make($req->password);
             }
         );
-        return $result;
     }
 
     public function destroy($id)
     {
-        $result = $this->baseDelete(
+        return $this->baseDelete(
             User::class,
             $id
         );
-        return $result;
     }
 }
