@@ -51,7 +51,6 @@ trait ApiFilterTrait
         return getenv("PER_PAGE_DEFAULT") ?: 100;
     }
 
-
     public function successResponse($data, $message="Success")
     {
         return response()->json([

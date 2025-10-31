@@ -1,9 +1,12 @@
 <?php
 
+namespace App\Http\Controllers\MasterData;
+
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiFilterTrait;
 use App\Models\MasterData\Role;
-
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class RoleController extends Controller
 {

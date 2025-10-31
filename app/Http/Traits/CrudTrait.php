@@ -1,0 +1,93 @@
+<?php
+
+namespace App\Http\Traits;
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+
+trait CrudTrait
+{
+    use ApiFilterTrait;
+
+    public function baseIndex(Request $request, $model, array $relations = [], array $filters = [], callable $map = null)
+    {
+        $perPage = (int) ($request->input('per_page', $this->getPerPageDefault()));
+        $query = $model::query()->with($relations);
+
+        if (method_exists($this, 'applyFilter') && !empty($filters)) {
+            $query = $this->applyFilter($query, $request, $filters);
+        }
+
+        if ($request->has('search') && property_exists($model, 'searchable')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search, $model) {
+                foreach ($model::$searchable as $column) {
+                    $q->orWhere($column, 'LIKE', "%{$search}");
+                }
+            });
+        }
+
+        $data = $model::paginate($perPage);
+
+        $items = collect($data->items())->map($map ?? fn($item) => $item);
+        return response()->json($this->paginateResponse($data, $items));
+    }
+
+    public function baseShow($model, $id, array $relations = [], callable $map = null)
+    {
+        $item = $model::with($relations)->find($id);
+        if (!$item) {
+            return null;
+        }
+        return response()->json($map ? $map($item) : $item);
+    }
+
+    public function baseStore(Request $request, $model, array $rules, callable $afterCreate = null)
+    {
+        $validator = Validator::make($request->all(), $rules);
+        if ($validator->fails()) {
+            return $this->errorResponse(422, $validator->errors()->first());
+        }
+        return DB::transaction(function () use ($request, $model, $afterCreate) {
+            $data = $model::create($request->only(array_keys($request->all())));
+
+            if ($afterCreate) {
+                $afterCreate($data, $request);
+            }
+            return $this->successResponse($data);
+        });
+    }
+
+    public function baseUpdate(Request $request, $model, $id, array $rules, callable $afterUpdate = null)
+    {
+        $record = $model::find($id);
+        if (!$record) {
+            return $this->errorResponse(404, 'Not found');
+        }
+
+        $validator = Validator::make($request->all(), $rules);
+        if ($validator->fails()) {
+            return $this->errorResponse(422, $validator->errors()->first());
+        }
+
+        return DB::transaction(function () use ($request, $record, $afterUpdate) {
+            $record->update($request->only(array_keys($request->all())));
+
+            if ($afterUpdate) {
+                $afterUpdate($record, $request);
+            }
+            return $this->successResponse($record);
+        });
+    }
+
+    public function baseDelete($model, $id)
+    {
+        $item = $model::find($id);
+        if (!$item) {
+            return $this->errorResponse('Not found', 404);
+        }
+        $item->delete();
+        return $this->successResponse($item);
+    }
+}
