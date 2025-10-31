@@ -3,80 +3,81 @@
 namespace App\Http\Controllers\MasterData;
 
 use App\Http\Controllers\Controller;
-use App\Http\Traits\ApiFilterTrait;
+use App\Http\Traits\CrudTrait;
 use App\Models\MasterData\Role;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 
 class RoleController extends Controller
 {
-    use ApiFilterTrait;
+    use CrudTrait;
+
+    private function structure()
+    {
+        return fn($role) => [
+            'id' => $role->id,
+            'name' => $role->name,
+            'description' => $role->description,
+        ];
+    }
 
     public function index(Request $request)
     {
-        $perPage = (int)($request->input('per_page', $this->getPerPageDefault()));
-        $query = Role::query();
-        $query = $this->applyFilter($query,$request,['name','description']);
-        $data = $query->paginate($perPage);
-        $items = collect($data->items());
-        return response()->json($this->paginateResponse($data, $items));
-    }
-
-    public function store(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|unique:roles,name|max:255',
-            'description' => 'nullable|string|max:500',
-        ]);
-
-        if ($validator->fails()) {
-            return $this->errorResponse($validator->errors()->first(), 422);
-        }
-
-        $role = Role::create($request->only(['name', 'description']));
-        return $this->successResponse($role);
+        $result = $this->baseIndex(
+            $request,
+            Role::class,
+            [],
+            ['name'],
+            $this->structure()
+        );
+        return $result;
     }
 
     public function show($id)
     {
-        $role = Role::find($id);
-        if (!$role) {
-            return $this->errorResponse(404);
-        }
-        return $this->successResponse($role);
+        $user = $this->baseShow(
+            Role::class,
+            $id,
+            [],
+            $this->structure()
+        );
+        return $user;
+    }
+
+    public function store(Request $request)
+    {
+        $result = $this->baseStore(
+            $request,
+            Role::class,
+            [
+                'name' => 'required|string|unique:mdx_roles,name|max:255',
+                'description' => 'nullable|string|max:500',
+            ],
+            null
+        );
+        return $result;
     }
 
     public function update(Request $request, $id)
     {
-        $role = Role::find($id);
-        if (!$role) {
-            return $this->errorResponse(404);
-        }
-        $validator = Validator::make($request->all(), [
-            'name' => "equired|string|unique:roles,name,{$role->id}|max:255",
-            'description' => 'nullable|string|max:500',
-        ]);
-
-        if ($validator->fails()) {
-            return $this->errorResponse($validator->errors()->first(), 422);
-        }
-
-        $role->update($request->only(['name', 'description']));
-        return $this->successResponse($role);
+        $result = $this->baseUpdate(
+            $request,
+            Role::class,
+            $id,
+            [
+                'name' => "sometimes|required|string|unique:mdx_roles,name|max:255,unique:mdx_roles,name,{$id}",
+                'description' => "sometimes|nullable|string|max:500",
+            ],
+            null
+        );
+        return $result;
     }
 
     public function destroy($id)
     {
-        $role = Role::find($id);
-        if (!$role) {
-            return $this->errorResponse(404);
-        }
-
-        if ($role->users()->count() > 0) {
-            return $this->errorResponse(422);
-        }
-
-        $role->delete();
-        return $this->successResponse(null);
+        $result = $this->baseDelete(
+            Role::class,
+            $id
+        );
+        return $result;
     }
 }
