@@ -11,12 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('trx_scanneditems', function (Blueprint $table) {
+        Schema::create('trx_scanned_items', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('inventories_id')->constrained('mdx_inventories')->onDelete('restrict');
+            $table->foreignId('inventory_id')->constrained('mdx_inventories')->onDelete('restrict');
             $table->foreignId('rack_id')->constrained('mdx_racks')->onDelete('restrict');
             $table->string('barcode')->unique();
-            $table->foreignId('order_items')->constrained('trx_order_items')->onDelete('restrict');
+            $table->foreignId('order_item_id')->constrained('trx_order_items')->onDelete('restrict');
             $table->timestamps();
         });
     }
@@ -26,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('trx_scanneditems');
+        Schema::dropIfExists('trx_scanned_items');
     }
 };

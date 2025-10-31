@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('name')->unique();
             $table->string('base_api_url')->nullable();
             $table->text('description')->nullable();
-            $table->boolean('is_need_checker')->default(true);
+            $table->boolean('is_need_checker')->default(false);
             $table->timestamps();
             $table->softDeletes();
         });

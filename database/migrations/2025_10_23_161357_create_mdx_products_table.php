@@ -13,7 +13,6 @@ return new class extends Migration
     {
         Schema::create('mdx_products', function (Blueprint $table) {
             $table->id();
-            $table->string('barcode')->unique();
             $table->string('sku')->unique();
             $table->foreignId('color_id')->constrained('mdx_colors')->onDelete('restrict');
             $table->foreignId('model_id')->constrained('mdx_models')->onDelete('restrict');

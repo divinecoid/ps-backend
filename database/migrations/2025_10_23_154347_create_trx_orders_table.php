@@ -16,11 +16,10 @@ return new class extends Migration
             $table->string('awb_code')->nullable();
             $table->timestamp('read_at')->nullable();
             $table->timestamp('prepared_at')->nullable();
-            $table->integer('prepare_duration_minutes')->nullable();
+            $table->integer('prepare_duration')->nullable();
             $table->timestamp('readytoship_at')->nullable();
             $table->string('readytoship_marketplace')->nullable();
             $table->foreignId('online_store_id')->constrained('mdx_online_stores')->onDelete('restrict');
-            $table->foreignId('marketplace_id')->constrained('mdx_marketplaces')->onDelete('restrict');
             $table->integer('item_count');
             $table->integer('unique_item_count');
             $table->enum('status', [

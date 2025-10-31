@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('trx_requests', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('inventories_id')->constrained('mdx_inventories')->onDelete('restrict');
+            $table->foreignId('inventory_id')->constrained('mdx_inventories')->onDelete('restrict');
             $table->string('format');
             $table->bigInteger('start');
             $table->bigInteger('end');
