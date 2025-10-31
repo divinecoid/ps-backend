@@ -2,7 +2,7 @@
 
 namespace App\Models\Transactions;
 
-use App\Models\User;
+use App\Models\MasterData\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
