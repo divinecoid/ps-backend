@@ -16,7 +16,7 @@ class Warehouse extends Model
     protected $fillable = ['code', 'name', 'priority'];
 
     // Define relationship with Rack model
-    public function racks()
+    public function rack()
     {
         return $this->hasMany(Rack::class, 'warehouse_id');
     }
