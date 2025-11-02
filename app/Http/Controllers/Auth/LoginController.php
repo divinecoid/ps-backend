@@ -27,13 +27,12 @@ class LoginController extends Controller
 
             $user = User::where('username', $request->username)->first();
             if (!$user || !Hash::check($request->password, $user->password)) {
-                return response()-> json([
+                return response()->json([
                     'success' => false,
                     'message' => 'Invalid username or password'
                 ], 401);
             }
-            
-            
+
             //clear expired token
             $user->refreshTokens()->where('expires_at', '<', now())->delete();
 
@@ -46,19 +45,111 @@ class LoginController extends Controller
             }
 
             $accessToken = JWTAuth::fromUser($user);
-            
 
             $refreshToken = RefreshToken::createToken($user);
 
-            $payload = JWTAuth::setToken($accessToken)->getPayload();
-            Log::info('JWT Payload:', $payload->toArray());
+            // $payload = JWTAuth::setToken($accessToken)->getPayload();
+            // Log::info('JWT Payload:', $payload->toArray());
 
             return response()->json([
-                'success'=>true,
-                'message'=>"OK",
-                'token'=>$accessToken,
-                'refresh_token'=>$refreshToken->token,
-                'token_type'=>'Bearer'
+                'success' => true,
+                'message' => "OK",
+                'token' => $accessToken,
+                'refresh_token' => $refreshToken->token,
+                'token_type' => 'Bearer'
+            ]);
+
+        } catch (ConnectionException $e) {
+            Log::error('Database connection error' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'code' => 503,
+            ], 503);
+        } catch (QueryException $e) {
+            Log::error('Database query error' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'code' => 500,
+            ], 500);
+        } catch (Exception $e) {
+            Log::error('Unexpected error' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'code' => 500,
+            ], 500);
+        }
+    }
+
+    public function refresh(Request $request)
+    {
+        try {
+
+            $request->validate([
+                'refresh_token' => 'required|string'
+            ]);
+
+            $refreshToken = RefreshToken::findByToken($request->refresh_token);
+
+            if (!$refreshToken || !$refreshToken->isValid()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Invalid refresh token"
+                ], 401);
+            }
+
+            $user = $refreshToken->user;
+
+            $accessToken = JWTAuth::fromUser($user);
+
+            return response()->json([
+                'success' => true,
+                'message' => "OK",
+                'token' => $accessToken,
+                'token_type' => 'Bearer'
+            ]);
+
+        } catch (ConnectionException $e) {
+            Log::error('Database connection error' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'code' => 503,
+            ], 503);
+        } catch (QueryException $e) {
+            Log::error('Database query error' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'code' => 500,
+            ], 500);
+        } catch (Exception $e) {
+            Log::error('Unexpected error' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'code' => 500,
+            ], 500);
+        }
+    }
+
+    public function logout(Request $request)
+    {
+        try {
+            $request->validate([
+                'refresh_token' => 'required|string'
+            ]);
+
+            $refreshToken = RefreshToken::findByToken($request->refresh_token);
+
+            if (!$refreshToken || !$refreshToken->isValid()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Invalid refresh token"
+                ], 401);
+            }
+
+            $refreshToken->revoke();
+            
+            return response()->json([
+                'success' => true,
+                'message' => "OK",
             ]);
 
         } catch (ConnectionException $e) {
