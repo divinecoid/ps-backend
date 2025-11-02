@@ -38,9 +38,9 @@ trait CrudTrait
     {
         $item = $model::with($relations)->find($id);
         if (!$item) {
-            return null;
+            return $this->errorResponse(404, "Not found");
         }
-        return response()->json($map ? $map($item) : $item);
+        return $this->successResponse(response()->json($map ? $map($item) : $item));
     }
 
     public function baseStore(Request $request, $model, array $rules, callable $afterCreate = null)
