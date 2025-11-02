@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\MasterData\MarketplaceController;
 use App\Http\Controllers\MasterData\RoleController;
