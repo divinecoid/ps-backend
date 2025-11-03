@@ -26,7 +26,7 @@ class OnlineStore extends Model
     ];
 
     // Define relationship with Order model
-    public function orders()
+    public function order()
     {
         return $this->hasMany(Order::class, 'online_store_id');
     }
