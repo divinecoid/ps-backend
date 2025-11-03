@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Auth\RegisterController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\MasterData\MarketplaceController;
@@ -12,6 +13,8 @@ Route::prefix('auth')->group(function () {
     Route::post('/refresh', [LoginController::class, 'refresh']);
     Route::post('/logout', [LoginController::class, 'logout']);
 });
+
+Route::middleware('checkrole:admin')->post('/register', RegisterController::class);
 
 //MasterData
 Route::prefix('role')->middleware('checkrole:admin')->group(function () {

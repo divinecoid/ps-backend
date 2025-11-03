@@ -47,7 +47,7 @@ class RefreshToken extends Model
     }
     public function isRevoked()
     {
-        return $this->isRevoked();
+        return $this->revoked;
     }
 
     public function isValid()
