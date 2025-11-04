@@ -120,6 +120,7 @@ Route::prefix('rack')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [RackController::class, 'index']);
     Route::get('{id}', [RackController::class, 'show']);
     Route::post('/', [RackController::class, 'store']);
+    Route::post('{id}/restore', [RackController::class, 'restore']);
     Route::patch('{id}', [RackController::class, 'update']);
     Route::delete('{id}', [RackController::class, 'destroy']);
 });
@@ -128,6 +129,7 @@ Route::prefix('warehouse')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [WarehouseController::class, 'index']);
     Route::get('{id}', [WarehouseController::class, 'show']);
     Route::post('/', [WarehouseController::class, 'store']);
+    Route::post('{id}/restore', [WarehouseController::class, 'restore']);
     Route::patch('{id}', [WarehouseController::class, 'update']);
     Route::delete('{id}', [WarehouseController::class, 'destroy']);
 });

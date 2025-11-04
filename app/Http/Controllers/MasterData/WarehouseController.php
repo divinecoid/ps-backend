@@ -78,4 +78,9 @@ class WarehouseController extends Controller
             $id
         );
     }
+
+    public function restore($id)
+    {
+        return $this->baseRestore(Warehouse::class, $id);
+    }
 }

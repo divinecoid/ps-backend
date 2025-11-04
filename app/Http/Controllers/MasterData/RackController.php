@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
 use App\Models\MasterData\Rack;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class RackController extends Controller
 {
@@ -50,7 +51,10 @@ class RackController extends Controller
             [
                 'code' => 'required|string|unique:mdx_racks,name|max:255',
                 'name' => 'required|string|max:255',
-                'warehouse_id' => 'required|exists:mdx_warehouses,id',
+                'warehouse_id' => [
+                    'required',
+                    Rule::exists('mdx_warehouses', 'id')->whereNull('deleted_at'),
+                ],
             ],
             null
         );
@@ -65,7 +69,10 @@ class RackController extends Controller
             [
                 'code' => 'required|string|unique:mdx_racks,name|max:255',
                 'name' => 'required|string|max:255',
-                'warehouse_id' => 'required|exists:mdx_warehouses,id',
+                'warehouse_id' => [
+                    'required',
+                    Rule::exists('mdx_warehouses', 'id')->whereNull('deleted_at'),
+                ],
             ],
             null
         );
@@ -77,5 +84,10 @@ class RackController extends Controller
             Rack::class,
             $id
         );
+    }
+
+    public function restore($id)
+    {
+        return $this->baseRestore(Rack::class, $id);
     }
 }

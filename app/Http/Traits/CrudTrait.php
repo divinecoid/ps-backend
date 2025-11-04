@@ -85,9 +85,19 @@ trait CrudTrait
     {
         $item = $model::find($id);
         if (!$item) {
-            return $this->errorResponse('Not found', 404);
+            return $this->errorResponse(404, 'Not found');
         }
         $item->delete();
+        return $this->successResponse($item);
+    }
+
+    public function baseRestore($model, $id)
+    {
+        $item = $model::onlyTrashed()->find($id);
+        if (!$item) {
+            return $this->errorResponse(404, 'Not found or already active');
+        }
+        $item->restore();
         return $this->successResponse($item);
     }
 }
