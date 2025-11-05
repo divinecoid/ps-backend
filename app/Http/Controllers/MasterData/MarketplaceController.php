@@ -84,4 +84,9 @@ class MarketplaceController extends Controller
             $id
         );
     }
+
+    public function restore($id)
+    {
+        return $this->baseRestore(Marketplace::class, $id);
+    }
 }

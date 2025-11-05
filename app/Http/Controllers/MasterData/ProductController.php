@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
 use App\Models\MasterData\Product;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
@@ -50,9 +51,18 @@ class ProductController extends Controller
             Product::class,
             [
                 'sku' => 'required|string|unique:mdx_products,sku|max:255',
-                'color_id' => 'required|exists:mdx_colors,id',
-                'model_id' => 'required|exists:mdx_models,id',
-                'size_id' => 'required|exists:mdx_sizes,id',
+                'color_id' => [
+                    'required',
+                    Rule::exists('mdx_colors', 'id')->whereNull('deleted_at'),
+                ],
+                'model_id' => [
+                    'required',
+                    Rule::exists('mdx_models', 'id')->whereNull('deleted_at'),
+                ],
+                'size_id' => [
+                    'required',
+                    Rule::exists('mdx_sizes', 'id')->whereNull('deleted_at'),
+                ],
             ],
             null
         );
@@ -66,9 +76,18 @@ class ProductController extends Controller
             $id,
             [
                 'sku' => 'required|string|unique:mdx_products,sku|max:255',
-                'color_id' => 'required|exists:mdx_colors,id',
-                'model_id' => 'required|exists:mdx_models,id',
-                'size_id' => 'required|exists:mdx_sizes,id',
+                'color_id' => [
+                    'required',
+                    Rule::exists('mdx_colors', 'id')->whereNull('deleted_at'),
+                ],
+                'model_id' => [
+                    'required',
+                    Rule::exists('mdx_models', 'id')->whereNull('deleted_at'),
+                ],
+                'size_id' => [
+                    'required',
+                    Rule::exists('mdx_sizes', 'id')->whereNull('deleted_at'),
+                ],
             ],
             null
         );
@@ -80,5 +99,10 @@ class ProductController extends Controller
             Product::class,
             $id
         );
+    }
+
+    public function restore($id)
+    {
+        return $this->baseRestore(Product::class, $id);
     }
 }

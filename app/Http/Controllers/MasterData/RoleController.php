@@ -75,4 +75,9 @@ class RoleController extends Controller
             $id
         );
     }
+
+    public function restore($id)
+    {
+        return $this->baseRestore(Role::class, $id);
+    }
 }

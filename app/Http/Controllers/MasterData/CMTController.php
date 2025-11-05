@@ -75,4 +75,9 @@ class CMTController extends Controller
             $id
         );
     }
+
+    public function restore($id)
+    {
+        return $this->baseRestore(CMT::class, $id);
+    }
 }

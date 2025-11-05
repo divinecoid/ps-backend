@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
 use App\Models\MasterData\Inventory;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class InventoryController extends Controller
 {
@@ -53,11 +54,24 @@ class InventoryController extends Controller
             Inventory::class,
             [
                 'serial_number' => 'required|string|unique:mdx_inventories,serial_number|max:255',
-                'product_id' => 'required|exists:mdx_products,id',
-                'factory_id' => 'required|exists:mdx_factories,id',
-                'quantity' => 'required|integer|min:0',
-                'cmt_id' => 'required|exists:mdx_cmts,id',
-                'rack_id' => 'required|exists:mdx_racks,id',
+                'product_id' => [
+                    'required',
+                    Rule::exists('mdx_products', 'id')->whereNull('deleted_at'),
+                ],
+                'factory_id' => [
+                    'required',
+                    Rule::exists('mdx_factories', 'id')->whereNull('deleted_at'),
+                ],
+                'quantity' => 'required|integer|min:1',
+                'cmt_id' =>
+                [
+                    'required',
+                    Rule::exists('mdx_cmts', 'id')->whereNull('deleted_at'),
+                ],
+                'rack_id' => [
+                    'required',
+                    Rule::exists('mdx_racks', 'id')->whereNull('deleted_at'),
+                ],
                 'barcode_group' => 'nullable|string|max:255',
             ],
             null
@@ -72,11 +86,24 @@ class InventoryController extends Controller
             $id,
             [
                 'serial_number' => 'required|string|unique:mdx_inventories,serial_number|max:255',
-                'product_id' => 'required|exists:mdx_products,id',
-                'factory_id' => 'required|exists:mdx_factories,id',
+                'product_id' => [
+                    'required',
+                    Rule::exists('mdx_products', 'id')->whereNull('deleted_at'),
+                ],
+                'factory_id' => [
+                    'required',
+                    Rule::exists('mdx_factories', 'id')->whereNull('deleted_at'),
+                ],
                 'quantity' => 'required|integer|min:1',
-                'cmt_id' => 'required|exists:mdx_cmts,id',
-                'rack_id' => 'required|exists:mdx_racks,id',
+                'cmt_id' =>
+                [
+                    'required',
+                    Rule::exists('mdx_cmts', 'id')->whereNull('deleted_at'),
+                ],
+                'rack_id' => [
+                    'required',
+                    Rule::exists('mdx_racks', 'id')->whereNull('deleted_at'),
+                ],
                 'barcode_group' => 'nullable|string|max:255',
             ],
             null
@@ -89,5 +116,10 @@ class InventoryController extends Controller
             Inventory::class,
             $id
         );
+    }
+
+    public function restore($id)
+    {
+        return $this->baseRestore(Inventory::class, $id);
     }
 }

@@ -47,7 +47,7 @@ class FactoryController extends Controller
             $request,
             Factory::class,
             [
-                'code' => 'required|string|unique:mdx_cmts,name|max:255',
+                'code' => 'required|string|unique:mdx_factories,name|max:255',
                 'name' => 'required|string|max:255',
             ],
             null
@@ -61,7 +61,7 @@ class FactoryController extends Controller
             Factory::class,
             $id,
             [
-                'code' => 'required|string|unique:mdx_cmts,name|max:255',
+                'code' => 'required|string|unique:mdx_factories,name|max:255',
                 'name' => 'required|string|max:255',
             ],
             null
@@ -71,8 +71,13 @@ class FactoryController extends Controller
     public function destroy($id)
     {
         return $this->baseDelete(
-        Factory::class,
+            Factory::class,
             $id
         );
+    }
+
+    public function restore($id)
+    {
+        return $this->baseRestore(Factory::class, $id);
     }
 }

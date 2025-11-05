@@ -7,6 +7,7 @@ use App\Http\Traits\CrudTrait;
 use App\Models\MasterData\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
@@ -58,7 +59,10 @@ class UserController extends Controller
                 'name' => 'required|string|max:255',
                 'email' => 'nullable|email|unique:users,email',
                 'password' => 'required|string|min:8',
-                'role_id' => 'required|exists:mdx_roles,id'
+                'role_id' => [
+                    'required',
+                    Rule::exists('mdx_roles', 'id')->whereNull('deleted_at'),
+                ]
             ],
             function (User $user, Request $req) {
                 $user->password = Hash::make($req->password);
@@ -93,5 +97,10 @@ class UserController extends Controller
             User::class,
             $id
         );
+    }
+
+    public function restore($id)
+    {
+        return $this->baseRestore(User::class, $id);
     }
 }

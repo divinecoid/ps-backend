@@ -32,6 +32,7 @@ Route::prefix('role')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [RoleController::class, 'index']);
     Route::get('{id}', [RoleController::class, 'show']);
     Route::post('/', [RoleController::class, 'store']);
+    Route::post('{id}/restore', [RoleController::class, 'restore']);
     Route::patch('{id}', [RoleController::class, 'update']);
     Route::delete('{id}', [RoleController::class, 'destroy']);
 });
@@ -40,6 +41,7 @@ Route::prefix('user')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [UserController::class, 'index']);
     Route::get('{id}', [UserController::class, 'show']);
     Route::post('/', [UserController::class, 'store']);
+    Route::post('{id}/restore', [UserController::class, 'restore']);
     Route::patch('{id}', [UserController::class, 'update']);
     Route::delete('{id}', [UserController::class, 'destroy']);
 });
@@ -48,6 +50,7 @@ Route::prefix('marketplace')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [MarketplaceController::class, 'index']);
     Route::get('{id}', [MarketplaceController::class, 'show']);
     Route::post('/', [MarketplaceController::class, 'store']);
+    Route::post('{id}/restore', [MarketplaceController::class, 'restore']);
     Route::patch('{id}', [MarketplaceController::class, 'update']);
     Route::delete('{id}', [MarketplaceController::class, 'destroy']);
 });
@@ -56,6 +59,7 @@ Route::prefix('onlinestore')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [OnlineStoreController::class, 'index']);
     Route::get('{id}', [OnlineStoreController::class, 'show']);
     Route::post('/', [OnlineStoreController::class, 'store']);
+    Route::post('{id}/restore', [OnlineStoreController::class, 'restore']);
     Route::patch('{id}', [OnlineStoreController::class, 'update']);
     Route::delete('{id}', [OnlineStoreController::class, 'destroy']);
 });
@@ -64,6 +68,7 @@ Route::prefix('color')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [ColorController::class, 'index']);
     Route::get('{id}', [ColorController::class, 'show']);
     Route::post('/', [ColorController::class, 'store']);
+    Route::post('{id}/restore', [ColorController::class, 'restore']);
     Route::patch('{id}', [ColorController::class, 'update']);
     Route::delete('{id}', [ColorController::class, 'destroy']);
 });
@@ -72,6 +77,7 @@ Route::prefix('model')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [ProductModelController::class, 'index']);
     Route::get('{id}', [ProductModelController::class, 'show']);
     Route::post('/', [ProductModelController::class, 'store']);
+    Route::post('{id}/restore', [ProductModelController::class, 'restore']);
     Route::patch('{id}', [ProductModelController::class, 'update']);
     Route::delete('{id}', [ProductModelController::class, 'destroy']);
 });
@@ -80,6 +86,7 @@ Route::prefix('size')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [SizeController::class, 'index']);
     Route::get('{id}', [SizeController::class, 'show']);
     Route::post('/', [SizeController::class, 'store']);
+    Route::post('{id}/restore', [SizeController::class, 'restore']);
     Route::patch('{id}', [SizeController::class, 'update']);
     Route::delete('{id}', [SizeController::class, 'destroy']);
 });
@@ -88,6 +95,7 @@ Route::prefix('product')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [ProductController::class, 'index']);
     Route::get('{id}', [ProductController::class, 'show']);
     Route::post('/', [ProductController::class, 'store']);
+    Route::post('{id}/restore', [ProductController::class, 'restore']);
     Route::patch('{id}', [ProductController::class, 'update']);
     Route::delete('{id}', [ProductController::class, 'destroy']);
 });
@@ -96,6 +104,7 @@ Route::prefix('factory')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [FactoryController::class, 'index']);
     Route::get('{id}', [FactoryController::class, 'show']);
     Route::post('/', [FactoryController::class, 'store']);
+    Route::post('{id}/restore', [FactoryController::class, 'restore']);
     Route::patch('{id}', [FactoryController::class, 'update']);
     Route::delete('{id}', [FactoryController::class, 'destroy']);
 });
@@ -104,6 +113,7 @@ Route::prefix('cmt')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [CMTController::class, 'index']);
     Route::get('{id}', [CMTController::class, 'show']);
     Route::post('/', [CMTController::class, 'store']);
+    Route::post('{id}/restore', [CMTController::class, 'restore']);
     Route::patch('{id}', [CMTController::class, 'update']);
     Route::delete('{id}', [CMTController::class, 'destroy']);
 });
@@ -112,6 +122,7 @@ Route::prefix('inventory')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [InventoryController::class, 'index']);
     Route::get('{id}', [InventoryController::class, 'show']);
     Route::post('/', [InventoryController::class, 'store']);
+    Route::post('{id}/restore', [InventoryController::class, 'restore']);
     Route::patch('{id}', [InventoryController::class, 'update']);
     Route::delete('{id}', [InventoryController::class, 'destroy']);
 });

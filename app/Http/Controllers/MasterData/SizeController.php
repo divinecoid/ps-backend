@@ -47,7 +47,7 @@ class SizeController extends Controller
             $request,
             Size::class,
             [
-                'code' => 'required|string|unique:mdx_cmts,name|max:255',
+                'code' => 'required|string|unique:mdx_sizes,name|max:255',
                 'name' => 'required|string|max:255',
             ],
             null
@@ -61,7 +61,7 @@ class SizeController extends Controller
             Size::class,
             $id,
             [
-                'code' => 'required|string|unique:mdx_cmts,name|max:255',
+                'code' => 'required|string|unique:mdx_sizes,name|max:255',
                 'name' => 'required|string|max:255',
             ],
             null
@@ -74,5 +74,10 @@ class SizeController extends Controller
             Size::class,
             $id
         );
+    }
+
+    public function restore($id)
+    {
+        return $this->baseRestore(Size::class, $id);
     }
 }

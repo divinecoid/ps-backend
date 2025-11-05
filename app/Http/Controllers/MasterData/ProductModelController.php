@@ -47,7 +47,7 @@ class ProductModelController extends Controller
             $request,
             ProductModel::class,
             [
-                'code' => 'required|string|unique:mdx_cmts,name|max:255',
+                'code' => 'required|string|unique:mdx_models,name|max:255',
                 'name' => 'required|string|max:255',
             ],
             null
@@ -61,7 +61,7 @@ class ProductModelController extends Controller
             ProductModel::class,
             $id,
             [
-                'code' => 'required|string|unique:mdx_cmts,name|max:255',
+                'code' => 'required|string|unique:mdx_models,name|max:255',
                 'name' => 'required|string|max:255',
             ],
             null
@@ -74,5 +74,10 @@ class ProductModelController extends Controller
             ProductModel::class,
             $id
         );
+    }
+
+    public function restore($id)
+    {
+        return $this->baseRestore(ProductModel::class, $id);
     }
 }

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
 use App\Models\MasterData\OnlineStore;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class OnlineStoreController extends Controller
 {
@@ -53,7 +54,10 @@ class OnlineStoreController extends Controller
             $request,
             OnlineStore::class,
             [
-                'marketplace_id' => 'required|exists:mdx_marketplaces,id',
+                'marketplace_id' => [
+                    'required',
+                    Rule::exists('mdx_warehouses', 'id')->whereNull('deleted_at'),
+                ],
                 'store_code' => 'required|string|unique:mdx_online_stores,store_code|max:255',
                 'store_name' => 'required|string|max:255',
                 'api_key' => 'string|max:500',
@@ -73,7 +77,10 @@ class OnlineStoreController extends Controller
             OnlineStore::class,
             $id,
             [
-                'marketplace_id' => 'required|exists:mdx_marketplaces,id',
+                'marketplace_id' => [
+                    'required',
+                    Rule::exists('mdx_warehouses', 'id')->whereNull('deleted_at'),
+                ],
                 'store_code' => 'required|string|unique:mdx_online_stores,store_code|max:255',
                 'store_name' => 'required|string|max:255',
                 'api_key' => 'string|max:500',
@@ -92,5 +99,10 @@ class OnlineStoreController extends Controller
             OnlineStore::class,
             $id
         );
+    }
+
+    public function restore($id)
+    {
+        return $this->baseRestore(OnlineStore::class, $id);
     }
 }

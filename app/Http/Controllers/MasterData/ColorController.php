@@ -47,7 +47,7 @@ class ColorController extends Controller
             $request,
             Color::class,
             [
-                'code' => 'required|string|unique:mdx_cmts,name|max:255',
+                'code' => 'required|string|unique:mdx_colors,name|max:255',
                 'name' => 'required|string|max:255',
             ],
             null
@@ -61,7 +61,7 @@ class ColorController extends Controller
             Color::class,
             $id,
             [
-                'code' => 'required|string|unique:mdx_cmts,name|max:255',
+                'code' => 'required|string|unique:mdx_colors,name|max:255',
                 'name' => 'required|string|max:255',
             ],
             null
@@ -74,5 +74,10 @@ class ColorController extends Controller
             Color::class,
             $id
         );
+    }
+
+    public function restore($id)
+    {
+        return $this->baseRestore(Color::class, $id);
     }
 }
