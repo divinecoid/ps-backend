@@ -56,7 +56,7 @@ class OnlineStoreController extends Controller
             [
                 'marketplace_id' => [
                     'required',
-                    Rule::exists('mdx_warehouses', 'id')->whereNull('deleted_at'),
+                    Rule::exists('mdx_marketplaces', 'id')->whereNull('deleted_at'),
                 ],
                 'store_code' => 'required|string|unique:mdx_online_stores,store_code|max:255',
                 'store_name' => 'required|string|max:255',
@@ -79,7 +79,7 @@ class OnlineStoreController extends Controller
             [
                 'marketplace_id' => [
                     'required',
-                    Rule::exists('mdx_warehouses', 'id')->whereNull('deleted_at'),
+                    Rule::exists('mdx_marketplaces', 'id')->whereNull('deleted_at'),
                 ],
                 'store_code' => 'required|string|unique:mdx_online_stores,store_code|max:255',
                 'store_name' => 'required|string|max:255',

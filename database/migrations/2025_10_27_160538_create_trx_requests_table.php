@@ -19,6 +19,7 @@ return new class extends Migration
             $table->bigInteger('end');
             $table->bigInteger('retrieved_qty');
             $table->timestamp('request_date');
+            $table->softDeletes();
             $table->timestamps();
         });
     }

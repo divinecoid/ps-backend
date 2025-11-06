@@ -17,6 +17,7 @@ return new class extends Migration
             $table->foreignId('color_id')->constrained('mdx_colors')->onDelete('restrict');
             $table->foreignId('model_id')->constrained('mdx_models')->onDelete('restrict');
             $table->foreignId('size_id')->constrained('mdx_sizes')->onDelete('restrict');
+            $table->softDeletes();
             $table->timestamps();
         });
     }

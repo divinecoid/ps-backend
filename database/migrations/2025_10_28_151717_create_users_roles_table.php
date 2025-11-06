@@ -16,7 +16,6 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->onDelete('restrict');
             $table->foreignId('role_id')->constrained('mdx_roles')->onDelete('restrict');
             $table->timestamps();
-
             $table->unique(['user_id', 'role_id']);
         });
     }

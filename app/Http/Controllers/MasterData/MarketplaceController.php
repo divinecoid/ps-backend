@@ -19,7 +19,7 @@ class MarketplaceController extends Controller
             'name' => $data->name,
             'base_api_url' => $data->base_api_url,
             'description' => $data->description,
-            'is_needed_checker' => $data->is_needed_checker
+            'is_need_checker' => $data->is_needed_checker
         ];
     }
 
@@ -29,7 +29,7 @@ class MarketplaceController extends Controller
             $request,
             Marketplace::class,
             [],
-            ['code', 'name', 'base_api_url', 'is_needed_checker'],
+            ['code', 'name', 'base_api_url', 'is_need_checker'],
             $this->structure()
         );
     }
@@ -54,7 +54,7 @@ class MarketplaceController extends Controller
                 'name' => 'required|string|max:255',
                 'base_api_url' => 'required|string|max:255',
                 'description' => 'string|max:500',
-                'is_needed_checker' => 'required|boolean',
+                'is_need_checker' => 'required|boolean',
             ],
             null
         );
@@ -71,7 +71,7 @@ class MarketplaceController extends Controller
                 'name' => 'sometimes|required|string|max:255',
                 'base_api_url' => 'sometimes|required|string|max:255',
                 'description' => 'string|max:500',
-                'is_needed_checker' => 'sometimes|required|boolean',
+                'is_need_checker' => 'sometimes|required|boolean',
             ],
             null
         );

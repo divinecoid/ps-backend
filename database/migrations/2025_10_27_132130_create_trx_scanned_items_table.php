@@ -17,6 +17,7 @@ return new class extends Migration
             $table->foreignId('rack_id')->constrained('mdx_racks')->onDelete('restrict');
             $table->string('barcode')->unique();
             $table->foreignId('order_item_id')->constrained('trx_order_items')->onDelete('restrict');
+            $table->softDeletes();
             $table->timestamps();
         });
     }

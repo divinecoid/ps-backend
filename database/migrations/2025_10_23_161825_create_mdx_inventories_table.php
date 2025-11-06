@@ -20,6 +20,7 @@ return new class extends Migration
             $table->foreignId('cmt_id')->constrained('mdx_cmts')->onDelete('restrict');
             $table->string('barcode_group')->unique();
             $table->integer('quantity');
+            $table->softDeletes();
             $table->timestamps();
         });
     }

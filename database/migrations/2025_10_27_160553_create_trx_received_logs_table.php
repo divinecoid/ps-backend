@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignId('request_id')->constrained('trx_requests')->onDelete('restrict');
             $table->bigInteger('quantity');
             $table->timestamp('received_date');
+            $table->softDeletes();
             $table->timestamps();
         });
     }
