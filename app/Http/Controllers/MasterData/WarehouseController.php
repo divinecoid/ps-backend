@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
 use App\Models\MasterData\Warehouse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class WarehouseController extends Controller
 {
@@ -48,7 +49,7 @@ class WarehouseController extends Controller
             $request,
             Warehouse::class,
             [
-                'code' => 'required|string|unique:mdx_warehouses,name|max:255',
+                'code' => 'required|string|unique:mdx_warehouses,code|max:255',
                 'name' => 'required|string|max:255',
                 'priority' => 'required|integer',
             ],
@@ -63,7 +64,12 @@ class WarehouseController extends Controller
             Warehouse::class,
             $id,
             [
-                'code' => 'required|string|unique:mdx_warehouses,name|max:255',
+                'code' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('mdx_warehouses', 'code')->ignore($id)
+                ],
                 'name' => 'required|string|max:255',
                 'priority' => 'required|integer',
             ],

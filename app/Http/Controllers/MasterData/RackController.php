@@ -49,7 +49,7 @@ class RackController extends Controller
             $request,
             Rack::class,
             [
-                'code' => 'required|string|unique:mdx_racks,name|max:255',
+                'code' => 'required|string|unique:mdx_racks,code|max:255',
                 'name' => 'required|string|max:255',
                 'warehouse_id' => [
                     'required',
@@ -67,7 +67,12 @@ class RackController extends Controller
             Rack::class,
             $id,
             [
-                'code' => 'required|string|unique:mdx_racks,name|max:255',
+                'code' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('mdx_racks', 'code')->ignore($id)
+                ],
                 'name' => 'required|string|max:255',
                 'warehouse_id' => [
                     'required',

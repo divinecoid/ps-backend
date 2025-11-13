@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
 use App\Models\MasterData\Factory;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class FactoryController extends Controller
 {
@@ -47,7 +48,7 @@ class FactoryController extends Controller
             $request,
             Factory::class,
             [
-                'code' => 'required|string|unique:mdx_factories,name|max:255',
+                'code' => 'required|string|unique:mdx_factories,code|max:255',
                 'name' => 'required|string|max:255',
             ],
             null
@@ -61,7 +62,12 @@ class FactoryController extends Controller
             Factory::class,
             $id,
             [
-                'code' => 'required|string|unique:mdx_factories,name|max:255',
+                'code' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('mdx_factories', 'code')->ignore($id)
+                ],
                 'name' => 'required|string|max:255',
             ],
             null

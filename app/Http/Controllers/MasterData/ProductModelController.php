@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
 use App\Models\MasterData\ProductModel;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ProductModelController extends Controller
 {
@@ -47,7 +48,7 @@ class ProductModelController extends Controller
             $request,
             ProductModel::class,
             [
-                'code' => 'required|string|unique:mdx_models,name|max:255',
+                'code' => 'required|string|unique:mdx_models,code|max:255',
                 'name' => 'required|string|max:255',
             ],
             null
@@ -61,7 +62,12 @@ class ProductModelController extends Controller
             ProductModel::class,
             $id,
             [
-                'code' => 'required|string|unique:mdx_models,name|max:255',
+                'code' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('mdx_models', 'code')->ignore($id)
+                ],
                 'name' => 'required|string|max:255',
             ],
             null

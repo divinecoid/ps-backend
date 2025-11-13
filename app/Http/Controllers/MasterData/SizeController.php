@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
 use App\Models\MasterData\Size;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class SizeController extends Controller
 {
@@ -47,7 +48,7 @@ class SizeController extends Controller
             $request,
             Size::class,
             [
-                'code' => 'required|string|unique:mdx_sizes,name|max:255',
+                'code' => 'required|string|unique:mdx_sizes,code|max:255',
                 'name' => 'required|string|max:255',
             ],
             null
@@ -61,7 +62,12 @@ class SizeController extends Controller
             Size::class,
             $id,
             [
-                'code' => 'required|string|unique:mdx_sizes,name|max:255',
+                'code' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('mdx_sizes', 'code')->ignore($id)
+                ],
                 'name' => 'required|string|max:255',
             ],
             null

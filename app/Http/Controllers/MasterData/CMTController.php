@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
 use App\Models\MasterData\CMT;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class CMTController extends Controller
 {
@@ -47,7 +48,7 @@ class CMTController extends Controller
             $request,
             CMT::class,
             [
-                'code' => 'required|string|unique:mdx_cmts,name|max:255',
+                'code' => 'required|string|unique:mdx_cmts,code|max:255',
                 'name' => 'required|string|max:255',
             ],
             null
@@ -61,7 +62,12 @@ class CMTController extends Controller
             CMT::class,
             $id,
             [
-                'code' => 'required|string|unique:mdx_cmts,name|max:255',
+                'code' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('mdx_cmts', 'code')->ignore($id)
+                ],
                 'name' => 'required|string|max:255',
             ],
             null

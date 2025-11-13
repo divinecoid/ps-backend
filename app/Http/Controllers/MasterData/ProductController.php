@@ -75,7 +75,12 @@ class ProductController extends Controller
             Product::class,
             $id,
             [
-                'sku' => 'required|string|unique:mdx_products,sku|max:255',
+                'sku' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('mdx_products', 'sku')->ignore($id)
+                ],
                 'color_id' => [
                     'required',
                     Rule::exists('mdx_colors', 'id')->whereNull('deleted_at'),

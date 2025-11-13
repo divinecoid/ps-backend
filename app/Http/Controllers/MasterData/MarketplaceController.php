@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
 use App\Models\MasterData\Marketplace;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class MarketplaceController extends Controller
 {
@@ -50,7 +51,7 @@ class MarketplaceController extends Controller
             $request,
             Marketplace::class,
             [
-                'code' => 'required|string|unique:mdx_marketplaces,name|max:255',
+                'code' => 'required|string|unique:mdx_marketplaces,code|max:255',
                 'name' => 'required|string|max:255',
                 'base_api_url' => 'required|string|max:255',
                 'description' => 'string|max:500',
@@ -67,7 +68,13 @@ class MarketplaceController extends Controller
             Marketplace::class,
             $id,
             [
-                'code' => "sometimes|required|string|unique:mdx_marketplaces,name,{$id}|max:255",
+                'code' => [
+                    'sometimes',
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('mdx_marketplaces', 'code')->ignore($id)
+                ],
                 'name' => 'sometimes|required|string|max:255',
                 'base_api_url' => 'sometimes|required|string|max:255',
                 'description' => 'string|max:500',

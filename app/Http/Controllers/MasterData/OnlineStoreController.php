@@ -23,7 +23,11 @@ class OnlineStoreController extends Controller
             'client_id' => $data->client_id,
             'client_secret' => $data->client_secret,
             'store_url' => $data->store_url,
-            'is_active' => $data->is_active
+            'is_active' => $data->is_active,
+            'redirect_uri' => $data->redirect_uri,
+            'access_token' => $data->access_token,
+            'refresh_token' => $data->refresh_token,
+            'expires_at' => $data->expires_at,
         ];
     }
 
@@ -65,6 +69,10 @@ class OnlineStoreController extends Controller
                 'client_secret' => 'string|max:500',
                 'store_url' => 'string|max:500',
                 'is_active' => 'required|boolean',
+                'redirect_uri' => 'string|max:500',
+                'access_token' => 'string|nullable',
+                'refresh_token' => 'string|nullable',
+                'expires_at' => 'date|nullable',
             ],
             null
         );
@@ -81,13 +89,22 @@ class OnlineStoreController extends Controller
                     'required',
                     Rule::exists('mdx_marketplaces', 'id')->whereNull('deleted_at'),
                 ],
-                'store_code' => 'required|string|unique:mdx_online_stores,store_code|max:255',
+                'store_code' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('mdx_online_stores', 'store_code')->ignore($id)->whereNull('deleted_at'),
+                ],
                 'store_name' => 'required|string|max:255',
                 'api_key' => 'string|max:500',
                 'client_id' => 'string|max:255',
                 'client_secret' => 'string|max:500',
                 'store_url' => 'string|max:500',
                 'is_active' => 'required|boolean',
+                'redirect_uri' => 'required|string|max:500',
+                'access_token' => 'string|nullable',
+                'refresh_token' => 'string|nullable',
+                'expires_at' => 'date|nullable',
             ],
             null
         );

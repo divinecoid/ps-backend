@@ -85,7 +85,12 @@ class InventoryController extends Controller
             Inventory::class,
             $id,
             [
-                'serial_number' => 'required|string|unique:mdx_inventories,serial_number|max:255',
+                'serial_number' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('mdx_inventories', 'serial_number')->ignore($id)
+                ],
                 'product_id' => [
                     'required',
                     Rule::exists('mdx_products', 'id')->whereNull('deleted_at'),

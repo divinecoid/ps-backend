@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
 use App\Models\MasterData\Color;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ColorController extends Controller
 {
@@ -47,7 +48,7 @@ class ColorController extends Controller
             $request,
             Color::class,
             [
-                'code' => 'required|string|unique:mdx_colors,name|max:255',
+                'code' => 'required|string|unique:mdx_colors,code|max:255',
                 'name' => 'required|string|max:255',
             ],
             null
@@ -61,7 +62,12 @@ class ColorController extends Controller
             Color::class,
             $id,
             [
-                'code' => 'required|string|unique:mdx_colors,name|max:255',
+                'code' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('mdx_colors', 'code')->ignore($id)
+                ],
                 'name' => 'required|string|max:255',
             ],
             null

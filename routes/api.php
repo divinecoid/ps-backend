@@ -16,6 +16,7 @@ use App\Http\Controllers\MasterData\FactoryController;
 use App\Http\Controllers\MasterData\ProductController;
 use App\Http\Controllers\MasterData\RackController;
 use App\Http\Controllers\MasterData\WarehouseController;
+use App\Http\Controllers\Transaction\OrderController;
 
 //Auth
 Route::prefix('auth')->group(function () {
@@ -144,3 +145,19 @@ Route::prefix('warehouse')->middleware('checkrole:admin')->group(function () {
     Route::patch('{id}', [WarehouseController::class, 'update']);
     Route::delete('{id}', [WarehouseController::class, 'destroy']);
 });
+
+
+//Order
+Route::prefix('order')->middleware('checkrole:admin')->group(function () {
+    Route::get('/lazada/{id}', [OrderController::class, 'getLazadaOrder']);
+    Route::get('/tiktokshop/{id}', [OrderController::class, 'getTiktokShopOrder']);
+    Route::get('/shopee/{id}', [OrderController::class, 'getShopeeOrder']);
+});
+
+//Order Items
+Route::prefix('order')->middleware('checkrole:admin')->group(function () {
+    Route::get('/items/lazada/{id}', [OrderController::class, 'getLazadaOrderItems']);
+    Route::get('/items/tiktokshop/{id}', [OrderController::class, 'getTiktokShopOrderItems']);
+    Route::get('/items/shopee/{id}', [OrderController::class, 'getShopeeOrderItems']);
+});
+
