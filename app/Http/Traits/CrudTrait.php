@@ -23,12 +23,12 @@ trait CrudTrait
             $search = $request->input('search');
             $query->where(function ($q) use ($search, $model) {
                 foreach ($model::$searchable as $column) {
-                    $q->orWhere($column, 'LIKE', "%{$search}");
+                    $q->orWhere($column, 'LIKE', "%{$search}%");
                 }
             });
         }
 
-        $data = $model::paginate($perPage);
+        $data = $query->paginate($perPage);
 
         $items = collect($data->items())->map($map ?? fn($item) => $item);
         return response()->json($this->paginateResponse($data, $items));
