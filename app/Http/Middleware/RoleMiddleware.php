@@ -18,7 +18,6 @@ class RoleMiddleware
     {
         try {
             $user = JWTAuth::parseToken()->authenticate();
-            Log::info('JWT User:', ['user' => $user]);
 
             if ($roles) {
                 $roleArray = explode(',', $roles);
