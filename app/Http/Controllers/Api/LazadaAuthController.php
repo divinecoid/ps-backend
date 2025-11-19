@@ -5,169 +5,124 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\MasterData\OnlineStore;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
+use LazopClient;
+use LazopRequest;
 use Carbon\Carbon;
+use Log;
 
 class LazadaAuthController extends Controller
 {
     /**
-     * Redirect the user to Lazada's authorization page
-     * to obtain the Authorization Code.
+     * STEP 1
+     * Redirect user ke halaman authorization Lazada
      */
     public function redirectToLazada($id)
     {
         $store = OnlineStore::findOrFail($id);
 
-        $authUrl = "https://auth.lazada.com/oauth/authorize?"
-            . "response_type=code"
-            . "&force_auth=true"
-            . "&redirect_uri=" . urlencode($store->redirect_uri)
-            . "&client_id=" . $store->api_key;
+        // OAuth URL resmi yang dipakai Seller Authorization
+        $authUrl = "https://auth.lazada.com/oauth/authorize?" . http_build_query([
+            "response_type" => "code",
+            "force_auth"    => "true",
+            "redirect_uri"  => $store->redirect_uri,
+            "client_id"     => $store->api_key,  // = app_key
+        ]);
 
         return redirect($authUrl);
     }
 
     /**
-     * Lazada redirects back to this method with the "code".
-     * We capture the code and exchange it for an access token.
+     * STEP 2
+     * Callback → dapat CODE → Tukar dengan Access Token via SDK
      */
     public function handleCallback(Request $request, $id)
     {
         $store = OnlineStore::findOrFail($id);
 
-        $code = $request->query('code');
-
+        $code = $request->query("code");
         if (!$code) {
             return response()->json([
-                'error' => 'Authorization code not found in callback'
+                "success" => false,
+                "message" => "Authorization code not found in callback",
+                "query"   => $request->query(),
             ], 400);
         }
 
-        return $this->exchangeCodeForToken($store, $code);
-    }
+        // SDK CLIENT
+        $client = new LazopClient(
+            "https://auth.lazada.com/rest",
+            $store->api_key,
+            $store->client_secret
+        );
 
-    /**
-     * Exchange the Authorization Code for an
-     * Access Token and Refresh Token.
-     */
-    private function exchangeCodeForToken(OnlineStore $store, string $code)
-    {
-        $url = "https://auth.lazada.com/rest/auth/token/create";
-        $timestamp = round(microtime(true) * 1000);
+        // Lazada Token Request
+        $req = new LazopRequest('/auth/token/create');
+        $req->addApiParam("code", $code);
 
-        $params = [
-            "app_key"    => $store->api_key,
-            "timestamp"  => $timestamp,
-            "sign_method" => "sha256",
-            "grant_type" => "authorization_code",
-            "code"       => $code,
-        ];
+        // Execute Request
+        $response = json_decode($client->execute($req), true);
 
-        // Generate signature
-        $sign = $this->generateSignature($params, $store->client_secret);
-
-        $response = Http::asForm()->post($url, array_merge($params, [
-            "sign" => $sign
-        ]));
-
-        $data = $response->json();
-
-        if (!isset($data["access_token"])) {
+        if (!isset($response["access_token"])) {
             return response()->json([
                 "success" => false,
                 "message" => "Failed to obtain access token",
-                "response" => $data
+                "response" => $response
             ], 400);
         }
 
-        // Save access token to database
+        // Save token
         $store->update([
-            'access_token'  => $data['access_token'],
-            'refresh_token' => $data['refresh_token'],
-            'expires_at'    => Carbon::now()->addSeconds($data['expires_in']),
+            "access_token"  => $response["access_token"],
+            "refresh_token" => $response["refresh_token"] ?? null,
+            "expires_at"    => Carbon::now()->addSeconds($response["expires_in"]),
         ]);
 
-        return response()->json([
-            "success" => true,
-            "message" => "Access token retrieved successfully",
-            "store"   => $store,
-            "response" => $data
-        ]);
-    }
-
-    /**
-     * STEP 4:
-     * Refresh the access token when it is expired.
-     */
-    public function refreshToken($storeId)
-    {
-        $store = OnlineStore::findOrFail($storeId);
-
-        if (!$store->refresh_token) {
-            return response()->json([
-                'error' => 'No refresh token available'
-            ], 400);
-        }
-
-        $url = "https://auth.lazada.com/rest/auth/token/refresh";
-        $timestamp = round(microtime(true) * 1000);
-
-        $params = [
-            "app_key"       => $store->api_key,
-            "refresh_token" => $store->refresh_token,
-            "timestamp"     => $timestamp,
-            "sign_method"   => "sha256",
-        ];
-
-        // Generate signature
-        $sign = $this->generateSignature($params, $store->client_secret);
-
-        $response = Http::asForm()->post($url, array_merge($params, [
-            "sign" => $sign
-        ]));
-
-        $data = $response->json();
-
-        if (!isset($data["access_token"])) {
-            return response()->json([
-                "success" => false,
-                "message" => "Failed to refresh access token",
-                "response" => $data
-            ], 400);
-        }
-
-        // Save updated tokens
-        $store->update([
-            'access_token'  => $data['access_token'],
-            'refresh_token' => $data['refresh_token'],
-            'expires_at'    => Carbon::now()->addSeconds($data['expires_in']),
-        ]);
-
-        return response()->json([
-            "success" => true,
-            "message" => "Token refreshed successfully",
-            "store"   => $store,
-            "response" => $data
-        ]);
-    }
-
-    /**
-     * HELPER:
-     * Lazada requires a signature generated from sorted parameters.
-     * This creates the HMAC-SHA256 signature in the correct format.
-     */
-    private function generateSignature(array $params, string $secret)
-    {
-        // Lazada requires parameters to be sorted alphabetically
-        ksort($params);
-
-        // Build the base string (key + value)
-        $baseString = "";
-        foreach ($params as $key => $value) {
-            $baseString .= $key . $value;
-        }
-
-        // Generate the signature
-        return strtoupper(hash_hmac("sha256", $baseString, $secret));
+        // RETURN SIMPLE HTML PAGE
+        return response("
+            <html>
+                <head>
+                    <title>Authorization Success</title>
+                    <meta name='password-manager' content='disable'>
+                    <meta name='autofill' content='false'>
+                    <meta name='google' content='notranslate'>
+                    <style>
+                        body {
+                            font-family: Arial, sans-serif; 
+                            background: #f5f5f5; 
+                            padding: 40px; 
+                            text-align: center;
+                        }
+                        .box {
+                            background: white;
+                            padding: 30px;
+                            border-radius: 10px;
+                            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                            display: inline-block;
+                        }
+                        button {
+                            margin-top: 20px;
+                            padding: 10px 20px;
+                            border: none;
+                            background: #3498db;
+                            color: white;
+                            border-radius: 5px;
+                            font-size: 14px;
+                            cursor: pointer;
+                        }
+                        button:hover {
+                            background: #2980b9;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class='box'>
+                        <h2>Sukses!</h2>
+                        <p>Silakan menutup halaman ini dan cek data terupdate pada online store tersebut.</p>
+                    </div>
+                </body>
+            </html>
+            ", 200)
+            ->header('Content-Type', 'text/html')
+            ->header("Cache-Control", "no-store");
     }
 }
