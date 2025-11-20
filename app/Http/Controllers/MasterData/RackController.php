@@ -18,7 +18,10 @@ class RackController extends Controller
             'id' => $data->id,
             'code' => $data->code,
             'name' => $data->name,
-            'warehouse_id' => $data->warehouse_id
+            'warehouse_id' => $data->warehouse_id,
+            'warehouse' => (object) [
+                'name' => $data->warehouse->name
+            ]
         ];
     }
 

@@ -20,6 +20,15 @@ class ProductController extends Controller
             'color_id' => $data->color_id,
             'model_id' => $data->model_id,
             'size_id' => $data->size_id,
+            'color' => (object) [
+                'name' => $data->color->name
+            ],
+            'model' => (object) [
+                'name' => $data->model->name
+            ],
+            'size' => (object) [
+                'name' => $data->size->name
+            ],
         ];
     }
 

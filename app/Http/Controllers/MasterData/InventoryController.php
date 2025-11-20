@@ -23,6 +23,18 @@ class InventoryController extends Controller
             'cmt_id' => $data->cmt_id,
             'rack_id' => $data->rack_id,
             'barcode_group' => $data->barcode_group,
+            'cmt' => (object) [
+                'name' => $data->cmt->name
+            ],
+            'rack' => (object) [
+                'name' => $data->rack->name
+            ],
+            'product' => (object) [
+                'sku' => $data->product->sku
+            ],
+            'factory' => (object) [
+                'name' => $data->factory->name
+            ],
         ];
     }
 
@@ -64,10 +76,10 @@ class InventoryController extends Controller
                 ],
                 'quantity' => 'required|integer|min:1',
                 'cmt_id' =>
-                [
-                    'required',
-                    Rule::exists('mdx_cmts', 'id')->whereNull('deleted_at'),
-                ],
+                    [
+                        'required',
+                        Rule::exists('mdx_cmts', 'id')->whereNull('deleted_at'),
+                    ],
                 'rack_id' => [
                     'required',
                     Rule::exists('mdx_racks', 'id')->whereNull('deleted_at'),
@@ -101,10 +113,10 @@ class InventoryController extends Controller
                 ],
                 'quantity' => 'required|integer|min:1',
                 'cmt_id' =>
-                [
-                    'required',
-                    Rule::exists('mdx_cmts', 'id')->whereNull('deleted_at'),
-                ],
+                    [
+                        'required',
+                        Rule::exists('mdx_cmts', 'id')->whereNull('deleted_at'),
+                    ],
                 'rack_id' => [
                     'required',
                     Rule::exists('mdx_racks', 'id')->whereNull('deleted_at'),
