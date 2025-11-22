@@ -40,7 +40,7 @@ trait CrudTrait
         if (!$item) {
             return $this->errorResponse(404, "Not found");
         }
-        return $this->successResponse(response()->json($map ? $map($item) : $item));
+        return $this->successResponse($map ? $map($item) : $item);
     }
 
     public function baseStore(Request $request, $model, array $rules, callable $afterCreate = null)
