@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\LazadaAuthController;
+use App\Http\Controllers\Api\TiktokAuthController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -16,4 +17,9 @@ Route::get('/lazada/login/{id}', [LazadaAuthController::class, 'redirectToLazada
 Route::get('/lazada/refresh/{id}', [LazadaAuthController::class, 'refreshToken']);
 
 // Callback – must remain public (Lazada needs access)
-Route::get('/lazada/callback/{id}', [LazadaAuthController::class, 'handleCallback']);
+Route::get('/lazada/callback', [LazadaAuthController::class, 'handleCallback']);
+
+
+Route::get('/tiktok-shop/login/{id}', [TiktokAuthController::class, 'redirectToTiktok']);
+Route::get('/tiktok-shop/callback', [TiktokAuthController::class, 'handleCallback']);
+Route::get('/tiktok-shop/refresh/{id}', [TiktokAuthController::class, 'refreshToken']);
