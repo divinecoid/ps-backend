@@ -49,6 +49,17 @@ class InventoryController extends Controller
         );
     }
 
+    public function master(Request $request)
+    {
+        return $this->baseMaster(
+            $request,
+            Inventory::class,
+            [],
+            ['serial_number', 'product_id', 'factory_id', 'quantity', 'cmt_id', 'rack_id', 'barcode_group'],
+            $this->structure()
+        );
+    }
+
     public function show($id)
     {
         return $this->baseShow(

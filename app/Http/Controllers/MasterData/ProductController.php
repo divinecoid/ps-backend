@@ -43,6 +43,17 @@ class ProductController extends Controller
         );
     }
 
+    public function master(Request $request)
+    {
+        return $this->baseMaster(
+            $request,
+            Product::class,
+            [],
+            ['sku', 'color_id', 'model_id', 'size_id'],
+            $this->structure()
+        );
+    }
+
     public function show($id)
     {
         return $this->baseShow(

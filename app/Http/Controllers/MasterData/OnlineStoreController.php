@@ -42,6 +42,17 @@ class OnlineStoreController extends Controller
         );
     }
 
+    public function master(Request $request)
+    {
+        return $this->baseMaster(
+            $request,
+            OnlineStore::class,
+            [],
+            ['marketplace_id', 'store_code', 'store_name', 'api_key', 'client_id', 'client_secret', 'store_url', 'is_active'],
+            $this->structure()
+        );
+    }
+
     public function show($id)
     {
         return $this->baseShow(

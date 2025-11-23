@@ -32,6 +32,16 @@ class WarehouseController extends Controller
             $this->structure()
         );
     }
+    public function master(Request $request)
+    {
+        return $this->baseMaster(
+            $request,
+            Warehouse::class,
+            [],
+            ['code', 'name', 'priority'],
+            $this->structure()
+        );
+    }
 
     public function show($id)
     {

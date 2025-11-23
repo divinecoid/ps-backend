@@ -35,6 +35,17 @@ class MarketplaceController extends Controller
         );
     }
 
+    public function master(Request $request)
+    {
+        return $this->baseMaster(
+            $request,
+            Marketplace::class,
+            [],
+            ['code', 'name', 'base_api_url', 'is_need_checker'],
+            $this->structure()
+        );
+    }
+
     public function show($id)
     {
         return $this->baseShow(

@@ -39,6 +39,18 @@ class UserController extends Controller
         return $result;
     }
 
+    public function master(Request $request)
+    {
+        $result = $this->baseMaster(
+            $request,
+            User::class,
+            ['roles'],
+            ['name', 'username', 'email'],
+            $this->structure()
+        );
+        return $result;
+    }
+
     public function show($id)
     {
         return $this->baseShow(
