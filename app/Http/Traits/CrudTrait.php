@@ -54,7 +54,13 @@ trait CrudTrait
 
         $data = $query->paginate($perPage);
 
-        $items = collect($data->items())->map($map ?? fn($item) => $item);
+        $items = collect($data->items())->map(function ($item) use ($map) {
+            $base = $map ? $map($item) : $item;
+            return [
+                ...$base,
+                'is_deleted' => $item->deleted_at !== null,
+            ];
+        });
         return response()->json($this->paginateResponse($data, $items));
     }
 
