@@ -17,6 +17,9 @@ class OnlineStoreController extends Controller
         return fn($data) => [
             'id' => $data->id,
             'marketplace_id' => $data->marketplace_id,
+            'marketplace' => (object)[
+                'name' => $data->marketplace->name
+            ],
             'store_code' => $data->store_code,
             'store_name' => $data->store_name,
             'api_key' => $data->api_key,
