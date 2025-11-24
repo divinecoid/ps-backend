@@ -16,6 +16,7 @@ class Marketplace extends Model
     protected $fillable = [
         'code',
         'name',
+        'alias',
         'base_api_url',
         'description',
         'is_needed_checker'
