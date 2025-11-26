@@ -30,7 +30,8 @@ class OnlineStoreController extends Controller
             'redirect_uri' => $data->redirect_uri,
             'access_token' => $data->access_token,
             'refresh_token' => $data->refresh_token,
-            'expires_at' => $data->expires_at,
+            'access_token_expires_at' => $data->access_token_expires_at,
+            'refresh_token_expires_at' => $data->refresh_token_expires_at
         ];
     }
 
