@@ -104,7 +104,13 @@ class UserController extends Controller
                 ]
             ],
             function (User $user, Request $req) {
-                $user->password = Hash::make($req->password);
+                if ($req->filled('password')) {
+                    $user->password = Hash::make($req->password);
+                }
+                $user->save();
+                if ($req->has('role_id')) {
+                    $user->roles()->sync($req->role_id);
+                }
             }
         );
     }
