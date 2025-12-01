@@ -34,6 +34,36 @@ trait CrudTrait
         return response()->json($this->paginateResponse($data, $items));
     }
 
+    public function baseMaster(Request $request, $model, array $relations = [], array $filters = [], callable $map = null)
+    {
+        $perPage = (int) ($request->input('per_page', $this->getPerPageDefault()));
+        $query = $model::withTrashed()->with($relations);
+
+        if (method_exists($this, 'applyFilter') && !empty($filters)) {
+            $query = $this->applyFilter($query, $request, $filters);
+        }
+
+        if ($request->has('search') && property_exists($model, 'searchable')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search, $model) {
+                foreach ($model::$searchable as $column) {
+                    $q->orWhere($column, 'LIKE', "%{$search}%");
+                }
+            });
+        }
+
+        $data = $query->paginate($perPage);
+
+        $items = collect($data->items())->map(function ($item) use ($map) {
+            $base = $map ? $map($item) : $item;
+            return [
+                ...$base,
+                'is_deleted' => $item->deleted_at !== null,
+            ];
+        });
+        return response()->json($this->paginateResponse($data, $items));
+    }
+
     public function baseShow($model, $id, array $relations = [], callable $map = null)
     {
         $item = $model::with($relations)->find($id);

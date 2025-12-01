@@ -36,6 +36,17 @@ class RackController extends Controller
         );
     }
 
+    public function master(Request $request)
+    {
+        return $this->baseMaster(
+            $request,
+            Rack::class,
+            [],
+            ['code', 'name'],
+            $this->structure()
+        );
+    }
+
     public function show($id)
     {
         return $this->baseShow(

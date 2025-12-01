@@ -23,13 +23,26 @@ class UserController extends Controller
             'roles' => $data->roles->map(fn($r) => [
                 'id' => $r->id,
                 'name' => $r->name
-            ])
+            ]),
+            'role_id' => $data->roles->pluck('id')
         ];
     }
 
     public function index(Request $request)
     {
         $result = $this->baseIndex(
+            $request,
+            User::class,
+            ['roles'],
+            ['name', 'username', 'email'],
+            $this->structure()
+        );
+        return $result;
+    }
+
+    public function master(Request $request)
+    {
+        $result = $this->baseMaster(
             $request,
             User::class,
             ['roles'],
@@ -84,9 +97,20 @@ class UserController extends Controller
                 'username' => "sometimes|required|string|unique:users,username,{$id}",
                 'email' => "sometimes|required|email|unique:users,email,{$id}",
                 'password' => 'sometimes|required|string|min:8',
+                'role_id' => [
+                    'sometimes',
+                    'required',
+                    Rule::exists('mdx_roles', 'id')->whereNull('deleted_at'),
+                ]
             ],
             function (User $user, Request $req) {
-                $user->password = Hash::make($req->password);
+                if ($req->filled('password')) {
+                    $user->password = Hash::make($req->password);
+                }
+                $user->save();
+                if ($req->has('role_id')) {
+                    $user->roles()->sync($req->role_id);
+                }
             }
         );
     }

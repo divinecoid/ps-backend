@@ -31,6 +31,16 @@ class ProductModelController extends Controller
             $this->structure()
         );
     }
+    public function master(Request $request)
+    {
+        return $this->baseMaster(
+            $request,
+            ProductModel::class,
+            [],
+            ['code', 'name'],
+            $this->structure()
+        );
+    }
 
     public function show($id)
     {

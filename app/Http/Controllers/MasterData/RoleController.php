@@ -31,6 +31,17 @@ class RoleController extends Controller
         );
     }
 
+    public function master(Request $request)
+    {
+        return $this->baseMaster(
+            $request,
+            Role::class,
+            [],
+            ['name'],
+            $this->structure()
+        );
+    }
+
     public function show($id)
     {
         return $this->baseShow(

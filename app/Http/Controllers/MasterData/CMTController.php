@@ -32,6 +32,17 @@ class CMTController extends Controller
         );
     }
 
+    public function master(Request $request)
+    {
+        return $this->baseMaster(
+            $request,
+            CMT::class,
+            [],
+            ['code', 'name'],
+            $this->structure()
+        );
+    }
+
     public function show($id)
     {
         return $this->baseShow(

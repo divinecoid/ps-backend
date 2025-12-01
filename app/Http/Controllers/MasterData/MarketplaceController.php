@@ -18,6 +18,7 @@ class MarketplaceController extends Controller
             'id' => $data->id,
             'code' => $data->code,
             'name' => $data->name,
+            'alias' => $data->alias,
             'base_api_url' => $data->base_api_url,
             'description' => $data->description,
             'is_need_checker' => $data->is_needed_checker
@@ -30,7 +31,18 @@ class MarketplaceController extends Controller
             $request,
             Marketplace::class,
             [],
-            ['code', 'name', 'base_api_url', 'is_need_checker'],
+            ['code', 'name', 'alias', 'base_api_url', 'is_need_checker'],
+            $this->structure()
+        );
+    }
+
+    public function master(Request $request)
+    {
+        return $this->baseMaster(
+            $request,
+            Marketplace::class,
+            [],
+            ['code', 'name', 'alias', 'base_api_url', 'is_need_checker'],
             $this->structure()
         );
     }
@@ -53,6 +65,7 @@ class MarketplaceController extends Controller
             [
                 'code' => 'required|string|unique:mdx_marketplaces,code|max:255',
                 'name' => 'required|string|max:255',
+                'alias' => 'required|string|max:255',
                 'base_api_url' => 'required|string|max:255',
                 'description' => 'string|max:500',
                 'is_need_checker' => 'required|boolean',
@@ -76,6 +89,7 @@ class MarketplaceController extends Controller
                     Rule::unique('mdx_marketplaces', 'code')->ignore($id)
                 ],
                 'name' => 'sometimes|required|string|max:255',
+                'alias' => 'sometimes|required|string|max:255',
                 'base_api_url' => 'sometimes|required|string|max:255',
                 'description' => 'string|max:500',
                 'is_need_checker' => 'sometimes|required|boolean',
