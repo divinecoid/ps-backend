@@ -17,6 +17,7 @@ use App\Http\Controllers\MasterData\ProductController;
 use App\Http\Controllers\MasterData\RackController;
 use App\Http\Controllers\MasterData\WarehouseController;
 use App\Http\Controllers\Transaction\OrderController;
+use App\Http\Controllers\Api\ShopeeAuthController;
 
 //Auth
 Route::prefix('auth')->group(function () {
@@ -174,3 +175,7 @@ Route::prefix('order')->middleware('checkrole:admin')->group(function () {
     Route::get('/items/shopee/{id}', [OrderController::class, 'getShopeeOrderItems']);
 });
 
+//Shopee Auth
+Route::prefix('shopee')->middleware('checkrole:admin')->group(function () {
+    Route::post('/auth-url', [ShopeeAuthController::class, 'generateAuthUrl']);
+});

@@ -1,0 +1,15 @@
+ALUR API SHOPEE (SANDBOX)
+
+1. GET CODE
+Jalankan node auth.js -> Login di browser -> Copy code dari URL redirect.
+2. SET CONFIG
+Buka config.json -> Paste kode ke AUTH_CODE.
+3. GET TOKEN
+Jalankan node gettoken.js (Otomatis update access_token & refresh_token di JSON).
+4. GET ORDER
+Jalankan node getorderlist.js untuk tarik data pesanan.
+5. REFRESH
+Jalankan node refreshtoken.js kalau token expired (tiap 4 jam).
+
+PENTING
+Satu AUTH_CODE cuma bisa dipakai satu kali untuk gettoken. Kalau gagal, ulangi dari langkah pertama.
