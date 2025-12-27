@@ -161,7 +161,7 @@ Mengambil detail lengkap dari satu atau beberapa pesanan.
 
 ---
 
-## 3. Search Package List
+<!-- ## 3. Search Package List
 Mencari daftar paket berdasarkan filter tertentu.
 
 - **Endpoint**: `/api/v2/order/search_package_list`
@@ -284,7 +284,7 @@ Mengambil detail paket berdasarkan nomor paket.
   },
   "request_id": "e3e3e7f346d8d72577a1ee49777d1600:01000242d39ae3d5:000000af94472f6a"
 }
-```
+``` -->
 
 ---
 
