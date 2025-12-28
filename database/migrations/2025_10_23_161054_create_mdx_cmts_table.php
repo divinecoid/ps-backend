@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('mdx_cmts', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->string('barcode')->unique();
+            $table->string('code')->unique();
             $table->string('name')->unique();
             $table->string('contact_person')->nullable();
             $table->string('phone')->nullable();
