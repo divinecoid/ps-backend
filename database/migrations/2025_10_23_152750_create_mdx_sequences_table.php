@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('mdx_sequences', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->date('date')->default(now()->format('Y-m-d'));
             $table->string('key')->unique();
             $table->integer('sequence')->default(0);

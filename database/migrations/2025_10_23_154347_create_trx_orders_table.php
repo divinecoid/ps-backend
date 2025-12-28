@@ -12,14 +12,14 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('trx_orders', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('awb_code')->nullable();
             $table->timestamp('read_at')->nullable();
             $table->timestamp('prepared_at')->nullable();
             $table->integer('prepare_duration')->nullable();
             $table->timestamp('readytoship_at')->nullable();
             $table->string('readytoship_marketplace')->nullable();
-            $table->foreignId('online_store_id')->constrained('mdx_online_stores')->onDelete('restrict');
+            $table->foreignUuid('online_store_id')->constrained('mdx_online_stores')->onDelete('restrict');
             $table->integer('item_count');
             $table->integer('unique_item_count');
             $table->enum('status', [
@@ -36,7 +36,7 @@ return new class extends Migration
             $table->decimal('total_price', 18, 2);
             $table->decimal('total_shipping', 18, 2);
             $table->decimal('total_amount', 18, 2);
-            $table->foreignId('preparist_user_id')->constrained('users')->onDelete('restrict');
+            $table->foreignUuid('preparist_user_id')->constrained('users')->onDelete('restrict');
             $table->string('customer_name');
             $table->string('customer_phone')->nullable();
             $table->string('customer_address')->nullable();

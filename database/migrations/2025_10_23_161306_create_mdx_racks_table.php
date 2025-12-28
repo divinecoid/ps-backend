@@ -12,10 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('mdx_racks', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('code')->unique();
             $table->string('name')->unique();
-            $table->foreignId('warehouse_id')->constrained('mdx_warehouses')->onDelete('restrict');
+            $table->foreignUuid('warehouse_id')->constrained('mdx_warehouses')->onDelete('restrict');
             $table->softDeletes();
             $table->timestamps();
         });

@@ -11,15 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('mdx_cmts', function (Blueprint $table) {
+        Schema::create('models_colors', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->string('barcode')->unique();
-            $table->string('name')->unique();
-            $table->string('contact_person')->nullable();
-            $table->string('phone')->nullable();
-            $table->text('address')->nullable();
+            $table->foreignUuid('model_id')->constrained('mdx_models')->onDelete('cascade');
+            $table->foreignUuid('color_id')->constrained('mdx_colors')->onDelete('cascade');
             $table->timestamps();
-            $table->softDeletes();
         });
     }
 
@@ -28,6 +24,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('mdx_cmts');
+        Schema::dropIfExists('models_colors');
     }
 };

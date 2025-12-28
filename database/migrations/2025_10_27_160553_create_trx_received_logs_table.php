@@ -11,14 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('trx_received_logs', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('request_id')->constrained('trx_requests')->onDelete('restrict');
-            $table->bigInteger('quantity');
-            $table->timestamp('received_date');
-            $table->softDeletes();
-            $table->timestamps();
-        });
+        // Schema::create('trx_received_logs', function (Blueprint $table) {
+        //     $table->id();
+        //     $table->foreignUuid('request_id')->constrained('trx_requests')->onDelete('restrict');
+        //     $table->bigInteger('quantity');
+        //     $table->timestamp('received_date');
+        //     $table->softDeletes();
+        //     $table->timestamps();
+        // });
     }
 
     /**
@@ -26,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('trx_received_logs');
+        // Schema::dropIfExists('trx_received_logs');
     }
 };

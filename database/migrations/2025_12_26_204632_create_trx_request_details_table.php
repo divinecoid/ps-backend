@@ -11,10 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('mdx_products', function (Blueprint $table) {
+        Schema::create('trx_request_details', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('model_id')->constrained('mdx_models')->onDelete('restrict');
-            $table->foreignUuid('rack_id')->constrained('mdx_racks')->onDelete('restrict');
+            $table->foreignUuid(('request_id'))->constrained('trx_requests')->onDelete('cascade');
+            $table->foreignUuid('model_id')->constrained('mdx_models')->onDelete('cascade');
+            $table->integer('req_dozen_qty');
+            $table->integer('req_piece_qty');
+            $table->integer('rec_dozen_qty');
+            $table->integer('rec_piece_qty');
             $table->string('barcode');
             $table->softDeletes();
             $table->timestamps();
@@ -26,6 +30,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('mdx_products');
+        Schema::dropIfExists('trx_request_details');
     }
 };
