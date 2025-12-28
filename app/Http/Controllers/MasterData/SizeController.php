@@ -48,7 +48,7 @@ class SizeController extends Controller
         return $this->baseShow(
             Size::class,
             $id,
-            ['product'],
+            [],
             $this->structure()
         );
     }

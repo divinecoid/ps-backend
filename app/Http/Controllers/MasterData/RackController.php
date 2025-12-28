@@ -52,7 +52,7 @@ class RackController extends Controller
         return $this->baseShow(
             Rack::class,
             $id,
-            ['scanned_item', 'inventory'],
+            [],
             $this->structure()
         );
     }

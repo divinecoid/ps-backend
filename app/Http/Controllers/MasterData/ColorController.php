@@ -48,7 +48,7 @@ class ColorController extends Controller
         return $this->baseShow(
             Color::class,
             $id,
-            ['product'],
+            [],
             $this->structure()
         );
     }

@@ -48,7 +48,7 @@ class FactoryController extends Controller
         return $this->baseShow(
             Factory::class,
             $id,
-            ['inventory'],
+            [],
             $this->structure()
         );
     }

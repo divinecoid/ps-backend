@@ -48,7 +48,7 @@ class CMTController extends Controller
         return $this->baseShow(
             CMT::class,
             $id,
-            ['inventory'],
+            [],
             $this->structure()
         );
     }

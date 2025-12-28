@@ -15,7 +15,7 @@ class ProductModel extends Model
     protected $table = 'mdx_models';
 
     protected $fillable = [
-        'code',
+        'sku',
         'name'
     ];
 
