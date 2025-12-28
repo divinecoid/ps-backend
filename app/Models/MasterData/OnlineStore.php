@@ -3,6 +3,7 @@
 namespace App\Models\MasterData;
 
 use App\Models\Transactions\Order;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -10,9 +11,11 @@ use Carbon\Carbon;
 
 class OnlineStore extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasUuids;
 
     protected $table = 'mdx_online_stores';
+    public $incrementing = false;
+    protected $keyType = 'string';
 
     protected $fillable = [
         'marketplace_id',

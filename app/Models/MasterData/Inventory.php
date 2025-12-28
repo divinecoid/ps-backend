@@ -4,6 +4,7 @@ namespace App\Models\MasterData;
 
 use App\Models\Transactions\Request;
 use App\Models\Transactions\ScannedItem;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -11,9 +12,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Inventory extends Model
 {
     /** @use HasFactory<\Database\Factories\MasterData\InventoryFactory> */
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasUuids;
 
     protected $table = 'mdx_inventories';
+    public $incrementing = false;
+    protected $keyType = 'string';
 
     protected $fillable = [
         'serial_number',

@@ -12,7 +12,6 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('models_sizes', function (Blueprint $table) {
-            $table->uuid('id')->primary();
             $table->foreignUuid('model_id')->constrained('mdx_models')->onDelete('cascade');
             $table->foreignUuid('size_id')->constrained('mdx_sizes')->onDelete('cascade');
             $table->timestamps();

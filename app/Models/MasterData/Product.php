@@ -3,6 +3,7 @@
 namespace App\Models\MasterData;
 
 use App\Models\Transactions\OrderItem;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -10,9 +11,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Product extends Model
 {
     /** @use HasFactory<\Database\Factories\MasterData\ProductFactory> */
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasUuids;
 
     protected $table = 'mdx_products';
+    public $incrementing = false;
+    protected $keyType = 'string';
 
     protected $fillable = [
         'sku',

@@ -5,6 +5,7 @@ namespace App\Models\MasterData;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\MasterData\UserFactory;
 use App\Models\Auth\RefreshToken;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -15,13 +16,16 @@ use Tymon\JWTAuth\Contracts\JWTSubject;
 class User extends Authenticatable implements JWTSubject
 {
     /** @use HasFactory<\Database\Factories\MasterData\UserFactory> */
-    use HasFactory, Notifiable, SoftDeletes;
+    use HasFactory, Notifiable, SoftDeletes, HasUuids;
 
     /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
      */
+    public $incrementing = false;
+    protected $keyType = 'string';
+
     protected $fillable = [
         'username',
         'name',
