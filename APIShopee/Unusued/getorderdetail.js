@@ -1,6 +1,6 @@
 const axios = require('axios');
 const crypto = require('crypto');
-const config = require('./config.json');
+const config = require('../config.json');
 
 const PATH = "/api/v2/order/get_order_detail";
 const ORDER_SN_LIST = "251227DGWNKEAV,251226DG33VAB8"; 
