@@ -130,4 +130,18 @@ trait CrudTrait
         $item->restore();
         return $this->successResponse($item);
     }
+
+    public function baseValidate(Request $request, array $rules, callable $afterValidate = null)
+    {
+        $validator = Validator::make($request->all(), $rules);
+        if ($validator->fails()) {
+            return $this->errorResponse(422, $validator->errors()->first());
+        }
+        $data = $request->only(array_keys($request->all()));
+
+        if ($afterValidate) {
+            $afterValidate($data, $request);
+        }
+        return $this->successResponse($data);
+    }
 }

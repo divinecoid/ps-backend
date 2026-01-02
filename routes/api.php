@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Transaction\RequestController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\LoginController;
@@ -178,4 +179,12 @@ Route::prefix('order')->middleware('checkrole:admin')->group(function () {
 //Shopee Auth
 Route::prefix('shopee')->middleware('checkrole:admin')->group(function () {
     Route::post('/auth-url', [ShopeeAuthController::class, 'generateAuthUrl']);
+});
+
+Route::prefix('request')->middleware('checkrole')->group(function(){
+    Route::get('/', [RequestController::class, 'index']);
+    Route::get('/{id}', [RequestController::class, 'show']);
+    Route::post('/', [RequestController::class, 'store']);
+    Route::patch('/{id}', [RequestController::class, 'update']);
+    Route::delete('/{id}', [RequestController::class, 'destroy']);
 });

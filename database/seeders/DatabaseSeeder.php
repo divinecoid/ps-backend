@@ -2,8 +2,12 @@
 
 namespace Database\Seeders;
 
+use Database\Seeders\MasterData\CMTSeeder;
+use Database\Seeders\MasterData\ColorSeeder;
 use Database\Seeders\MasterData\RoleSeeder;
+use Database\Seeders\MasterData\SizeSeeder;
 use Database\Seeders\MasterData\UserSeeder;
+use Database\Seeders\MasterData\WarehouseRackSeeder;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -17,8 +21,12 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
+            CMTSeeder::class,
+            ColorSeeder::class,
             RoleSeeder::class,
-            UserSeeder::class
+            SizeSeeder::class,
+            UserSeeder::class,
+            WarehouseRackSeeder::class
         ]);
     }
 }
