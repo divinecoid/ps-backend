@@ -29,13 +29,9 @@ class RequestController extends Controller
                 'rec_piece_qty' => $detail->rec_piece_qty,
                 'rec_bs_qty' => $detail->rec_bs_qty,
                 'model_id' => $detail->model_id,
-                'models' => [
-                    'name' => $detail->model?->name,
-                ],
+                'models' => $detail->model,
                 'color_id' => $detail->color_id,
-                'colors' => [
-                    'name' => $detail->color?->name,
-                ],
+                'colors' => $detail->color,
             ]),
         ];
     }
@@ -45,8 +41,21 @@ class RequestController extends Controller
         return $this->baseIndex(
             $request,
             \App\Models\Transactions\Request::class,
-            [],
-            ['code', 'name'],
+            [
+                'cmt',
+                'request_detail'
+            ],
+            [
+                'cmt.code',
+                'cmt.name',
+                'request_detail.model.sku',
+                'request_detail.model.name',
+                'request_detail.color.code',
+                'request_detail.color.name',
+                'request_detail.size.code',
+                'request_detail.size.name',
+                'request_detail.barcode'
+            ],
             $this->structure()
         );
     }
