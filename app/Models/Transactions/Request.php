@@ -3,6 +3,7 @@
 namespace App\Models\Transactions;
 
 // use App\Models\MasterData\Inventory;
+use App\Models\MasterData\CMT;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,7 +15,7 @@ class Request extends Model
 
     protected $table = 'trx_requests';
 
-    protected $fillable = ['inventory_id', 'cmt_id', 'request_date'];
+    protected $fillable = ['cmt_id'];
 
     // Define relationship with Received Log model
     // public function recevied_log()
@@ -31,5 +32,10 @@ class Request extends Model
     public function request_detail()
     {
         return $this->hasMany(RequestDetail::class, 'request_id');
+    }
+
+    public function cmt()
+    {
+        return $this->belongsTo(CMT::class, 'cmt_id');
     }
 }

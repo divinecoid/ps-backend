@@ -2,6 +2,9 @@
 
 namespace App\Models\Transactions;
 
+use App\Models\MasterData\Color;
+use App\Models\MasterData\ProductModel;
+use App\Models\MasterData\Size;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,7 +16,7 @@ class RequestDetail extends Model
 
     protected $table = 'trx_request_details';
 
-    protected $fillable = ['request_id', 'model_id', 'req_dozen_qty', 'req_piece_qty', 'rec_dozen_qty', 'rec_piece_qty', 'rec_bs_qty', 'barcode'];
+    protected $fillable = ['request_id', 'model_id', 'color_id', 'size_id', 'req_dozen_qty', 'req_piece_qty', 'rec_dozen_qty', 'rec_piece_qty', 'rec_bs_qty', 'barcode'];
 
     public function request()
     {
@@ -22,7 +25,15 @@ class RequestDetail extends Model
 
     public function model()
     {
-        return $this->hasMany(Model::class, 'request_id');
+        return $this->belongsTo(ProductModel::class, 'model_id');
+    }
+    public function color()
+    {
+        return $this->belongsTo(Color::class, 'color_id');
+    }
+    public function size()
+    {
+        return $this->belongsTo(Size::class, 'size_id');
     }
 
 }

@@ -14,9 +14,7 @@ return new class extends Migration
         Schema::create('trx_requests', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid(('cmt_id'))->constrained('mdx_cmts')->onDelete('restrict');
-            $table->enum('status',['open','closed']);
-            $table->timestamp('request_date');
-            $table->softDeletes();
+            $table->enum('status',['OPEN','CLOSED'])->default('OPEN');
             $table->timestamps();
         });
     }

@@ -17,12 +17,12 @@ return new class extends Migration
             $table->foreignUuid('model_id')->constrained('mdx_models')->onDelete('restrict');
             $table->foreignUuid('color_id')->constrained('mdx_colors')->onDelete('restrict');
             $table->foreignUuid('size_id')->constrained('mdx_sizes')->onDelete('restrict');
-            $table->integer('req_dozen_qty');
-            $table->integer('req_piece_qty');
-            $table->integer('rec_dozen_qty');
-            $table->integer('rec_piece_qty');
-            $table->integer('rec_bs_qty');
-            $table->softDeletes();
+            $table->integer('req_dozen_qty')->default(0);
+            $table->integer('req_piece_qty')->default(0);
+            $table->integer('rec_dozen_qty')->default(0);
+            $table->integer('rec_piece_qty')->default(0);
+            $table->integer('rec_bs_qty')->default(0);
+            $table->string('barcode');
             $table->timestamps();
         });
     }

@@ -185,6 +185,5 @@ Route::prefix('request')->middleware('checkrole')->group(function(){
     Route::get('/', [RequestController::class, 'index']);
     Route::get('/{id}', [RequestController::class, 'show']);
     Route::post('/', [RequestController::class, 'store']);
-    Route::patch('/{id}', [RequestController::class, 'update']);
     Route::delete('/{id}', [RequestController::class, 'destroy']);
 });
