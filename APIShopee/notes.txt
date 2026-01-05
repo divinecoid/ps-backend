@@ -13,3 +13,9 @@ Jalankan node refreshtoken.js kalau token expired (tiap 4 jam).
 
 PENTING
 Satu AUTH_CODE cuma bisa dipakai satu kali untuk gettoken. Kalau gagal, ulangi dari langkah pertama.
+
+16. CLI COMMAND (LARAVEL)
+17. Jalankan php artisan db:seed --class=ShopeeSeeder untuk setup data awal (Marketplace & OnlineStore).
+18. Jalankan php artisan shopee:refresh-token untuk refresh token otomatis.
+19. Jalankan php artisan shopee:fetch-orders --days=1 untuk tarik data pesanan.
+Config marketplace membaca ACCESS_TOKEN dan REFRESH_TOKEN dari APIShopee/config.json.
