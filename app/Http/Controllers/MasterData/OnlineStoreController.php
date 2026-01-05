@@ -17,6 +17,9 @@ class OnlineStoreController extends Controller
         return fn($data) => [
             'id' => $data->id,
             'marketplace_id' => $data->marketplace_id,
+            'marketplace' => (object)[
+                'name' => $data->marketplace->name
+            ],
             'store_code' => $data->store_code,
             'store_name' => $data->store_name,
             'api_key' => $data->api_key,
@@ -27,13 +30,25 @@ class OnlineStoreController extends Controller
             'redirect_uri' => $data->redirect_uri,
             'access_token' => $data->access_token,
             'refresh_token' => $data->refresh_token,
-            'expires_at' => $data->expires_at,
+            'access_token_expires_at' => $data->access_token_expires_at,
+            'refresh_token_expires_at' => $data->refresh_token_expires_at
         ];
     }
 
     public function index(Request $request)
     {
         return $this->baseIndex(
+            $request,
+            OnlineStore::class,
+            [],
+            ['marketplace_id', 'store_code', 'store_name', 'api_key', 'client_id', 'client_secret', 'store_url', 'is_active'],
+            $this->structure()
+        );
+    }
+
+    public function master(Request $request)
+    {
+        return $this->baseMaster(
             $request,
             OnlineStore::class,
             [],

@@ -32,12 +32,23 @@ class SizeController extends Controller
         );
     }
 
+    public function master(Request $request)
+    {
+        return $this->baseMaster(
+            $request,
+            Size::class,
+            [],
+            ['code', 'name'],
+            $this->structure()
+        );
+    }
+
     public function show($id)
     {
         return $this->baseShow(
             Size::class,
             $id,
-            ['product'],
+            [],
             $this->structure()
         );
     }

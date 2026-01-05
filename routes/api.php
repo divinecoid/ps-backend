@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Transaction\RequestController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\LoginController;
@@ -17,6 +18,7 @@ use App\Http\Controllers\MasterData\ProductController;
 use App\Http\Controllers\MasterData\RackController;
 use App\Http\Controllers\MasterData\WarehouseController;
 use App\Http\Controllers\Transaction\OrderController;
+use App\Http\Controllers\Api\ShopeeAuthController;
 
 //Auth
 Route::prefix('auth')->group(function () {
@@ -31,6 +33,7 @@ Route::middleware('checkrole:admin')->post('/register', RegisterController::clas
 //Role
 Route::prefix('role')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [RoleController::class, 'index']);
+    Route::get('/master', [RoleController::class, 'master']);
     Route::get('{id}', [RoleController::class, 'show']);
     Route::post('/', [RoleController::class, 'store']);
     Route::post('{id}/restore', [RoleController::class, 'restore']);
@@ -40,6 +43,7 @@ Route::prefix('role')->middleware('checkrole:admin')->group(function () {
 //User
 Route::prefix('user')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [UserController::class, 'index']);
+    Route::get('/master', [UserController::class, 'master']);
     Route::get('{id}', [UserController::class, 'show']);
     Route::post('/', [UserController::class, 'store']);
     Route::post('{id}/restore', [UserController::class, 'restore']);
@@ -49,6 +53,7 @@ Route::prefix('user')->middleware('checkrole:admin')->group(function () {
 //Marketplace
 Route::prefix('marketplace')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [MarketplaceController::class, 'index']);
+    Route::get('/master', [MarketplaceController::class, 'master']);
     Route::get('{id}', [MarketplaceController::class, 'show']);
     Route::post('/', [MarketplaceController::class, 'store']);
     Route::post('{id}/restore', [MarketplaceController::class, 'restore']);
@@ -58,6 +63,7 @@ Route::prefix('marketplace')->middleware('checkrole:admin')->group(function () {
 //Online Store
 Route::prefix('onlinestore')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [OnlineStoreController::class, 'index']);
+    Route::get('/master', [OnlineStoreController::class, 'master']);
     Route::get('{id}', [OnlineStoreController::class, 'show']);
     Route::post('/', [OnlineStoreController::class, 'store']);
     Route::post('{id}/restore', [OnlineStoreController::class, 'restore']);
@@ -67,6 +73,7 @@ Route::prefix('onlinestore')->middleware('checkrole:admin')->group(function () {
 //Color
 Route::prefix('color')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [ColorController::class, 'index']);
+    Route::get('/master', [ColorController::class, 'master']);
     Route::get('{id}', [ColorController::class, 'show']);
     Route::post('/', [ColorController::class, 'store']);
     Route::post('{id}/restore', [ColorController::class, 'restore']);
@@ -76,6 +83,7 @@ Route::prefix('color')->middleware('checkrole:admin')->group(function () {
 //Model
 Route::prefix('model')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [ProductModelController::class, 'index']);
+    Route::get('/master', [ProductModelController::class, 'master']);
     Route::get('{id}', [ProductModelController::class, 'show']);
     Route::post('/', [ProductModelController::class, 'store']);
     Route::post('{id}/restore', [ProductModelController::class, 'restore']);
@@ -85,6 +93,7 @@ Route::prefix('model')->middleware('checkrole:admin')->group(function () {
 //Size
 Route::prefix('size')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [SizeController::class, 'index']);
+    Route::get('/master', [SizeController::class, 'master']);
     Route::get('{id}', [SizeController::class, 'show']);
     Route::post('/', [SizeController::class, 'store']);
     Route::post('{id}/restore', [SizeController::class, 'restore']);
@@ -94,6 +103,7 @@ Route::prefix('size')->middleware('checkrole:admin')->group(function () {
 //Product
 Route::prefix('product')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [ProductController::class, 'index']);
+    Route::get('/master', [ProductController::class, 'master']);
     Route::get('{id}', [ProductController::class, 'show']);
     Route::post('/', [ProductController::class, 'store']);
     Route::post('{id}/restore', [ProductController::class, 'restore']);
@@ -103,6 +113,7 @@ Route::prefix('product')->middleware('checkrole:admin')->group(function () {
 //Factory
 Route::prefix('factory')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [FactoryController::class, 'index']);
+    Route::get('/master', [FactoryController::class, 'master']);
     Route::get('{id}', [FactoryController::class, 'show']);
     Route::post('/', [FactoryController::class, 'store']);
     Route::post('{id}/restore', [FactoryController::class, 'restore']);
@@ -112,6 +123,7 @@ Route::prefix('factory')->middleware('checkrole:admin')->group(function () {
 //CMT
 Route::prefix('cmt')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [CMTController::class, 'index']);
+    Route::get('/master', [CMTController::class, 'master']);
     Route::get('{id}', [CMTController::class, 'show']);
     Route::post('/', [CMTController::class, 'store']);
     Route::post('{id}/restore', [CMTController::class, 'restore']);
@@ -121,6 +133,7 @@ Route::prefix('cmt')->middleware('checkrole:admin')->group(function () {
 //Inventory
 Route::prefix('inventory')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [InventoryController::class, 'index']);
+    Route::get('/master', [InventoryController::class, 'master']);
     Route::get('{id}', [InventoryController::class, 'show']);
     Route::post('/', [InventoryController::class, 'store']);
     Route::post('{id}/restore', [InventoryController::class, 'restore']);
@@ -130,6 +143,7 @@ Route::prefix('inventory')->middleware('checkrole:admin')->group(function () {
 //Rack
 Route::prefix('rack')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [RackController::class, 'index']);
+    Route::get('/master', [RackController::class, 'master']);
     Route::get('{id}', [RackController::class, 'show']);
     Route::post('/', [RackController::class, 'store']);
     Route::post('{id}/restore', [RackController::class, 'restore']);
@@ -139,6 +153,7 @@ Route::prefix('rack')->middleware('checkrole:admin')->group(function () {
 //Warehouse
 Route::prefix('warehouse')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [WarehouseController::class, 'index']);
+    Route::get('/master', [WarehouseController::class, 'master']);
     Route::get('{id}', [WarehouseController::class, 'show']);
     Route::post('/', [WarehouseController::class, 'store']);
     Route::post('{id}/restore', [WarehouseController::class, 'restore']);
@@ -161,3 +176,14 @@ Route::prefix('order')->middleware('checkrole:admin')->group(function () {
     Route::get('/items/shopee/{id}', [OrderController::class, 'getShopeeOrderItems']);
 });
 
+//Shopee Auth
+Route::prefix('shopee')->middleware('checkrole:admin')->group(function () {
+    Route::post('/auth-url', [ShopeeAuthController::class, 'generateAuthUrl']);
+});
+
+Route::prefix('request')->middleware('checkrole')->group(function(){
+    Route::get('/', [RequestController::class, 'index']);
+    Route::get('/{id}', [RequestController::class, 'show']);
+    Route::post('/', [RequestController::class, 'store']);
+    Route::delete('/{id}', [RequestController::class, 'destroy']);
+});

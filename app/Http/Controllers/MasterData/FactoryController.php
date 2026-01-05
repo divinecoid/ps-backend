@@ -31,13 +31,24 @@ class FactoryController extends Controller
             $this->structure()
         );
     }
+    
+    public function master(Request $request)
+    {
+        return $this->baseMaster(
+            $request,
+            Factory::class,
+            [],
+            ['code', 'name'],
+            $this->structure()
+        );
+    }
 
     public function show($id)
     {
         return $this->baseShow(
             Factory::class,
             $id,
-            ['inventory'],
+            [],
             $this->structure()
         );
     }

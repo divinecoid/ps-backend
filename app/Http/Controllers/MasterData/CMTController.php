@@ -18,6 +18,9 @@ class CMTController extends Controller
             'id' => $data->id,
             'code' => $data->code,
             'name' => $data->name,
+            'contact_person' => $data->contact_person,
+            'phone' => $data->phone,
+            'address' => $data->address
         ];
     }
 
@@ -32,12 +35,23 @@ class CMTController extends Controller
         );
     }
 
+    public function master(Request $request)
+    {
+        return $this->baseMaster(
+            $request,
+            CMT::class,
+            [],
+            ['code', 'name'],
+            $this->structure()
+        );
+    }
+
     public function show($id)
     {
         return $this->baseShow(
             CMT::class,
             $id,
-            ['inventory'],
+            [],
             $this->structure()
         );
     }
@@ -50,6 +64,9 @@ class CMTController extends Controller
             [
                 'code' => 'required|string|unique:mdx_cmts,code|max:255',
                 'name' => 'required|string|max:255',
+                'contact_person' => 'required|string|max:255',
+                'phone' => 'required|string|max:255',
+                'address' => 'required|string|max:255'
             ],
             null
         );
@@ -69,6 +86,9 @@ class CMTController extends Controller
                     Rule::unique('mdx_cmts', 'code')->ignore($id)
                 ],
                 'name' => 'required|string|max:255',
+                'contact_person' => 'required|string|max:255',
+                'phone' => 'required|string|max:255',
+                'address' => 'required|string|max:255'
             ],
             null
         );

@@ -2,6 +2,7 @@
 
 namespace App\Models\MasterData;
 
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -9,12 +10,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class ProductModel extends Model
 {
     /** @use HasFactory<\Database\Factories\MasterData\ProductModelFactory> */
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasUuids;
 
     protected $table = 'mdx_models';
 
     protected $fillable = [
-        'code',
+        'sku',
         'name'
     ];
 
@@ -22,5 +23,14 @@ class ProductModel extends Model
     public function product()
     {
         return $this->hasMany(Product::class, 'model_id');
+    }
+    public function colors()
+    {
+        return $this->belongsToMany(Color::class, 'models_colors', 'model_id', 'color_id');
+    }
+
+    public function sizes()
+    {
+        return $this->belongsToMany(Size::class, 'models_sizes', 'model_id', 'size_id');
     }
 }

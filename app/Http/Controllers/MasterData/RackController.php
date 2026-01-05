@@ -18,7 +18,10 @@ class RackController extends Controller
             'id' => $data->id,
             'code' => $data->code,
             'name' => $data->name,
-            'warehouse_id' => $data->warehouse_id
+            'warehouse_id' => $data->warehouse_id,
+            'warehouse' => (object) [
+                'name' => $data->warehouse->name
+            ]
         ];
     }
 
@@ -33,12 +36,23 @@ class RackController extends Controller
         );
     }
 
+    public function master(Request $request)
+    {
+        return $this->baseMaster(
+            $request,
+            Rack::class,
+            [],
+            ['code', 'name'],
+            $this->structure()
+        );
+    }
+
     public function show($id)
     {
         return $this->baseShow(
             Rack::class,
             $id,
-            ['scanned_item', 'inventory'],
+            [],
             $this->structure()
         );
     }

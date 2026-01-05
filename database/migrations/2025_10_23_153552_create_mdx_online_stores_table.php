@@ -12,10 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('mdx_online_stores', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('store_code')->unique();
             $table->string('store_name');
-            $table->foreignId('marketplace_id')->constrained('mdx_marketplaces')->onDelete('restrict');
+            $table->foreignUuid('marketplace_id')->constrained('mdx_marketplaces')->onDelete('restrict');
             $table->string('api_key')->nullable();
             $table->string('client_id')->nullable();
             $table->string('client_secret')->nullable();

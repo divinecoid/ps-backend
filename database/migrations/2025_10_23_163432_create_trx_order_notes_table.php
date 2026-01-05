@@ -11,14 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('trx_order_notes', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('order_id')->constrained('trx_orders')->onDelete('restrict');
-            $table->foreignId('author_user_id')->constrained('users')->onDelete('restrict');
-            $table->text('notes');
-            $table->timestamps();
-            $table->softDeletes();
-        });
+        // Schema::create('trx_order_notes', function (Blueprint $table) {
+        //     $table->uuid('id')->primary();
+        //     $table->foreignUuid('order_id')->constrained('trx_orders')->onDelete('restrict');
+        //     $table->foreignUuid('author_user_id')->constrained('users')->onDelete('restrict');
+        //     $table->text('notes');
+        //     $table->timestamps();
+        //     $table->softDeletes();
+        // });
     }
 
     /**
@@ -26,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('trx_order_notes');
+        // Schema::dropIfExists('trx_order_notes');
     }
 };

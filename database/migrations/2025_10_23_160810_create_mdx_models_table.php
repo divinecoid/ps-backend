@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('mdx_models', function (Blueprint $table) {
-            $table->id();
-            $table->string('code')->unique();
+            $table->uuid('id')->primary();
+            $table->string('sku')->unique();
             $table->string('name')->unique();
             $table->timestamps();
             $table->softDeletes();

@@ -12,14 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('trx_requests', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('inventory_id')->constrained('mdx_inventories')->onDelete('restrict');
-            $table->string('format');
-            $table->bigInteger('start');
-            $table->bigInteger('end');
-            $table->bigInteger('retrieved_qty');
-            $table->timestamp('request_date');
-            $table->softDeletes();
+            $table->uuid('id')->primary();
+            $table->foreignUuid(('cmt_id'))->constrained('mdx_cmts')->onDelete('restrict');
+            $table->enum('status',['OPEN','CLOSED'])->default('OPEN');
             $table->timestamps();
         });
     }

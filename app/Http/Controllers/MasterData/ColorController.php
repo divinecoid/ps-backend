@@ -32,12 +32,23 @@ class ColorController extends Controller
         );
     }
 
+    public function master(Request $request)
+    {
+        return $this->baseMaster(
+            $request,
+            Color::class,
+            [],
+            ['code', 'name'],
+            $this->structure()
+        );
+    }
+
     public function show($id)
     {
         return $this->baseShow(
             Color::class,
             $id,
-            ['product'],
+            [],
             $this->structure()
         );
     }

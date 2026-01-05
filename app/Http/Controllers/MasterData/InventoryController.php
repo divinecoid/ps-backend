@@ -23,12 +23,35 @@ class InventoryController extends Controller
             'cmt_id' => $data->cmt_id,
             'rack_id' => $data->rack_id,
             'barcode_group' => $data->barcode_group,
+            'cmt' => (object) [
+                'name' => $data->cmt->name
+            ],
+            'rack' => (object) [
+                'name' => $data->rack->name
+            ],
+            'product' => (object) [
+                'sku' => $data->product->sku
+            ],
+            'factory' => (object) [
+                'name' => $data->factory->name
+            ],
         ];
     }
 
     public function index(Request $request)
     {
         return $this->baseIndex(
+            $request,
+            Inventory::class,
+            [],
+            ['serial_number', 'product_id', 'factory_id', 'quantity', 'cmt_id', 'rack_id', 'barcode_group'],
+            $this->structure()
+        );
+    }
+
+    public function master(Request $request)
+    {
+        return $this->baseMaster(
             $request,
             Inventory::class,
             [],
@@ -64,10 +87,10 @@ class InventoryController extends Controller
                 ],
                 'quantity' => 'required|integer|min:1',
                 'cmt_id' =>
-                [
-                    'required',
-                    Rule::exists('mdx_cmts', 'id')->whereNull('deleted_at'),
-                ],
+                    [
+                        'required',
+                        Rule::exists('mdx_cmts', 'id')->whereNull('deleted_at'),
+                    ],
                 'rack_id' => [
                     'required',
                     Rule::exists('mdx_racks', 'id')->whereNull('deleted_at'),
@@ -101,10 +124,10 @@ class InventoryController extends Controller
                 ],
                 'quantity' => 'required|integer|min:1',
                 'cmt_id' =>
-                [
-                    'required',
-                    Rule::exists('mdx_cmts', 'id')->whereNull('deleted_at'),
-                ],
+                    [
+                        'required',
+                        Rule::exists('mdx_cmts', 'id')->whereNull('deleted_at'),
+                    ],
                 'rack_id' => [
                     'required',
                     Rule::exists('mdx_racks', 'id')->whereNull('deleted_at'),

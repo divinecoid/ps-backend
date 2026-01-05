@@ -12,9 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('users_roles', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('restrict');
-            $table->foreignId('role_id')->constrained('mdx_roles')->onDelete('restrict');
+            $table->foreignUuid('user_id')->constrained()->onDelete('restrict');
+            $table->foreignUuid('role_id')->constrained('mdx_roles')->onDelete('restrict');
             $table->timestamps();
             $table->unique(['user_id', 'role_id']);
         });

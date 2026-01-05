@@ -11,18 +11,18 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('mdx_inventories', function (Blueprint $table) {
-            $table->id();
-            $table->string('serial_number')->unique();
-            $table->foreignId('product_id')->constrained('mdx_products')->onDelete('restrict');
-            $table->foreignId('factory_id')->constrained('mdx_factories')->onDelete('restrict');
-            $table->foreignId('rack_id')->constrained('mdx_racks')->onDelete('restrict');
-            $table->foreignId('cmt_id')->constrained('mdx_cmts')->onDelete('restrict');
-            $table->string('barcode_group')->unique();
-            $table->integer('quantity');
-            $table->softDeletes();
-            $table->timestamps();
-        });
+        // Schema::create('mdx_inventories', function (Blueprint $table) {
+        //     $table->id();
+        //     $table->string('serial_number')->unique();
+        //     $table->foreignUuid('product_id')->constrained('mdx_products')->onDelete('restrict');
+        //     $table->foreignUuid('factory_id')->constrained('mdx_factories')->onDelete('restrict');
+        //     $table->foreignUuid('rack_id')->constrained('mdx_racks')->onDelete('restrict');
+        //     $table->foreignUuid('cmt_id')->constrained('mdx_cmts')->onDelete('restrict');
+        //     $table->string('barcode_group')->unique();
+        //     $table->integer('quantity');
+        //     $table->softDeletes();
+        //     $table->timestamps();
+        // });
     }
 
     /**
@@ -30,6 +30,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('mdx_inventories');
+        // Schema::dropIfExists('mdx_inventories');
     }
 };
