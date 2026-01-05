@@ -4,6 +4,7 @@ namespace App\Models\Transactions;
 
 use App\Models\MasterData\Product;
 use App\Models\Transactions\Order;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -11,7 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class OrderItem extends Model
 {
     /** @use HasFactory<\Database\Factories\Transactions\OrderItemFactory> */
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasUuids;
 
     protected $table = 'trx_order_items';
 

@@ -4,6 +4,7 @@ namespace App\Models\Transactions;
 
 use App\Models\MasterData\OnlineStore;
 use App\Models\MasterData\User;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -11,12 +12,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Order extends Model
 {
     /** @use HasFactory<\Database\Factories\OrderFactory> */
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasUuids;
 
     protected $table = 'trx_orders';
 
     protected $fillable = [
         'awb_code',
+        'order_sn',
+        'marketplace_order_status',
         'read_at',
         'prepared_at',
         'prepare_duration',
