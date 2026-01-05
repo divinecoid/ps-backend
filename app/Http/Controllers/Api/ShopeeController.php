@@ -3,31 +3,28 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Services\ShopeeService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class ShopeeController extends Controller
 {
-    protected $shopeeService;
+    protected ShopeeService $shopeeService;
 
     public function __construct(ShopeeService $shopeeService)
     {
         $this->shopeeService = $shopeeService;
     }
 
-    /**
-     * Generate Shopee Auth URL
-     * 
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function generateAuthUrl()
     {
         try {
             $url = $this->shopeeService->generateAuthUrl();
             return response()->json([
                 'success' => true,
-                'url' => $url
+                'data' => [
+                    'auth_url' => $url
+                ]
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -37,12 +34,6 @@ class ShopeeController extends Controller
         }
     }
 
-    /**
-     * Get Shipping Parameter
-     * 
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function getShippingParameter(Request $request)
     {
         $request->validate([
