@@ -28,7 +28,8 @@ class OnlineStore extends Model
         'redirect_uri',
         'access_token',
         'refresh_token',
-        'expires_at',
+        'access_token_expires_at',
+        'refresh_token_expires_at',
     ];
 
     /**
