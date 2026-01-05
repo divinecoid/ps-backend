@@ -18,7 +18,7 @@ use App\Http\Controllers\MasterData\ProductController;
 use App\Http\Controllers\MasterData\RackController;
 use App\Http\Controllers\MasterData\WarehouseController;
 use App\Http\Controllers\Transaction\OrderController;
-use App\Http\Controllers\Api\ShopeeAuthController;
+use App\Http\Controllers\Api\ShopeeController;
 
 //Auth
 Route::prefix('auth')->group(function () {
@@ -28,6 +28,14 @@ Route::prefix('auth')->group(function () {
 });
 
 Route::middleware('checkrole:admin')->post('/register', RegisterController::class);
+
+//Shopee Auth & Logistics
+Route::prefix('shopee')->middleware('checkrole:admin')->group(function () {
+    Route::post('/auth-url', [ShopeeController::class, 'generateAuthUrl']);
+    Route::get('/shipping-parameter', [ShopeeController::class, 'getShippingParameter']);
+    Route::post('/ship-order', [ShopeeController::class, 'shipOrder']);
+    Route::post('/download-shipping-document', [ShopeeController::class, 'downloadShippingDocument']);
+});
 
 //MasterData
 //Role
@@ -174,11 +182,6 @@ Route::prefix('order')->middleware('checkrole:admin')->group(function () {
     Route::get('/items/lazada/{id}', [OrderController::class, 'getLazadaOrderItems']);
     Route::get('/items/tiktokshop/{id}', [OrderController::class, 'getTiktokShopOrderItems']);
     Route::get('/items/shopee/{id}', [OrderController::class, 'getShopeeOrderItems']);
-});
-
-//Shopee Auth
-Route::prefix('shopee')->middleware('checkrole:admin')->group(function () {
-    Route::post('/auth-url', [ShopeeAuthController::class, 'generateAuthUrl']);
 });
 
 Route::prefix('request')->middleware('checkrole')->group(function(){
