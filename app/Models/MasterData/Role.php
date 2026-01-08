@@ -4,7 +4,6 @@ namespace App\Models\MasterData;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Role extends Model
@@ -18,7 +17,7 @@ class Role extends Model
         'description'
     ];
 
-    public function users(): BelongsToMany
+    public function users()
     {
         return $this->belongsToMany(User::class, 'users_roles', 'role_id', 'user_id');
     }

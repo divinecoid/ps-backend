@@ -18,6 +18,16 @@ class ProductModelController extends Controller
             'id' => $data->id,
             'sku' => $data->sku,
             'name' => $data->name,
+            'color_id' => $data->colors->pluck('id'),
+            'size_id' => $data->sizes->pluck('id'),
+            'colors' => $data->colors->map(fn($c) => [
+                'id' => $c->id,
+                'name' => $c->name
+            ]),
+            'sizes' => $data->sizes->map(fn($s) => [
+                'id' => $s->id,
+                'name' => $s->name
+            ])
         ];
     }
 
@@ -26,7 +36,7 @@ class ProductModelController extends Controller
         return $this->baseIndex(
             $request,
             ProductModel::class,
-            [],
+            ['colors', 'sizes'],
             ['sku', 'name'],
             $this->structure()
         );
@@ -36,7 +46,7 @@ class ProductModelController extends Controller
         return $this->baseMaster(
             $request,
             ProductModel::class,
-            [],
+            ['colors', 'sizes'],
             ['sku', 'name'],
             $this->structure()
         );
@@ -47,7 +57,7 @@ class ProductModelController extends Controller
         return $this->baseShow(
             ProductModel::class,
             $id,
-            ['product'],
+            ['colors', 'sizes'],
             $this->structure()
         );
     }
@@ -60,8 +70,19 @@ class ProductModelController extends Controller
             [
                 'sku' => 'required|string|unique:mdx_models,sku|max:255',
                 'name' => 'required|string|max:255',
+                'size_id' => [
+                    'required',
+                    Rule::exists('mdx_sizes', 'id')->whereNull('deleted_at'),
+                ],
+                'color_id' => [
+                    'required',
+                    Rule::exists('mdx_colors', 'id')->whereNull('deleted_at'),
+                ]
             ],
-            null
+            function (ProductModel $model, Request $req) {
+                $model->sizes()->attach($req->size_id);
+                $model->colors()->attach($req->color_id);
+            }
         );
     }
 
@@ -79,8 +100,21 @@ class ProductModelController extends Controller
                     Rule::unique('mdx_models', 'sku')->ignore($id)
                 ],
                 'name' => 'required|string|max:255',
+                'size_id' => [
+                    'sometimes',
+                    'required',
+                    Rule::exists('mdx_sizes', 'id')->whereNull('deleted_at'),
+                ],
+                'color_id' => [
+                    'sometimes',
+                    'required',
+                    Rule::exists('mdx_colors', 'id')->whereNull('deleted_at'),
+                ]
             ],
-            null
+            function (ProductModel $model, Request $req) {
+                $model->sizes()->attach($req->size_id);
+                $model->colors()->attach($req->color_id);
+            }
         );
     }
 

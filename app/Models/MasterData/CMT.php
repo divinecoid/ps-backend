@@ -19,6 +19,9 @@ class CMT extends Model
     protected $fillable = [
         'code',
         'name',
+        'contact_person',
+        'phone',
+        'address'
     ];
 
     // Define relationship with Inventory model

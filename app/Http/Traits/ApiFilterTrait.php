@@ -7,15 +7,24 @@ trait ApiFilterTrait
     public function applyFilter($query, $request, $searchFields = [])
     {
         if ($search = $request->input('search')) {
-            $query->where(function($q) use ($search, $searchFields) {
-                foreach($searchFields as $field) {
-                    $q->orWhere($field, 'like', "%{$search}%");
+            $query->where(function ($q) use ($search, $searchFields) {
+                foreach ($searchFields as $field) {
+                    if (str_contains($field, '.')) {
+                        $parts = explode('.', $field);
+                        $column = array_pop($parts);
+                        $relation = implode('.', $parts);
+                        $q->orWhereHas($relation, function ($qr) use ($column, $search) {
+                            $qr->where($column, 'LIKE', "%{$search}%");
+                        });
+                    } else {
+                        $q->orWhere($field, 'LIKE', "%{$search}%");
+                    }
                 }
             });
         }
         if ($sort = $request->input('sort')) {
             $sortArray = explode(';', $sort);
-            foreach($sortArray as $sortItem) {
+            foreach ($sortArray as $sortItem) {
                 $sortParts = explode(',', $sortItem);
                 if (count($sortParts) == 2) {
                     $column = trim($sortParts[0]);
@@ -51,22 +60,22 @@ trait ApiFilterTrait
         return getenv("PER_PAGE_DEFAULT") ?: 100;
     }
 
-    public function successResponse($data, $message="Success")
+    public function successResponse($data, $message = "Success")
     {
         return response()->json([
-            'success'=>true,
-            'message'=>$message,
+            'success' => true,
+            'message' => $message,
             'data' => $data
         ]);
     }
 
-    public function errorResponse($code=400, $message="Error")
+    public function errorResponse($code = 400, $message = "Error")
     {
         return response()->json([
-            'success'=>false,
-            'message'=>$message,
-            'data'=>null
-        ],$code);
+            'success' => false,
+            'message' => $message,
+            'data' => null
+        ], $code);
     }
 
     public function getMaxTokens()

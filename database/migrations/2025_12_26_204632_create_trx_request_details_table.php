@@ -14,13 +14,15 @@ return new class extends Migration
         Schema::create('trx_request_details', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid(('request_id'))->constrained('trx_requests')->onDelete('cascade');
-            $table->foreignUuid('model_id')->constrained('mdx_models')->onDelete('cascade');
-            $table->integer('req_dozen_qty');
-            $table->integer('req_piece_qty');
-            $table->integer('rec_dozen_qty');
-            $table->integer('rec_piece_qty');
+            $table->foreignUuid('model_id')->constrained('mdx_models')->onDelete('restrict');
+            $table->foreignUuid('color_id')->constrained('mdx_colors')->onDelete('restrict');
+            $table->foreignUuid('size_id')->constrained('mdx_sizes')->onDelete('restrict');
+            $table->integer('req_dozen_qty')->default(0);
+            $table->integer('req_piece_qty')->default(0);
+            $table->integer('rec_dozen_qty')->default(0);
+            $table->integer('rec_piece_qty')->default(0);
+            $table->integer('rec_bs_qty')->default(0);
             $table->string('barcode');
-            $table->softDeletes();
             $table->timestamps();
         });
     }

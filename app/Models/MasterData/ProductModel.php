@@ -24,4 +24,13 @@ class ProductModel extends Model
     {
         return $this->hasMany(Product::class, 'model_id');
     }
+    public function colors()
+    {
+        return $this->belongsToMany(Color::class, 'models_colors', 'model_id', 'color_id');
+    }
+
+    public function sizes()
+    {
+        return $this->belongsToMany(Size::class, 'models_sizes', 'model_id', 'size_id');
+    }
 }
