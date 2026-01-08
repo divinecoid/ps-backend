@@ -119,6 +119,46 @@ class ShopeeController extends Controller
             // 1. Ship Order (Arrange Pickup)
             $shipResponse = $this->shopeeService->shipOrder($request->order_sn, $pickupData);
 
+            if (isset($shipResponse['error']) && !empty($shipResponse['error'])) {
+                 // Check if it's "Order has been shipped" error, treat as success (maybe state mismatch)
+                 if (isset($shipResponse['message']) && stripos($shipResponse['message'], 'shipped') !== false) {
+                      // It is shipped, proceed to update local status
+                 } else {
+                      return response()->json([
+                          'success' => false,
+                          'message' => 'Shopee API Error: ' . ($shipResponse['message'] ?? 'Unknown error'),
+                          'data' => $shipResponse
+                      ], 400);
+                 }
+            }
+
+            // Update Local Status & Fetch AWB
+            try {
+                $updateData = [
+                    'status' => OrderStatus::READY_TO_PICKUP,
+                    'readytoship_at' => now(),
+                ];
+
+                // Try to fetch AWB
+                $detailResponse = $this->shopeeService->getOrderDetail([$request->order_sn]);
+                $detail = $detailResponse['response']['order_list'][0] ?? null;
+                
+                if ($detail) {
+                    $awb = $detail['tracking_no'] ?? $detail['shipping_carrier'] ?? null;
+                    if ($awb) {
+                        $updateData['awb_code'] = $awb;
+                    }
+                    if (isset($detail['order_status'])) {
+                        $updateData['readytoship_marketplace'] = $detail['order_status'];
+                    }
+                }
+
+                $order->update($updateData);
+
+            } catch (\Exception $e) {
+                Log::warning("Failed to update local status/AWB after ship: " . $e->getMessage());
+            }
+
             // 2. Automatically Create Shipping Document
             // Note: This might take a moment to be available for download
             // We use try-catch here so if document creation fails, we still return success for ship order but with warning

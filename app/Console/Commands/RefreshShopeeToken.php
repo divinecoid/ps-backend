@@ -21,7 +21,9 @@ class RefreshShopeeToken extends Command
             if ($storeId) {
                 $service->setStore(OnlineStore::findOrFail($storeId));
             } elseif ($shopId) {
-                $store = OnlineStore::where('store_code', (string)$shopId)->first();
+                $store = OnlineStore::where('store_code', (string)$shopId)
+                    ->orWhere('shop_id', (string)$shopId)
+                    ->first();
                 if ($store) {
                     $service->setStore($store);
                 }

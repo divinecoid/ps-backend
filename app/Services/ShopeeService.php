@@ -20,16 +20,10 @@ class ShopeeService
     protected function getStore(): OnlineStore
     {
         if (!$this->store) {
-            // Fallback for backward compatibility or initial setup (not recommended for multi-store)
-            $shopId = (string)config('marketplace.shopee.shop_id');
-            $this->store = OnlineStore::where('store_code', $shopId)->first();
-            
-            if (!$this->store) {
-                // Try to find any Shopee store
-                $this->store = OnlineStore::whereHas('marketplace', function($q) {
-                    $q->where('name', 'Shopee')->orWhere('alias', 'shopee')->orWhere('alias', 'shopee_sandbox');
-                })->first();
-            }
+            // Try to find any Shopee store
+            $this->store = OnlineStore::whereHas('marketplace', function($q) {
+                $q->where('name', 'Shopee')->orWhere('alias', 'shopee')->orWhere('alias', 'shopee_sandbox');
+            })->first();
 
             if (!$this->store) {
                 throw new \Exception("Shopee Store context not set and no default store found.");
@@ -49,11 +43,11 @@ class ShopeeService
         // For Auth URL, we might need marketplace specific config if store is not fully setup
         // But assuming we have at least the marketplace/store record with credentials
         
-        $host = $store->marketplace->base_api_url ?? config('marketplace.shopee.base_url');
+        $host = $store->marketplace->base_api_url;
         $path = "/api/v2/shop/auth_partner";
-        $partnerId = $store->client_id ?? config('marketplace.shopee.partner_id');
-        $partnerKey = $store->client_secret ?? config('marketplace.shopee.partner_key');
-        $redirectUrl = $store->redirect_uri ?? config('marketplace.shopee.redirect_url');
+        $partnerId = $store->client_id;
+        $partnerKey = $store->client_secret;
+        $redirectUrl = $store->redirect_uri;
         $timestamp = time();
 
         $baseString = sprintf("%s%s%s", $partnerId, $path, $timestamp);
@@ -79,10 +73,10 @@ class ShopeeService
     {
         $store = $this->getStore();
         
-        $host = $store->marketplace->base_api_url ?? config('marketplace.shopee.base_url');
-        $partnerId = (int)($store->client_id ?? config('marketplace.shopee.partner_id'));
-        $partnerKey = $store->client_secret ?? config('marketplace.shopee.partner_key');
-        $shopId = (int)($store->store_code ?? config('marketplace.shopee.shop_id'));
+        $host = $store->marketplace->base_api_url;
+        $partnerId = (int)$store->client_id;
+        $partnerKey = $store->client_secret;
+        $shopId = (int)($store->shop_id ?? $store->store_code);
         
         // 1. Get Token & Prepare Params
         $accessToken = $store->access_token;
@@ -281,11 +275,11 @@ class ShopeeService
         $store = $this->getStore();
         
         $execute = function() use ($store, $orderSn, $shippingDocumentType) {
-            $host = $store->marketplace->base_api_url ?? config('marketplace.shopee.base_url');
+            $host = $store->marketplace->base_api_url;
             $path = "/api/v2/logistics/download_shipping_document";
-            $partnerId = (int)($store->client_id ?? config('marketplace.shopee.partner_id'));
-            $partnerKey = $store->client_secret ?? config('marketplace.shopee.partner_key');
-            $shopId = (int)($store->store_code ?? config('marketplace.shopee.shop_id'));
+            $partnerId = (int)$store->client_id;
+            $partnerKey = $store->client_secret;
+            $shopId = (int)($store->shop_id ?? $store->store_code);
             $accessToken = $store->access_token;
             $timestamp = time();
 
@@ -360,11 +354,11 @@ class ShopeeService
     {
         $store = $this->getStore();
         
-        $host = $store->marketplace->base_api_url ?? config('marketplace.shopee.base_url');
+        $host = $store->marketplace->base_api_url;
         $path = "/api/v2/auth/access_token/get";
-        $partnerId = (int)($store->client_id ?? config('marketplace.shopee.partner_id'));
-        $partnerKey = $store->client_secret ?? config('marketplace.shopee.partner_key');
-        $shopId = (int)($store->store_code ?? config('marketplace.shopee.shop_id'));
+        $partnerId = (int)$store->client_id;
+        $partnerKey = $store->client_secret;
+        $shopId = (int)($store->shop_id ?? $store->store_code);
         
         $refreshToken = $store->refresh_token;
         $timestamp = time();
@@ -412,11 +406,11 @@ class ShopeeService
     {
         $store = $this->getStore();
 
-        $host = $store->marketplace->base_api_url ?? config('marketplace.shopee.base_url');
+        $host = $store->marketplace->base_api_url;
         $path = "/api/v2/auth/token/get";
-        $partnerId = (int)($store->client_id ?? config('marketplace.shopee.partner_id'));
-        $partnerKey = $store->client_secret ?? config('marketplace.shopee.partner_key');
-        $shopId = $shopId ?? (int)($store->store_code ?? config('marketplace.shopee.shop_id'));
+        $partnerId = (int)$store->client_id;
+        $partnerKey = $store->client_secret;
+        $shopId = $shopId ?? (int)($store->shop_id ?? $store->store_code);
 
         $timestamp = time();
 
