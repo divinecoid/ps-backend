@@ -29,6 +29,14 @@ Route::prefix('auth')->group(function () {
 
 Route::middleware('checkrole:admin')->post('/register', RegisterController::class);
 
+//Shopee Auth & Logistics
+Route::prefix('shopee')->middleware('checkrole:admin')->group(function () {
+    Route::post('/auth-url', [ShopeeController::class, 'generateAuthUrl']);
+    Route::get('/shipping-parameter', [ShopeeController::class, 'getShippingParameter']);
+    Route::post('/ship-order', [ShopeeController::class, 'shipOrder']);
+    Route::post('/download-shipping-document', [ShopeeController::class, 'downloadShippingDocument']);
+});
+
 //MasterData
 //Role
 Route::prefix('role')->middleware('checkrole:admin')->group(function () {
@@ -189,4 +197,11 @@ Route::prefix('request')->middleware('checkrole')->group(function () {
     Route::get('/{id}', [RequestController::class, 'show']);
     Route::post('/', [RequestController::class, 'store']);
     Route::delete('/{id}', [RequestController::class, 'destroy']);
+});
+
+Route::prefix('model_color')->middleware('checkrole:admin')->group(function () {
+    Route::get('/{id}', [ProductModelController::class, 'modelColor']);
+});
+Route::prefix('model_size')->middleware('checkrole:admin')->group(function () {
+    Route::get('/{id}', [ProductModelController::class, 'modelSize']);
 });

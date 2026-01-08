@@ -126,4 +126,21 @@ trait CrudTrait
         }
         return $this->successResponse($data);
     }
+
+    public function baseRelationIndex(Request $request, $relationQuery, array $filters = [], callable $map = null)
+    {
+        $perPage = (int) ($request->input('per_page', $this->getPerPageDefault()));
+        $query = $relationQuery;
+
+        if (method_exists($this, 'applyFilter') && !empty($filters)) {
+            $query = $this->applyFilter($query, $request, $filters);
+        }
+
+        $data = $query->paginate($perPage);
+
+        $items = collect($data->items())->map($map ?? fn($item) => $item);
+
+        return response()->json($this->paginateResponse($data, $items));
+    }
+
 }

@@ -130,4 +130,36 @@ class ProductModelController extends Controller
     {
         return $this->baseRestore(ProductModel::class, $id);
     }
+
+    public function modelColor(Request $request, $id)
+    {
+        $model = ProductModel::find($id);
+        if (!$model) {
+            return $this->errorResponse(404, 'Not found');
+        }
+        return $this->baseRelationIndex(
+            $request,
+            $model->colors(),
+            ['name'],
+            fn($c) => [
+                'id' => $c->id,
+                'name' => $c->name,
+            ]
+        );
+    }
+
+    public function modelSize($id)
+    {
+        $model = ProductModel::find($id);
+        if (!$model) {
+            return $this->errorResponse(404, 'Not found');
+        }
+        return $this->baseShow(
+            ProductModel::class,
+            $id,
+            ['sizes'],
+            fn($data) => $data->sizes->map(fn($c) => ['id' => $c->id, 'name' => $c->name])
+        );
+    }
+
 }

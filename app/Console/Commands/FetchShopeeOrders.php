@@ -5,11 +5,6 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use App\Services\ShopeeService;
 use Illuminate\Support\Facades\Log;
-use App\Models\Transactions\Order;
-use App\Models\Transactions\OrderItem;
-use App\Models\MasterData\Marketplace;
-use App\Models\MasterData\OnlineStore;
-use App\Models\MasterData\Product;
 
 class FetchShopeeOrders extends Command
 {
@@ -89,7 +84,8 @@ class FetchShopeeOrders extends Command
                             }
                         }
                         
-                        $this->saveOrder($detail); 
+                        // TODO: Save to Database (Order, OrderItem, etc.)
+                        // $this->saveOrder($detail); 
                     }
                 }
             }
@@ -102,93 +98,5 @@ class FetchShopeeOrders extends Command
             Log::error('FetchShopeeOrders command failed', ['error' => $e->getMessage()]);
             return 1;
         }
-    }
-
-    protected function saveOrder($detail)
-    {
-        // Find Marketplace
-        $marketplace = Marketplace::where('name', 'Shopee')->first();
-        if (!$marketplace) {
-            $this->error("Marketplace 'Shopee' not found in DB. Skipping order {$detail['order_sn']}.");
-            return;
-        }
-
-        // Find OnlineStore
-        // Assuming shop_id from config matches store_code
-        $shopId = config('marketplace.shopee.shop_id');
-        // Try to find by store_code (assuming it holds shop_id)
-        $onlineStore = OnlineStore::where('store_code', $shopId)->first();
-        
-        if (!$onlineStore) {
-             // Fallback: Try to find first online store for this marketplace
-             $onlineStore = OnlineStore::where('marketplace_id', $marketplace->id)->first();
-             if (!$onlineStore) {
-                $this->error("OnlineStore for Shopee not found in DB. Skipping order {$detail['order_sn']}.");
-                return;
-             }
-        }
-
-        // Check if order exists
-        $order = Order::where('order_sn', $detail['order_sn'])->first();
-
-        if ($order) {
-            $this->info("Order {$detail['order_sn']} already exists. Updating status...");
-            $order->update([
-                'marketplace_order_status' => $detail['order_status'],
-                // Update other fields if needed
-            ]);
-            return;
-        }
-
-        // Calculate totals
-        $itemCount = 0;
-        $uniqueItemCount = count($detail['item_list'] ?? []);
-        foreach ($detail['item_list'] ?? [] as $item) {
-            $itemCount += $item['model_quantity_purchased'];
-        }
-
-        $totalShipping = $detail['actual_shipping_fee'] ?? $detail['estimated_shipping_fee'] ?? 0;
-
-        // Create Order
-        $order = Order::create([
-            'order_sn' => $detail['order_sn'],
-            'marketplace_order_status' => $detail['order_status'],
-            'online_store_id' => $onlineStore->id,
-            'marketplace_id' => $marketplace->id,
-            'status' => 'pending', // Internal status
-            'item_count' => $itemCount,
-            'unique_item_count' => $uniqueItemCount,
-            'total_price' => $detail['total_amount'] ?? 0,
-            'total_shipping' => $totalShipping,
-            'total_amount' => $detail['total_amount'] ?? 0,
-            'total_weight' => 0, // Not always available
-            'customer_name' => $detail['buyer_username'] ?? 'Unknown',
-            'customer_address' => $detail['recipient_address']['full_address'] ?? null,
-            'customer_phone' => $detail['recipient_address']['phone'] ?? null,
-            'read_at' => now(),
-            'preparist_user_id' => null, // Not assigned yet
-        ]);
-
-        // Create Order Items
-        foreach ($detail['item_list'] ?? [] as $item) {
-            // Find Product by SKU
-            $product = null;
-            if (!empty($item['item_sku'])) {
-                $product = Product::where('sku', $item['item_sku'])->first();
-            }
-
-            OrderItem::create([
-                'order_id' => $order->id,
-                'order_item_id' => $item['order_item_id'],
-                'sku' => $item['item_sku'] ?? null,
-                'product_id' => $product ? $product->id : null,
-                // 'quantity' => $item['model_quantity_purchased'], // Add this if column exists in DB
-                // 'item_name' => $item['item_name'],
-                // 'model_original_price' => $item['model_original_price'],
-                // 'model_discounted_price' => $item['model_discounted_price'],
-            ]);
-        }
-        
-        $this->info("Order {$detail['order_sn']} saved successfully.");
     }
 }
