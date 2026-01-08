@@ -4,6 +4,7 @@ namespace App\Models\Transactions;
 
 use App\Models\MasterData\OnlineStore;
 use App\Models\MasterData\User;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -11,11 +12,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Order extends Model
 {
     /** @use HasFactory<\Database\Factories\OrderFactory> */
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasUuids;
 
     protected $table = 'trx_orders';
 
     protected $fillable = [
+        'order_sn',
         'awb_code',
         'read_at',
         'prepared_at',
@@ -23,7 +25,6 @@ class Order extends Model
         'readytoship_at',
         'readytoship_marketplace',
         'online_store_id',
-        'marketplace_id',
         'item_count',
         'unique_item_count',
         'status',
@@ -35,6 +36,10 @@ class Order extends Model
         'customer_name',
         'customer_phone',
         'customer_address',
+    ];
+
+    protected $casts = [
+        'status' => \App\Enums\OrderStatus::class,
     ];
 
     // Define relationship with Order Item model

@@ -26,7 +26,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('online_stores', function (Blueprint $table) {
+        Schema::table('mdx_online_stores', function (Blueprint $table) {
             // Revert back to original name
             $table->renameColumn('access_token_expires_at', 'expires_at');
 

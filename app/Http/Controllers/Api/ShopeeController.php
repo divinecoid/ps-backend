@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Transactions\Order;
+use App\Enums\OrderStatus;
 use App\Services\ShopeeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -41,6 +43,26 @@ class ShopeeController extends Controller
         ]);
 
         try {
+            $order = Order::where('order_sn', $request->order_sn)->first();
+            if (!$order) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Order not found.'
+                ], 404);
+            }
+
+            if ($order->online_store) {
+                $this->shopeeService->setStore($order->online_store);
+            }
+
+            $statusValue = $order->status instanceof OrderStatus ? $order->status->value : (string) $order->status;
+            if (!in_array($statusValue, [OrderStatus::READY_TO_SHIP->value, OrderStatus::RETRY_SHIP->value])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Order status must be ready_to_ship or retry_ship.'
+                ], 422);
+            }
+
             $data = $this->shopeeService->getShippingParameter($request->order_sn);
             return response()->json([
                 'success' => true,
@@ -69,6 +91,26 @@ class ShopeeController extends Controller
         ]);
 
         try {
+            $order = Order::where('order_sn', $request->order_sn)->first();
+            if (!$order) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Order not found.'
+                ], 404);
+            }
+
+            if ($order->online_store) {
+                $this->shopeeService->setStore($order->online_store);
+            }
+
+            $statusValue = $order->status instanceof OrderStatus ? $order->status->value : (string) $order->status;
+            if (!in_array($statusValue, [OrderStatus::READY_TO_SHIP->value, OrderStatus::RETRY_SHIP->value])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Order status must be ready_to_ship or retry_ship.'
+                ], 422);
+            }
+
             $pickupData = [
                 'address_id' => $request->address_id,
                 'pickup_time_id' => $request->pickup_time_id
@@ -118,6 +160,32 @@ class ShopeeController extends Controller
         ]);
 
         try {
+            $order = Order::where('order_sn', $request->order_sn)->first();
+            if (!$order) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Order not found.'
+                ], 404);
+            }
+
+            if ($order->online_store) {
+                $this->shopeeService->setStore($order->online_store);
+            }
+
+            $statusValue = $order->status instanceof OrderStatus ? $order->status->value : (string) $order->status;
+            $allowed = [
+                OrderStatus::READY_TO_SHIP->value,
+                OrderStatus::RETRY_SHIP->value,
+                OrderStatus::READY_TO_PICKUP->value,
+                OrderStatus::SHIPPED->value,
+            ];
+            if (!in_array($statusValue, $allowed, true)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Order status must be ready_to_ship or ready_to_pickup.'
+                ], 422);
+            }
+
             $type = $request->shipping_document_type ?? 'NORMAL_AIR_WAYBILL';
             $fileContent = $this->shopeeService->downloadShippingDocument($request->order_sn, $type);
 
