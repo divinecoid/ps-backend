@@ -1,5 +1,4 @@
 <?php
-
 return [
     'lazada' => [
         'base_url' => env('LAZADA_API_URL', 'https://api.lazada.com'),
@@ -14,11 +13,12 @@ return [
     ],
 
     'shopee' => [
-        'base_url' => env('SHOPEE_HOST'),
-        'partner_id' => env('SHOPEE_PARTNER_ID'),
-        'partner_key' => env('SHOPEE_PARTNER_KEY'),
-        'shop_id' => env('SHOPEE_SHOP_ID'),
-        'access_token' => env('SHOPEE_ACCESS_TOKEN'),
-        'redirect_url' => env('SHOPEE_REDIRECT_URL'),
+        'base_url' => env('SHOPEE_HOST', 'https://partner.shopeemobile.com'),
+        'partner_id' => env('SHOPEE_PARTNER_ID', 2014481),
+        'partner_key' => env('SHOPEE_PARTNER_KEY', ''),
+        'shop_id' => env('SHOPEE_SHOP_ID', 0),
+        'access_token' => env('SHOPEE_ACCESS_TOKEN', ''),
+        'refresh_token' => env('SHOPEE_REFRESH_TOKEN', ''),
+        'redirect_url' => env('SHOPEE_REDIRECT_URL', ''),
     ],
 ];

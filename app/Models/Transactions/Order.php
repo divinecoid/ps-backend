@@ -17,16 +17,14 @@ class Order extends Model
     protected $table = 'trx_orders';
 
     protected $fillable = [
-        'awb_code',
         'order_sn',
-        'marketplace_order_status',
+        'awb_code',
         'read_at',
         'prepared_at',
         'prepare_duration',
         'readytoship_at',
         'readytoship_marketplace',
         'online_store_id',
-        'marketplace_id',
         'item_count',
         'unique_item_count',
         'status',
@@ -38,6 +36,10 @@ class Order extends Model
         'customer_name',
         'customer_phone',
         'customer_address',
+    ];
+
+    protected $casts = [
+        'status' => \App\Enums\OrderStatus::class,
     ];
 
     // Define relationship with Order Item model

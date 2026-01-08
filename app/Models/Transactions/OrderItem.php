@@ -16,7 +16,18 @@ class OrderItem extends Model
 
     protected $table = 'trx_order_items';
 
-    protected $fillable = ['order_id', 'order_item_id', 'sku', 'product_id', 'item_prepared_at'];
+    protected $fillable = [
+        'order_id', 
+        'order_item_id', 
+        'sku', 
+        'item_name',
+        'product_id', 
+        'model_original_price',
+        'model_discounted_price',
+        'model_quantity_purchased',
+        'item_prepared_at',
+        'notes'
+    ];
 
     // Define relationship with Scanned Item model
     public function scanned_items()
