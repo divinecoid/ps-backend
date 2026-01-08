@@ -14,8 +14,11 @@ return [
     ],
 
     'shopee' => [
-        'base_url' => env('SHOPEE_API_URL', 'https://partner.shopeemobile.com/'),
+        'base_url' => env('SHOPEE_HOST'),
+        'partner_id' => env('SHOPEE_PARTNER_ID'),
+        'partner_key' => env('SHOPEE_PARTNER_KEY'),
+        'shop_id' => env('SHOPEE_SHOP_ID'),
         'access_token' => env('SHOPEE_ACCESS_TOKEN'),
-        'app_key' => env('SHOPEE_APP_KEY'),
+        'redirect_url' => env('SHOPEE_REDIRECT_URL'),
     ],
 ];

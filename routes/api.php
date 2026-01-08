@@ -18,7 +18,7 @@ use App\Http\Controllers\MasterData\ProductController;
 use App\Http\Controllers\MasterData\RackController;
 use App\Http\Controllers\MasterData\WarehouseController;
 use App\Http\Controllers\Transaction\OrderController;
-use App\Http\Controllers\Api\ShopeeAuthController;
+use App\Http\Controllers\Api\ShopeeController;
 
 //Auth
 Route::prefix('auth')->group(function () {
@@ -176,12 +176,15 @@ Route::prefix('order')->middleware('checkrole:admin')->group(function () {
     Route::get('/items/shopee/{id}', [OrderController::class, 'getShopeeOrderItems']);
 });
 
-//Shopee Auth
+//Shopee Auth & Logistics
 Route::prefix('shopee')->middleware('checkrole:admin')->group(function () {
-    Route::post('/auth-url', [ShopeeAuthController::class, 'generateAuthUrl']);
+    Route::post('/auth-url', [ShopeeController::class, 'generateAuthUrl']);
+    Route::get('/shipping-parameter', [ShopeeController::class, 'getShippingParameter']);
+    Route::post('/ship-order', [ShopeeController::class, 'shipOrder']);
+    Route::post('/download-shipping-document', [ShopeeController::class, 'downloadShippingDocument']);
 });
 
-Route::prefix('request')->middleware('checkrole')->group(function(){
+Route::prefix('request')->middleware('checkrole')->group(function () {
     Route::get('/', [RequestController::class, 'index']);
     Route::get('/{id}', [RequestController::class, 'show']);
     Route::post('/', [RequestController::class, 'store']);
