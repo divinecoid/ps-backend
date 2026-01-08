@@ -195,6 +195,7 @@ Route::prefix('shopee')->middleware('checkrole:admin')->group(function () {
 Route::prefix('request')->middleware('checkrole')->group(function () {
     Route::get('/', [RequestController::class, 'index']);
     Route::get('/{id}', [RequestController::class, 'show']);
+    Route::get('/barcode/{id}',[RequestController::class, 'barcode']);
     Route::post('/', [RequestController::class, 'store']);
     Route::delete('/{id}', [RequestController::class, 'destroy']);
 });
