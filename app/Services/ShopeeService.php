@@ -6,9 +6,38 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use App\Models\MasterData\OnlineStore;
 use App\Models\MasterData\Marketplace;
+use Carbon\Carbon;
 
 class ShopeeService
 {
+    protected ?OnlineStore $store = null;
+
+    public function setStore(OnlineStore $store)
+    {
+        $this->store = $store;
+    }
+
+    protected function getStore(): OnlineStore
+    {
+        if (!$this->store) {
+            // Fallback for backward compatibility or initial setup (not recommended for multi-store)
+            $shopId = (string)config('marketplace.shopee.shop_id');
+            $this->store = OnlineStore::where('store_code', $shopId)->first();
+            
+            if (!$this->store) {
+                // Try to find any Shopee store
+                $this->store = OnlineStore::whereHas('marketplace', function($q) {
+                    $q->where('name', 'Shopee')->orWhere('alias', 'shopee')->orWhere('alias', 'shopee_sandbox');
+                })->first();
+            }
+
+            if (!$this->store) {
+                throw new \Exception("Shopee Store context not set and no default store found.");
+            }
+        }
+        return $this->store;
+    }
+
     /**
      * Generate Auth URL for Shopee Shop
      * 
@@ -16,11 +45,15 @@ class ShopeeService
      */
     public function generateAuthUrl()
     {
-        $host = config('marketplace.shopee.base_url');
+        $store = $this->getStore();
+        // For Auth URL, we might need marketplace specific config if store is not fully setup
+        // But assuming we have at least the marketplace/store record with credentials
+        
+        $host = $store->marketplace->base_api_url ?? config('marketplace.shopee.base_url');
         $path = "/api/v2/shop/auth_partner";
-        $partnerId = config('marketplace.shopee.partner_id');
-        $partnerKey = config('marketplace.shopee.partner_key');
-        $redirectUrl = config('marketplace.shopee.redirect_url');
+        $partnerId = $store->client_id ?? config('marketplace.shopee.partner_id');
+        $partnerKey = $store->client_secret ?? config('marketplace.shopee.partner_key');
+        $redirectUrl = $store->redirect_uri ?? config('marketplace.shopee.redirect_url');
         $timestamp = time();
 
         $baseString = sprintf("%s%s%s", $partnerId, $path, $timestamp);
@@ -44,13 +77,19 @@ class ShopeeService
      */
     private function request($method, $path, $params = [], $data = [])
     {
-        $host = config('marketplace.shopee.base_url');
-        $partnerId = (int)config('marketplace.shopee.partner_id');
-        $partnerKey = config('marketplace.shopee.partner_key');
-        $shopId = (int)config('marketplace.shopee.shop_id');
+        $store = $this->getStore();
+        
+        $host = $store->marketplace->base_api_url ?? config('marketplace.shopee.base_url');
+        $partnerId = (int)($store->client_id ?? config('marketplace.shopee.partner_id'));
+        $partnerKey = $store->client_secret ?? config('marketplace.shopee.partner_key');
+        $shopId = (int)($store->store_code ?? config('marketplace.shopee.shop_id'));
         
         // 1. Get Token & Prepare Params
-        $accessToken = $this->getAccessToken();
+        $accessToken = $store->access_token;
+        if (!$accessToken) {
+             throw new \Exception("Access token missing for store: " . $store->store_name);
+        }
+
         $timestamp = time();
         
         // Base String Construction
@@ -88,7 +127,7 @@ class ShopeeService
         $isTokenError = false;
         
         // Check for common token errors
-        if (isset($json['error']) && ($json['error'] === 'error_auth' || $json['error'] === 'invalid_access_token')) {
+        if (isset($json['error']) && ($json['error'] === 'error_auth' || $json['error'] === 'invalid_access_token' || $json['error'] === 'invalid_acceess_token')) {
             $isTokenError = true;
         }
         // Also check if message contains "access_token" keywords just in case
@@ -102,7 +141,9 @@ class ShopeeService
                 $this->refreshAccessToken();
                 
                 // Retry with new token
-                $accessToken = $this->getAccessToken();
+                $store->refresh(); // Reload from DB
+                $accessToken = $store->access_token;
+                
                 $timestamp = time();
                 $baseString = sprintf("%s%s%s%s%s", $partnerId, $path, $timestamp, $accessToken, $shopId);
                 $sign = hash_hmac('sha256', $baseString, $partnerKey);
@@ -237,35 +278,70 @@ class ShopeeService
      */
     public function downloadShippingDocument($orderSn, $shippingDocumentType = 'NORMAL_AIR_WAYBILL')
     {
-        $host = config('marketplace.shopee.base_url');
-        $path = "/api/v2/logistics/download_shipping_document";
-        $partnerId = config('marketplace.shopee.partner_id');
-        $partnerKey = config('marketplace.shopee.partner_key');
-        $shopId = (int)config('marketplace.shopee.shop_id');
-        $accessToken = $this->getAccessToken();
-        $timestamp = time();
+        $store = $this->getStore();
+        
+        $execute = function() use ($store, $orderSn, $shippingDocumentType) {
+            $host = $store->marketplace->base_api_url ?? config('marketplace.shopee.base_url');
+            $path = "/api/v2/logistics/download_shipping_document";
+            $partnerId = (int)($store->client_id ?? config('marketplace.shopee.partner_id'));
+            $partnerKey = $store->client_secret ?? config('marketplace.shopee.partner_key');
+            $shopId = (int)($store->store_code ?? config('marketplace.shopee.shop_id'));
+            $accessToken = $store->access_token;
+            $timestamp = time();
 
-        $baseString = sprintf("%s%s%s%s%s", $partnerId, $path, $timestamp, $accessToken, $shopId);
-        $sign = hash_hmac('sha256', $baseString, $partnerKey);
+            $baseString = sprintf("%s%s%s%s%s", $partnerId, $path, $timestamp, $accessToken, $shopId);
+            $sign = hash_hmac('sha256', $baseString, $partnerKey);
 
-        $params = [
-            'partner_id' => (int)$partnerId,
-            'timestamp' => $timestamp,
-            'access_token' => $accessToken,
-            'shop_id' => (int)$shopId,
-            'sign' => $sign
-        ];
+            $params = [
+                'partner_id' => (int)$partnerId,
+                'timestamp' => $timestamp,
+                'access_token' => $accessToken,
+                'shop_id' => (int)$shopId,
+                'sign' => $sign
+            ];
 
-        $data = [
-            'shipping_document_type' => $shippingDocumentType,
-            'order_list' => [
-                ['order_sn' => $orderSn]
-            ]
-        ];
+            $data = [
+                'shipping_document_type' => $shippingDocumentType,
+                'order_list' => [
+                    ['order_sn' => $orderSn]
+                ]
+            ];
+
+            return Http::post($host . $path . '?' . http_build_query($params), $data);
+        };
 
         try {
-            // Note: Laravel Http client handles response body automatically
-            $response = Http::post($host . $path . '?' . http_build_query($params), $data);
+            $response = $execute();
+
+            // Check if response is JSON (error) or Binary (PDF)
+            $isJson = false;
+            $json = [];
+            
+            // Simple check: if content-type is json OR if body starts with {
+            if (strpos($response->header('Content-Type'), 'application/json') !== false || substr(trim($response->body()), 0, 1) === '{') {
+                $json = $response->json();
+                $isJson = true;
+            }
+
+            // Handle Token Error
+            $isTokenError = false;
+            if ($isJson) {
+                if (isset($json['error']) && ($json['error'] === 'error_auth' || $json['error'] === 'invalid_access_token' || $json['error'] === 'invalid_acceess_token')) {
+                    $isTokenError = true;
+                }
+                if (isset($json['message']) && stripos($json['message'], 'access_token') !== false) {
+                    $isTokenError = true;
+                }
+            }
+
+            if ($isTokenError) {
+                Log::info("Shopee Token Expired/Invalid during Download. Refreshing...");
+                $this->refreshAccessToken();
+                $store->refresh();
+                
+                // Retry
+                $response = $execute();
+            }
 
             if ($response->failed()) {
                 Log::error('Shopee downloadShippingDocument failed', ['body' => $response->body()]);
@@ -282,18 +358,15 @@ class ShopeeService
 
     public function refreshAccessToken()
     {
-        $host = config('marketplace.shopee.base_url');
+        $store = $this->getStore();
+        
+        $host = $store->marketplace->base_api_url ?? config('marketplace.shopee.base_url');
         $path = "/api/v2/auth/access_token/get";
-        $partnerId = config('marketplace.shopee.partner_id');
-        $partnerKey = config('marketplace.shopee.partner_key');
-        $shopId = (int)config('marketplace.shopee.shop_id');
-        $store = null;
-        try {
-            $store = $this->getShopeeStore();
-        } catch (\Throwable $e) {
-            $store = null;
-        }
-        $refreshToken = $store ? $store->refresh_token : config('marketplace.shopee.refresh_token');
+        $partnerId = (int)($store->client_id ?? config('marketplace.shopee.partner_id'));
+        $partnerKey = $store->client_secret ?? config('marketplace.shopee.partner_key');
+        $shopId = (int)($store->store_code ?? config('marketplace.shopee.shop_id'));
+        
+        $refreshToken = $store->refresh_token;
         $timestamp = time();
 
         if (!$refreshToken) {
@@ -326,46 +399,64 @@ class ShopeeService
             throw new \Exception($json['message'] ?? 'Refresh token failed');
         }
 
-        if ($store) {
-            $store->update([
-                'access_token' => $json['access_token'] ?? $store->access_token,
-                'refresh_token' => $json['refresh_token'] ?? $store->refresh_token,
-                'access_token_expires_at' => isset($json['expire_in']) ? now()->addSeconds($json['expire_in']) : $store->access_token_expires_at,
-            ]);
-        }
+        $store->update([
+            'access_token' => $json['access_token'] ?? $store->access_token,
+            'refresh_token' => $json['refresh_token'] ?? $store->refresh_token,
+            'access_token_expires_at' => isset($json['expire_in']) ? now()->addSeconds($json['expire_in']) : $store->access_token_expires_at,
+        ]);
 
         return $json;
     }
 
-    private function getShopeeStore(): OnlineStore
+    public function exchangeAuthCodeForToken(string $code, ?int $shopId = null): array
     {
-        $shopId = (string)config('marketplace.shopee.shop_id');
-        $store = OnlineStore::where('store_code', $shopId)->first();
-        if (!$store) {
-            $store = OnlineStore::whereHas('marketplace', function($q) {
-                $q->where('name', 'Shopee')->orWhere('alias', 'Shopee');
-            })->first();
-        }
-        if (!$store) {
-            throw new \Exception("OnlineStore for Shopee not found");
-        }
-        return $store;
-    }
+        $store = $this->getStore();
 
-    private function getAccessToken(): string
-    {
-        try {
-            $store = $this->getShopeeStore();
-            if ($store && $store->access_token) {
-                return $store->access_token;
-            }
-        } catch (\Throwable $e) {
-            // ignore and try env fallback
+        $host = $store->marketplace->base_api_url ?? config('marketplace.shopee.base_url');
+        $path = "/api/v2/auth/token/get";
+        $partnerId = (int)($store->client_id ?? config('marketplace.shopee.partner_id'));
+        $partnerKey = $store->client_secret ?? config('marketplace.shopee.partner_key');
+        $shopId = $shopId ?? (int)($store->store_code ?? config('marketplace.shopee.shop_id'));
+
+        $timestamp = time();
+
+        $baseString = sprintf("%s%s%s", $partnerId, $path, $timestamp);
+        $sign = hash_hmac('sha256', $baseString, $partnerKey);
+
+        $params = [
+            'partner_id' => $partnerId,
+            'timestamp' => $timestamp,
+            'sign' => $sign,
+        ];
+
+        $data = [
+            'code' => $code,
+            'shop_id' => $shopId,
+            'partner_id' => $partnerId,
+        ];
+
+        $response = Http::post($host . $path . '?' . http_build_query($params), $data);
+
+        if ($response->failed()) {
+            Log::error('Shopee exchangeAuthCodeForToken failed', ['body' => $response->body()]);
+            throw new \Exception("Shopee API Error: " . $response->body());
         }
-        $envToken = config('marketplace.shopee.access_token');
-        if ($envToken) {
-            return $envToken;
+
+        $json = $response->json();
+        if (isset($json['error']) && !empty($json['error'])) {
+            throw new \Exception($json['message'] ?? 'Exchange auth code failed');
         }
-        throw new \Exception("Shopee access token is missing. Set in OnlineStore or .env");
+
+        $accessExpireIn = isset($json['expire_in']) ? (int)$json['expire_in'] : null;
+        $refreshExpireIn = isset($json['refresh_token_expire_in']) ? (int)$json['refresh_token_expire_in'] : null;
+
+        $store->update([
+            'access_token' => $json['access_token'] ?? $store->access_token,
+            'refresh_token' => $json['refresh_token'] ?? $store->refresh_token,
+            'access_token_expires_at' => $accessExpireIn ? Carbon::now()->addSeconds($accessExpireIn) : $store->access_token_expires_at,
+            'refresh_token_expires_at' => $refreshExpireIn ? Carbon::now()->addSeconds($refreshExpireIn) : $store->refresh_token_expires_at,
+        ]);
+
+        return $json;
     }
 }

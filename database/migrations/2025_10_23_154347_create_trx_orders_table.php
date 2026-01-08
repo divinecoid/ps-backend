@@ -27,6 +27,7 @@ return new class extends Migration
                 'read',
                 'prepared',
                 'ready_to_ship',
+                'ready_to_pickup',
                 'shipped',
                 'delivered',
                 'cancelled',

@@ -4,7 +4,12 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Services\ShopeeService;
+use App\Models\MasterData\OnlineStore;
+use App\Models\Transactions\Order;
+use App\Models\Transactions\OrderItem;
+use App\Enums\OrderStatus;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class FetchShopeeOrders extends Command
 {
@@ -33,70 +38,186 @@ class FetchShopeeOrders extends Command
         $timeTo = time();
         $timeFrom = $timeTo - ($days * 24 * 60 * 60);
 
-        $this->info("Fetching orders from " . date('Y-m-d H:i:s', $timeFrom) . " to " . date('Y-m-d H:i:s', $timeTo));
+        // Fetch all active Shopee stores
+        $stores = OnlineStore::whereHas('marketplace', function ($q) {
+            $q->where('name', 'like', '%Shopee%')
+              ->orWhere('alias', 'like', '%shopee%');
+        })->where('is_active', true)->get();
 
-        try {
-            // 1. Get List of Orders
-            $response = $shopeeService->getOrderList($timeFrom, $timeTo);
+        if ($stores->isEmpty()) {
+            $this->warn("No active Shopee stores found.");
+            return 0;
+        }
+
+        $this->info("Found " . $stores->count() . " active Shopee stores.");
+
+        foreach ($stores as $store) {
+            $this->info("Processing Store: " . $store->store_name . " (" . $store->store_code . ")");
             
-            if (isset($response['error']) && !empty($response['error'])) {
-                $this->error('Shopee API Error: ' . ($response['message'] ?? 'Unknown error'));
-                return 1;
+            try {
+                // Set the store context for the service
+                $shopeeService->setStore($store);
+
+                $this->info("Fetching orders from " . date('Y-m-d H:i:s', $timeFrom) . " to " . date('Y-m-d H:i:s', $timeTo));
+
+                // 1. Get List of Orders
+                $response = $shopeeService->getOrderList($timeFrom, $timeTo);
+                
+                if (isset($response['error']) && !empty($response['error'])) {
+                    $this->error('Shopee API Error: ' . ($response['message'] ?? 'Unknown error'));
+                    continue; // Skip to next store
+                }
+
+                $orders = $response['response']['order_list'] ?? [];
+                $count = count($orders);
+                
+                $this->info("Found {$count} orders for store {$store->store_name}.");
+                
+                if ($count > 0) {
+                    // Extract all Order SNs
+                    $orderSns = array_column($orders, 'order_sn');
+                    
+                    // Chunk them if necessary (Shopee might have a limit per request, e.g. 50)
+                    $chunks = array_chunk($orderSns, 50);
+
+                    foreach ($chunks as $chunk) {
+                        $this->info("Fetching details for " . count($chunk) . " orders...");
+                        
+                        // 2. Get Details for these orders
+                        $detailResponse = $shopeeService->getOrderDetail($chunk);
+
+                        if (isset($detailResponse['error']) && !empty($detailResponse['error'])) {
+                            $this->error('Shopee Detail API Error: ' . ($detailResponse['message'] ?? 'Unknown error'));
+                            continue;
+                        }
+
+                        $detailedOrders = $detailResponse['response']['order_list'] ?? [];
+
+                        foreach ($detailedOrders as $detail) {
+                            $this->line("--------------------------------------------------");
+                            $this->line("🆔 Order SN   : " . $detail['order_sn']);
+                            $this->line("👤 Buyer      : " . ($detail['buyer_username'] ?? '-'));
+                            $this->line("💰 Total      : " . ($detail['total_amount'] ?? '-'));
+                            $this->line("✉️  Note       : " . ($detail['message_to_seller'] ?? '-'));
+                            
+                            if (isset($detail['item_list'])) {
+                                $this->line("📦 Items:");
+                                foreach ($detail['item_list'] as $index => $item) {
+                                    $this->line("   " . ($index + 1) . ". " . $item['item_name'] . " [x" . $item['model_quantity_purchased'] . "]");
+                                }
+                            }
+                            
+                            // Save to Database
+                            $this->saveOrder($detail, $store);
+                        }
+                    }
+                }
+
+            } catch (\Exception $e) {
+                $this->error('Exception for store ' . $store->store_name . ': ' . $e->getMessage());
+                Log::error('FetchShopeeOrders command failed for store ' . $store->store_name, ['error' => $e->getMessage()]);
+            }
+        }
+
+        $this->info('All stores processed.');
+        return 0;
+    }
+
+    private function saveOrder($detail, $store)
+    {
+        try {
+            DB::beginTransaction();
+
+            // Map Status
+            $statusMap = [
+                'UNPAID' => null, // Skip per user request
+                'READY_TO_SHIP' => OrderStatus::READY_TO_SHIP,
+                'RETRY_SHIP' => OrderStatus::RETRY_SHIP,
+                'PROCESSED' => OrderStatus::READY_TO_PICKUP,
+                'SHIPPED' => OrderStatus::SHIPPED,
+                'TO_CONFIRM_RECEIVE' => OrderStatus::SHIPPED,
+                'COMPLETED' => OrderStatus::SHIPPED,
+                'CANCELLED' => OrderStatus::CANCELLED,
+                'TO_RETURN' => OrderStatus::CANCELLED,
+            ];
+
+            $status = $statusMap[$detail['order_status']] ?? null;
+
+            if ($status === null) {
+                $this->info("   Skipping order " . $detail['order_sn'] . " with status: " . $detail['order_status']);
+                DB::rollBack();
+                return;
             }
 
-            $orders = $response['response']['order_list'] ?? [];
-            $count = count($orders);
-            
-            $this->info("Found {$count} orders.");
-            
-            if ($count > 0) {
-                // Extract all Order SNs
-                $orderSns = array_column($orders, 'order_sn');
-                
-                // Chunk them if necessary (Shopee might have a limit per request, e.g. 50)
-                // Assuming standard practice, let's chunk by 50
-                $chunks = array_chunk($orderSns, 50);
+            $recipient = $detail['recipient_address'] ?? [];
 
-                foreach ($chunks as $chunk) {
-                    $this->info("Fetching details for " . count($chunk) . " orders...");
-                    
-                    // 2. Get Details for these orders
-                    $detailResponse = $shopeeService->getOrderDetail($chunk);
+            $this->info("   Saving Order: " . $detail['order_sn']);
 
-                    if (isset($detailResponse['error']) && !empty($detailResponse['error'])) {
-                        $this->error('Shopee Detail API Error: ' . ($detailResponse['message'] ?? 'Unknown error'));
-                        continue;
-                    }
+            $orderData = [
+                'online_store_id' => $store->id,
+                'status' => $status,
+                'awb_code' => null, // Empty for now as requested
+                'total_price' => $detail['goods_to_declare'] ?? 0,
+                'total_shipping' => $detail['estimated_shipping_fee'] ?? 0,
+                'total_amount' => $detail['total_amount'] ?? 0,
+                'customer_name' => $recipient['name'] ?? $detail['buyer_username'],
+                'customer_phone' => $recipient['phone'] ?? null,
+                'customer_address' => $this->formatAddress($recipient),
+                'item_count' => count($detail['item_list'] ?? []),
+                'unique_item_count' => count($detail['item_list'] ?? []), 
+                'read_at' => now(), 
+            ];
 
-                    $detailedOrders = $detailResponse['response']['order_list'] ?? [];
+            $order = Order::updateOrCreate(
+                ['order_sn' => $detail['order_sn']],
+                $orderData
+            );
 
-                    foreach ($detailedOrders as $detail) {
-                        $this->line("--------------------------------------------------");
-                        $this->line("🆔 Order SN   : " . $detail['order_sn']);
-                        $this->line("👤 Buyer      : " . ($detail['buyer_username'] ?? '-'));
-                        $this->line("💰 Total      : " . ($detail['total_amount'] ?? '-'));
-                        $this->line("✉️  Note       : " . ($detail['message_to_seller'] ?? '-'));
-                        
-                        if (isset($detail['item_list'])) {
-                            $this->line("📦 Items:");
-                            foreach ($detail['item_list'] as $index => $item) {
-                                $this->line("   " . ($index + 1) . ". " . $item['item_name'] . " [x" . $item['model_quantity_purchased'] . "]");
-                            }
-                        }
-                        
-                        // TODO: Save to Database (Order, OrderItem, etc.)
-                        // $this->saveOrder($detail); 
-                    }
+            if (isset($detail['item_list'])) {
+                foreach ($detail['item_list'] as $itemData) {
+                    OrderItem::updateOrCreate(
+                        [
+                            'order_id' => $order->id,
+                            'order_item_id' => (string)$itemData['order_item_id'],
+                        ],
+                        [
+                            'item_name' => $itemData['item_name'],
+                            'sku' => $itemData['item_sku'] ?? null,
+                            'model_quantity_purchased' => $itemData['model_quantity_purchased'],
+                            'model_original_price' => $itemData['model_original_price'],
+                            'model_discounted_price' => $itemData['model_discounted_price'],
+                        ]
+                    );
                 }
             }
 
-            $this->info('Done.');
-            return 0;
+            DB::commit();
+            $this->info("   ✅ Order saved successfully.");
 
         } catch (\Exception $e) {
-            $this->error('Exception: ' . $e->getMessage());
-            Log::error('FetchShopeeOrders command failed', ['error' => $e->getMessage()]);
-            return 1;
+            DB::rollBack();
+            $this->error("   ❌ Failed to save order " . $detail['order_sn'] . ": " . $e->getMessage());
+            Log::error("Failed to save order " . $detail['order_sn'], [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'data' => $detail
+            ]);
         }
+    }
+
+    private function formatAddress($recipient)
+    {
+        if (empty($recipient)) return null;
+
+        $parts = [
+            $recipient['full_address'] ?? '',
+            $recipient['district'] ?? '',
+            $recipient['city'] ?? '',
+            $recipient['state'] ?? '',
+            $recipient['zipcode'] ?? '',
+            $recipient['region'] ?? ''
+        ];
+
+        return implode(', ', array_filter($parts));
     }
 }

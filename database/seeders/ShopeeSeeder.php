@@ -7,6 +7,7 @@ use App\Models\MasterData\Marketplace;
 use App\Models\MasterData\OnlineStore;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class ShopeeSeeder extends Seeder
 {
@@ -48,6 +49,36 @@ class ShopeeSeeder extends Seeder
                     // Let's just set some value.
                     'access_token_expires_at' => now()->subMinute(), 
                     'refresh_token_expires_at' => now()->addDays(30),
+                ]
+            );
+
+            // Create or update Marketplace (Sandbox)
+            $marketplaceSandbox = Marketplace::updateOrCreate(
+                ['code' => 'shopee_sandbox'],
+                [
+                    'name' => 'Shopee Sandbox',
+                    'alias' => 'shopee_sandbox',
+                    'base_api_url' => 'https://openplatform.sandbox.test-stable.shopee.sg',
+                    'description' => 'Shopee Sandbox Marketplace Integration',
+                    'is_need_checker' => false,
+                ]
+            );
+
+            // Create or update OnlineStore (Sandbox)
+            OnlineStore::updateOrCreate(
+                ['store_code' => '226182910'], // SHOP_ID
+                [
+                    'store_name' => 'Shopee Sandbox Store',
+                    'marketplace_id' => $marketplaceSandbox->id,
+                    'client_id' => '1198129', // PARTNER_ID
+                    'client_secret' => 'shpk54746f6d6545646f4542617176486f4358775150626769675861524b714e', // PARTNER_KEY
+                    'store_url' => 'https://sandbox.shopee.sg',
+                    'is_active' => true,
+                    'redirect_uri' => 'https://google.com',
+                    'access_token' => 'eyJhbGciOiJIUzI1NiJ9.CLGQSRABGP6N7WsgASiWw7rKBjDWuIDgAzgBQAE.jnCUXDl8nyWKzFPXUCRAmf5pYCyp6y_a1xr73u3U5JU',
+                    'refresh_token' => 'eyJhbGciOiJIUzI1NiJ9.CLGQSRABGP6N7WsgAiiWw7rKBjCDqpbfDDgBQAE.yZ58IhmGo7HDnkTiUzOL5tPDEUxn9MyeKEgd2T1mmvI',
+                    'access_token_expires_at' => Carbon::parse('12/27/2025, 1:54:15 AM'),
+                    'refresh_token_expires_at' => Carbon::parse('12/27/2025, 1:54:15 AM')->addDays(30),
                 ]
             );
         });
