@@ -32,6 +32,7 @@ class RequestController extends Controller
                 'models' => $detail->model,
                 'color_id' => $detail->color_id,
                 'colors' => $detail->color,
+                'barcode' => $detail->barcode
             ]),
         ];
     }
@@ -85,6 +86,16 @@ class RequestController extends Controller
                     })
                     ->values(),
             ]
+        );
+    }
+
+    public function barcode($id)
+    {
+        return $this->baseShow(
+            \App\Models\Transactions\Request::class,
+            $id,
+            ['request_detail'],
+            $this->structure()
         );
     }
 
@@ -154,7 +165,7 @@ class RequestController extends Controller
                             'size_id' => $item['size_id'],
                             'req_dozen_qty' => $item['req_dozen_qty'],
                             'req_piece_qty' => $item['req_piece_qty'],
-                            'barcode' => $cmt->code . '|' . now() . '|' . $model->code . '|' . $color->code . '|' . $size->code, //TODO: generate barcode
+                            'barcode' => $cmt->code . '|' . now() . '|' . $model->sku . '|' . $color->code . '|' . $size->code, //TODO: generate barcode
                         ];
                     }
                     \App\Models\Transactions\RequestDetail::insert($details);
