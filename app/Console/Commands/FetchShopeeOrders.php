@@ -63,6 +63,9 @@ class FetchShopeeOrders extends Command
                 // 1. Get List of Orders
                 $response = $shopeeService->getOrderList($timeFrom, $timeTo);
                 
+                // Log response to file
+                $this->saveApiResponse('order_list', $store->store_name, $response);
+                
                 if (isset($response['error']) && !empty($response['error'])) {
                     $this->error('Shopee API Error: ' . ($response['message'] ?? 'Unknown error'));
                     continue; // Skip to next store
@@ -85,6 +88,9 @@ class FetchShopeeOrders extends Command
                         
                         // 2. Get Details for these orders
                         $detailResponse = $shopeeService->getOrderDetail($chunk);
+
+                        // Log response to file
+                        $this->saveApiResponse('order_detail', $store->store_name, $detailResponse);
 
                         if (isset($detailResponse['error']) && !empty($detailResponse['error'])) {
                             $this->error('Shopee Detail API Error: ' . ($detailResponse['message'] ?? 'Unknown error'));
@@ -121,6 +127,29 @@ class FetchShopeeOrders extends Command
 
         $this->info('All stores processed.');
         return 0;
+    }
+
+    private function saveApiResponse($type, $storeName, $data)
+    {
+        try {
+            $path = storage_path("logs/shopee/orders/" . date('Y-m-d'));
+            if (!file_exists($path)) {
+                mkdir($path, 0777, true);
+            }
+
+            $filename = sprintf(
+                "%s_%s_%s_%s.json",
+                date('H-i-s'),
+                str_replace([' ', '/', '\\'], '_', $storeName),
+                $type,
+                uniqid()
+            );
+
+            file_put_contents($path . '/' . $filename, json_encode($data, JSON_PRETTY_PRINT));
+            $this->info("   Saved JSON response to: " . $path . '/' . $filename);
+        } catch (\Exception $e) {
+            $this->warn("   Failed to save JSON response: " . $e->getMessage());
+        }
     }
 
     private function saveOrder($detail, $store)
@@ -175,6 +204,19 @@ class FetchShopeeOrders extends Command
 
             if (isset($detail['item_list'])) {
                 foreach ($detail['item_list'] as $itemData) {
+                    
+                    // Logic to extract color and size from model_name
+                    // Assumed format "Color,Size" or similar. Shopee usually sends "VariationName, VariationName2"
+                    // If model_name is "Merah,L" -> color=Merah, size=L
+                    // We will split by comma.
+                    $color = null;
+                    $size = null;
+                    if (!empty($itemData['model_name'])) {
+                        $parts = explode(',', $itemData['model_name']);
+                        $color = trim($parts[0] ?? '');
+                        $size = trim($parts[1] ?? '');
+                    }
+
                     OrderItem::updateOrCreate(
                         [
                             'order_id' => $order->id,
@@ -183,9 +225,11 @@ class FetchShopeeOrders extends Command
                         [
                             'item_name' => $itemData['item_name'],
                             'sku' => $itemData['item_sku'] ?? null,
-                            'model_quantity_purchased' => $itemData['model_quantity_purchased'],
-                            'model_original_price' => $itemData['model_original_price'],
-                            'model_discounted_price' => $itemData['model_discounted_price'],
+                            'color' => $color,
+                            'size' => $size,
+                            'quantity_purchased' => $itemData['model_quantity_purchased'],
+                            'price' => $itemData['model_original_price'],
+                            'discounted_price' => $itemData['model_discounted_price'],
                         ]
                     );
                 }

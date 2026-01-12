@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Transactions\Order;
 use App\Enums\OrderStatus;
 use App\Services\ShopeeService;
+use App\Models\MasterData\OnlineStore;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class ShopeeController extends Controller
 {
@@ -16,6 +18,67 @@ class ShopeeController extends Controller
     public function __construct(ShopeeService $shopeeService)
     {
         $this->shopeeService = $shopeeService;
+    }
+
+    public function redirectToShopee($id)
+    {
+        $store = OnlineStore::findOrFail($id);
+        $this->shopeeService->setStore($store);
+        $url = $this->shopeeService->generateAuthUrl();
+        return redirect($url);
+    }
+
+    public function handleCallback(Request $request)
+    {
+        Log::info('Shopee Callback Received', $request->all());
+
+        $state = $request->query('state'); // Partner ID
+        $code = $request->query('code');
+        $shopId = $request->query('shop_id');
+
+        if (!$state || !$code || !$shopId) {
+             Log::error('Shopee Callback Missing Parameters', ['state' => $state, 'code' => $code, 'shopId' => $shopId]);
+             return response()->json(['error' => 'Missing required parameters (state/code/shop_id). Please regenerate auth URL.'], 400);
+        }
+
+        // Find store by Partner ID (state)
+        // User requested to use state (PartnerID) to identify.
+        // We try to find a store that matches this PartnerID.
+        // Ideally we should also check shop_id if it exists, but for initial auth it might be null.
+        $store = OnlineStore::where('client_id', $state)
+                    ->where(function($q) use ($shopId) {
+                        $q->where('shop_id', $shopId)
+                          ->orWhereNull('shop_id')
+                          ->orWhere('shop_id', '');
+                    })
+                    ->first();
+
+        if (!$store) {
+            // Fallback: Find any store with this Partner ID (Caution: ambiguous if multiple stores)
+            $store = OnlineStore::where('client_id', $state)->first();
+        }
+
+        if (!$store) {
+            return response()->json(['error' => 'Store not found for Partner ID: ' . $state], 404);
+        }
+
+        // Set store context
+        $this->shopeeService->setStore($store);
+
+        // Update Auth Code and Shop ID as requested
+        $store->update([
+            'auth_code' => $code,
+            'shop_id' => $shopId
+        ]);
+
+        // Exchange for Token
+        try {
+            $this->shopeeService->exchangeAuthCodeForToken($code, (int)$shopId);
+            return response('Shopee Auth Success! Token has been generated. You can close this window.');
+        } catch (\Exception $e) {
+            Log::error('Shopee Auth Failed', ['error' => $e->getMessage()]);
+            return response('Auth Failed: ' . $e->getMessage(), 500);
+        }
     }
 
     public function generateAuthUrl()
@@ -138,6 +201,8 @@ class ShopeeController extends Controller
                     'status' => OrderStatus::READY_TO_PICKUP,
                     'readytoship_at' => now(),
                 ];
+                
+                Log::info("Attempting to update order status to READY_TO_PICKUP for order: " . $request->order_sn);
 
                 // Try to fetch AWB
                 $detailResponse = $this->shopeeService->getOrderDetail([$request->order_sn]);
@@ -155,8 +220,20 @@ class ShopeeController extends Controller
 
                 $order->update($updateData);
 
+                // Verify update
+                $order->refresh();
+                if ($order->status !== OrderStatus::READY_TO_PICKUP) {
+                     $currentStatus = $order->status instanceof \BackedEnum ? $order->status->value : $order->status;
+                     Log::warning("Order status update verification failed. Status is still: " . $currentStatus);
+                     // Force direct update
+                     DB::table('trx_orders')
+                        ->where('id', $order->id)
+                        ->update(['status' => 'ready_to_pickup', 'readytoship_at' => now()]);
+                }
+
             } catch (\Exception $e) {
                 Log::warning("Failed to update local status/AWB after ship: " . $e->getMessage());
+                $shipResponse['local_update_warning'] = $e->getMessage();
             }
 
             // 2. Automatically Create Shipping Document

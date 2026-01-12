@@ -54,13 +54,14 @@ class ShopeeService
         $sign = hash_hmac('sha256', $baseString, $partnerKey);
 
         $url = sprintf(
-            "%s%s?partner_id=%s&timestamp=%s&sign=%s&redirect=%s",
+            "%s%s?partner_id=%s&timestamp=%s&sign=%s&redirect=%s&state=%s",
             $host,
             $path,
             $partnerId,
             $timestamp,
             $sign,
-            urlencode($redirectUrl)
+            urlencode($redirectUrl),
+            $partnerId
         );
 
         return $url;
