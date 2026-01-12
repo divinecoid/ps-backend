@@ -110,6 +110,8 @@ class ShopeeRealFlowTest extends TestCase
                 }
 
                 // 4. If status is READY_TO_SHIP or RETRY_SHIP, do Shipment Flow
+                echo "Current Status: " . ($order->status->value ?? $order->status) . "\n";
+
                 if ($order->status === OrderStatus::READY_TO_SHIP || $order->status === OrderStatus::RETRY_SHIP) {
                     echo "Trying to Download Shipping Document (pre-ship)...\n";
                     $preDownloadResponse = $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -183,6 +185,10 @@ class ShopeeRealFlowTest extends TestCase
                     }
                     
                     echo "Order Shipped! Message: " . $shipResponse->json('message') . "\n";
+
+                    // Refresh and check status
+                    $order->refresh();
+                    echo "New Status after Ship: " . ($order->status->value ?? $order->status) . "\n";
 
                     echo "Downloading Shipping Document (post-ship)...\n";
                     $downloadResponse = $this->withHeaders(['Authorization' => "Bearer $token"])

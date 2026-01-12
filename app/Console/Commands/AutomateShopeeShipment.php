@@ -156,7 +156,7 @@ class AutomateShopeeShipment extends Command
                 
                 // Save to storage
                 $filename = "shopee_label_{$order->order_sn}.pdf";
-                $path = storage_path("app/public/labels/{$filename}");
+                $path = public_path("labels/{$filename}");
                 
                 if (!file_exists(dirname($path))) {
                     mkdir(dirname($path), 0755, true);
