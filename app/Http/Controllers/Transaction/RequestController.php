@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
 use App\Models\MasterData\CMT;
 use App\Models\MasterData\Color;
+use App\Models\MasterData\ProductModel;
 use App\Models\MasterData\Size;
+use App\Models\Transactions\RequestDetail;
 use DB;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class RequestController extends Controller
 {
@@ -114,62 +117,66 @@ class RequestController extends Controller
                 'request_detail.*.variant_detail.*.piece_qty' => 'required|integer|min:0',
             ],
             function ($data) {
-                return DB::transaction(function () use ($data) {
+                $items = [];
+                foreach ($data['request_detail'] as $detail) {
+                    foreach ($detail['variant_detail'] as $variant) {
+                        $items[] = [
+                            'model_id' => $detail['model_id'],
+                            'color_id' => $detail['color_id'],
+                            'size_id' => $variant['size_id'],
+                            'req_dozen_qty' => $variant['dozen_qty'],
+                            'req_piece_qty' => $variant['piece_qty'],
+                        ];
+                    }
+                }
+                $cmt = CMT::find($data['cmt_id']);
+                $models = ProductModel::with(['colors', 'sizes'])
+                    ->whereIn('id', collect($items)->pluck('model_id')->unique())
+                    ->get()
+                    ->keyBy('id');
+                foreach ($items as &$item) {
+                    $model = $models[$item['model_id']] ?? null;
+                    if (!$model) {
+                        return $this->errorResponse(422, "Model {$item['model_id']} not found");
+                    }
+                    $color = $model->colors->firstWhere('id', $item['color_id']);
+                    if (!$color) {
+                        return $this->errorResponse(422, "Invalid color for model {$model->name}");
+                    }
+                    $size = $model->sizes->firstWhere('id', $item['size_id']);
+                    if (!$size) {
+                        return $this->errorResponse(422, "Invalid size for model {$model->name}");
+                    }
+                    $item['model'] = $model;
+                    $item['color'] = $color;
+                    $item['size']  = $size;
+                }
+                unset($item);
+                return DB::transaction(function () use ($data, $items, $cmt) {
                     $requestModel = \App\Models\Transactions\Request::create([
                         'cmt_id' => $data['cmt_id']
                     ]);
-                    $items = [];
-                    foreach ($data['request_detail'] as $detail) {
-                        foreach ($detail['variant_detail'] as $variant) {
-                            $items[] = [
-                                'model_id' => $detail['model_id'],
-                                'color_id' => $detail['color_id'],
-                                'size_id' => $variant['size_id'],
-                                'req_dozen_qty' => $variant['dozen_qty'],
-                                'req_piece_qty' => $variant['piece_qty'],
-                            ];
-                        }
-                    }
-
-                    $modelIds = collect($items)->pluck('model_id')->unique();
-                    $cmt = CMT::find($data['cmt_id']);
-                    $models = \App\Models\MasterData\ProductModel::with([
-                        'colors:id',
-                        'sizes:id'
-                    ])
-                        ->whereIn('id', $modelIds)
-                        ->get()
-                        ->keyBy('id');
-
-                    foreach ($items as $item) {
-                        $model = $models[$item['model_id']] ?? null;
-                        $color = Color::find($item['color_id']) ?? null;
-                        $size = Size::find($item['size_id']) ?? null;
-                        if (!$model) {
-                            return $this->errorResponse(422, "Model {$item['model_id']} not found");
-                        }
-                        if (!$model->colors->contains('id', $item['color_id'])) {
-                            return $this->errorResponse(422, "Color {$color->name} not valid for model {$model->name}");
-                        }
-                        if (!$model->sizes->contains('id', $item['size_id'])) {
-                            return $this->errorResponse(422, "Size {$size->name} not valid for model {$model->name}");
-                        }
-                    }
                     $details = [];
                     foreach ($items as $item) {
                         $details[] = [
-                            'id' => \Str::uuid(),
+                            'id' => Str::uuid(),
                             'request_id' => $requestModel->id,
                             'model_id' => $item['model_id'],
                             'color_id' => $item['color_id'],
                             'size_id' => $item['size_id'],
                             'req_dozen_qty' => $item['req_dozen_qty'],
                             'req_piece_qty' => $item['req_piece_qty'],
-                            'barcode' => $cmt->code . '|' . now() . '|' . $model->sku . '|' . $color->code . '|' . $size->code, //TODO: generate barcode
+                            'barcode' => implode('|', [
+                                $cmt->code,
+                                now()->format('YmdHis'),
+                                $item['model']->sku,
+                                $item['color']->code,
+                                $item['size']->code,
+                            ]),
                         ];
                     }
-                    \App\Models\Transactions\RequestDetail::insert($details);
-                    return $requestModel;
+                    RequestDetail::insert($details);
+                    return $this->successResponse($requestModel);
                 });
             }
         );
