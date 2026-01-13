@@ -21,10 +21,12 @@ class OrderItem extends Model
         'order_item_id', 
         'sku', 
         'item_name',
+        'color',
+        'size',
         'product_id', 
-        'model_original_price',
-        'model_discounted_price',
-        'model_quantity_purchased',
+        'price',
+        'discounted_price',
+        'quantity_purchased',
         'item_prepared_at',
         'notes'
     ];
