@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Transaction\RequestController;
+use App\Http\Controllers\Transaction\InboundController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\LoginController;
@@ -198,6 +199,11 @@ Route::prefix('request')->middleware('checkrole')->group(function () {
     Route::get('/barcode/{id}', [RequestController::class, 'barcode']);
     Route::post('/', [RequestController::class, 'store']);
     Route::delete('/{id}', [RequestController::class, 'destroy']);
+});
+
+// Inbound Receiving
+Route::prefix('inbound')->middleware('checkrole')->group(function () {
+    Route::post('/', [InboundController::class, 'store']);
 });
 
 
