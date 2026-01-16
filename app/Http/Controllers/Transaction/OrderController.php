@@ -35,6 +35,7 @@ class OrderController extends Controller
             'customer_name' => $data->customer_name,
             'customer_phone' => $data->customer_phone,
             'customer_address' => $data->customer_address,
+            'marketplace_id' => $data->marketplace_id,
         ];
     }
 
@@ -83,6 +84,7 @@ class OrderController extends Controller
                 'customer_name' => 'required|string|max:255',
                 'customer_phone' => 'nullable|string|max:50',
                 'customer_address' => 'nullable|string|max:500',
+                'marketplace_id' => 'nullable|exists:mdx_marketplaces,id',
             ],
             null
         );
@@ -118,6 +120,7 @@ class OrderController extends Controller
                 'customer_name' => 'required|string|max:255',
                 'customer_phone' => 'nullable|string|max:50',
                 'customer_address' => 'nullable|string|max:500',
+                'marketplace_id' => 'nullable|exists:mdx_marketplaces,id',
             ],
             null
         );
@@ -150,7 +153,7 @@ class OrderController extends Controller
         $response = $this->getMarketplaceData(
             $baseUrl,
             '/order/get',
-            ['order_id' => (int)$id, 'app_key' => $app_key, 'timestamp' => $timestamp, 'sign_method' => $signinmethod, 'sign' => $sign],
+            ['order_id' => (int) $id, 'app_key' => $app_key, 'timestamp' => $timestamp, 'sign_method' => $signinmethod, 'sign' => $sign],
             // $token
         );
 

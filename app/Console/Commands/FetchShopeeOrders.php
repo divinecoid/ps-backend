@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use App\Services\ShopeeService;
 use App\Models\MasterData\OnlineStore;
+use App\Models\MasterData\Marketplace;
 use App\Models\Transactions\Order;
 use App\Models\Transactions\OrderItem;
 use App\Enums\OrderStatus;
@@ -33,7 +34,7 @@ class FetchShopeeOrders extends Command
     public function handle(ShopeeService $shopeeService)
     {
         $this->info('Starting Shopee Order Fetch...');
-        
+
         $days = $this->option('days');
         $timeTo = time();
         $timeFrom = $timeTo - ($days * 24 * 60 * 60);
@@ -41,7 +42,7 @@ class FetchShopeeOrders extends Command
         // Fetch all active Shopee stores
         $stores = OnlineStore::whereHas('marketplace', function ($q) {
             $q->where('name', 'like', '%Shopee%')
-              ->orWhere('alias', 'like', '%shopee%');
+                ->orWhere('alias', 'like', '%shopee%');
         })->where('is_active', true)->get();
 
         if ($stores->isEmpty()) {
@@ -53,7 +54,7 @@ class FetchShopeeOrders extends Command
 
         foreach ($stores as $store) {
             $this->info("Processing Store: " . $store->store_name . " (" . $store->store_code . ")");
-            
+
             try {
                 // Set the store context for the service
                 $shopeeService->setStore($store);
@@ -62,10 +63,10 @@ class FetchShopeeOrders extends Command
 
                 // 1. Get List of Orders
                 $response = $shopeeService->getOrderList($timeFrom, $timeTo);
-                
+
                 // Log response to file
                 $this->saveApiResponse('order_list', $store->store_name, $response);
-                
+
                 if (isset($response['error']) && !empty($response['error'])) {
                     $this->error('Shopee API Error: ' . ($response['message'] ?? 'Unknown error'));
                     continue; // Skip to next store
@@ -73,19 +74,19 @@ class FetchShopeeOrders extends Command
 
                 $orders = $response['response']['order_list'] ?? [];
                 $count = count($orders);
-                
+
                 $this->info("Found {$count} orders for store {$store->store_name}.");
-                
+
                 if ($count > 0) {
                     // Extract all Order SNs
                     $orderSns = array_column($orders, 'order_sn');
-                    
+
                     // Chunk them if necessary (Shopee might have a limit per request, e.g. 50)
                     $chunks = array_chunk($orderSns, 50);
 
                     foreach ($chunks as $chunk) {
                         $this->info("Fetching details for " . count($chunk) . " orders...");
-                        
+
                         // 2. Get Details for these orders
                         $detailResponse = $shopeeService->getOrderDetail($chunk);
 
@@ -105,14 +106,14 @@ class FetchShopeeOrders extends Command
                             $this->line("👤 Buyer      : " . ($detail['buyer_username'] ?? '-'));
                             $this->line("💰 Total      : " . ($detail['total_amount'] ?? '-'));
                             $this->line("✉️  Note       : " . ($detail['message_to_seller'] ?? '-'));
-                            
+
                             if (isset($detail['item_list'])) {
                                 $this->line("📦 Items:");
                                 foreach ($detail['item_list'] as $index => $item) {
                                     $this->line("   " . ($index + 1) . ". " . $item['item_name'] . " [x" . $item['model_quantity_purchased'] . "]");
                                 }
                             }
-                            
+
                             // Save to Database
                             $this->saveOrder($detail, $store);
                         }
@@ -182,6 +183,9 @@ class FetchShopeeOrders extends Command
 
             $this->info("   Saving Order: " . $detail['order_sn']);
 
+            // Get Shopee marketplace ID
+            $shopeeMarketplace = Marketplace::where('code', 'shopee')->first();
+
             $orderData = [
                 'online_store_id' => $store->id,
                 'status' => $status,
@@ -193,8 +197,9 @@ class FetchShopeeOrders extends Command
                 'customer_phone' => $recipient['phone'] ?? null,
                 'customer_address' => $this->formatAddress($recipient),
                 'item_count' => count($detail['item_list'] ?? []),
-                'unique_item_count' => count($detail['item_list'] ?? []), 
-                'read_at' => now(), 
+                'unique_item_count' => count($detail['item_list'] ?? []),
+                'read_at' => now(),
+                'marketplace_id' => $shopeeMarketplace?->id,
             ];
 
             $order = Order::updateOrCreate(
@@ -204,7 +209,7 @@ class FetchShopeeOrders extends Command
 
             if (isset($detail['item_list'])) {
                 foreach ($detail['item_list'] as $itemData) {
-                    
+
                     // Logic to extract color and size from model_name
                     // Assumed format "Color,Size" or similar. Shopee usually sends "VariationName, VariationName2"
                     // If model_name is "Merah,L" -> color=Merah, size=L
@@ -220,7 +225,7 @@ class FetchShopeeOrders extends Command
                     OrderItem::updateOrCreate(
                         [
                             'order_id' => $order->id,
-                            'order_item_id' => (string)$itemData['order_item_id'],
+                            'order_item_id' => (string) $itemData['order_item_id'],
                         ],
                         [
                             'item_name' => $itemData['item_name'],
@@ -251,7 +256,8 @@ class FetchShopeeOrders extends Command
 
     private function formatAddress($recipient)
     {
-        if (empty($recipient)) return null;
+        if (empty($recipient))
+            return null;
 
         $parts = [
             $recipient['full_address'] ?? '',
