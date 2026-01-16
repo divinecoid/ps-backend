@@ -26,10 +26,10 @@ class RequestController extends Controller
             'created_date' => $data->created_at,
             'status' => $data->status,
             'request_detail' => $data->request_detail->map(fn($detail) => [
-                'req_dozen_qty' => $detail->req_dozen_qty,
-                'req_piece_qty' => $detail->req_piece_qty,
-                'rec_dozen_qty' => $detail->rec_dozen_qty,
-                'rec_piece_qty' => $detail->rec_piece_qty,
+                'req_dozen_qty' => floor($detail->req_qty / 12),
+                'req_piece_qty' => $detail->req_qty % 12,
+                'rec_dozen_qty' => floor($detail->rec_qty / 12),
+                'rec_piece_qty' => $detail->rec_qty % 12,
                 'rec_bs_qty' => $detail->rec_bs_qty,
                 'model_id' => $detail->model_id,
                 'models' => $detail->model,
@@ -81,8 +81,8 @@ class RequestController extends Controller
                             'variant_detail' => $group->map(function ($item) {
                                 return [
                                     'size_id' => $item->size_id,
-                                    'dozen_qty' => $item->req_dozen_qty,
-                                    'piece_qty' => $item->req_piece_qty,
+                                    'dozen_qty' => floor($item->req_qty / 12),
+                                    'piece_qty' => $item->req_qty % 12,
                                 ];
                             })->values(),
                         ];
@@ -124,8 +124,7 @@ class RequestController extends Controller
                             'model_id' => $detail['model_id'],
                             'color_id' => $detail['color_id'],
                             'size_id' => $variant['size_id'],
-                            'req_dozen_qty' => $variant['dozen_qty'],
-                            'req_piece_qty' => $variant['piece_qty'],
+                            'req_qty' => ($variant['dozen_qty'] * 12) + $variant['piece_qty'],
                         ];
                     }
                 }
@@ -149,7 +148,7 @@ class RequestController extends Controller
                     }
                     $item['model'] = $model;
                     $item['color'] = $color;
-                    $item['size']  = $size;
+                    $item['size'] = $size;
                 }
                 unset($item);
                 return DB::transaction(function () use ($data, $items, $cmt) {
@@ -164,8 +163,8 @@ class RequestController extends Controller
                             'model_id' => $item['model_id'],
                             'color_id' => $item['color_id'],
                             'size_id' => $item['size_id'],
-                            'req_dozen_qty' => $item['req_dozen_qty'],
-                            'req_piece_qty' => $item['req_piece_qty'],
+                            'req_qty' => $item['req_qty'],
+                            'rec_qty' => 0,
                             'barcode' => implode('|', [
                                 $cmt->code,
                                 now()->format('YmdHis'),
