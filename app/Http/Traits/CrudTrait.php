@@ -122,7 +122,7 @@ trait CrudTrait
         $data = $request->only(array_keys($request->all()));
 
         if ($afterValidate) {
-            return $afterValidate($data, $request);
+            return $afterValidate($data);
         }
     }
 

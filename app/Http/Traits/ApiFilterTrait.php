@@ -69,12 +69,12 @@ trait ApiFilterTrait
         ]);
     }
 
-    public function errorResponse($code = 400, $message = "Error")
+    public function errorResponse($code = 400, $message = "Error", $data = null)
     {
         return response()->json([
             'success' => false,
             'message' => $message,
-            'data' => null
+            'data' => $data
         ], $code);
     }
 

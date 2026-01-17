@@ -96,7 +96,13 @@ class RequestController extends Controller
             \App\Models\Transactions\Request::class,
             $id,
             ['request_detail'],
-            $this->structure()
+            fn($data) => [
+                'request_detail' => $data->request_detail->map(fn($detail) => [
+                    'req_dozen_qty' => floor($detail->req_qty / 12),
+                    'req_piece_qty' => $detail->req_qty % 12,
+                    'barcode' => $detail->barcode
+                ]),
+            ]
         );
     }
 
