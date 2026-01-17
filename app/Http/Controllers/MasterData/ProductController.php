@@ -91,7 +91,7 @@ class ProductController extends Controller
                 if (!ctype_digit($barcodeIndex)) {
                     return $this->errorResponse(422, 'Sequence barcode tidak valid');
                 }
-                $totalQuantity = $request->req_dozen_qty * 12 + $request->req_piece_qty;
+                $totalQuantity = $request->req_qty;
                 if ((int)$barcodeIndex < 1 || (int)$barcodeIndex > $totalQuantity) {
                     return $this->errorResponse(422, 'Sequence barcode di luar jangkauan');
                 }

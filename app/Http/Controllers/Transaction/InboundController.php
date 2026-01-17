@@ -3,276 +3,285 @@
 namespace App\Http\Controllers\Transaction;
 
 use App\Http\Controllers\Controller;
-use App\Models\MasterData\CMT;
-use App\Models\MasterData\Color;
-use App\Models\MasterData\ProductModel;
-use App\Models\MasterData\Size;
-use App\Models\MasterData\Warehouse;
+use App\Http\Traits\CrudTrait;
 use App\Models\Transactions\Receivedlog;
 use App\Models\Transactions\ReceivedlogDetail;
-use App\Models\Transactions\Request;
 use App\Models\Transactions\RequestDetail;
 use Illuminate\Http\Request as HttpRequest;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
-use Carbon\Carbon;
+use Illuminate\Validation\Rule;
 
 class InboundController extends Controller
 {
-    /**
-     * Process inbound receiving from scanned barcodes
-     * 
-     * Barcode format: CMT_CODE|REQUEST_DATE|MODEL|COLOR|SIZE|TYPE|SEQUENCE
-     * Example: "CMT01|2026-01-08 16:25:35|LC|RED|L|DOZEN|1"
-     */
-    public function store(HttpRequest $request)
+    use CrudTrait;
+
+    // {
+    //     "barcodes_dozen": [
+    //         "CMT01|20260116172102|LP|RED|XS|1|1",
+    //         "CMT01|20260116172102|LP|RED|XS|1|1"
+    //     ],
+    //     "warehouse_id": "019b85c4-c21c-7215-b374-47b05605d1b3",
+    //     "barcodes_piece": [
+    //         {
+    //             "barcode": "CMT01|20260116172102|LP|RED|XS||1",
+    //             "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c5446"
+    //         },
+    //         {
+    //             "barcode": "CMT01|20260116172102|LP|RED|XS||2",
+    //             "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c5446"
+    //         },
+    //         {
+    //             "barcode": "CMT01|20260116172102|LP|RED|XS||3",
+    //             "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c5446"
+    //         }
+    //     ],
+    //     "notes": "Received in good condition"
+    // }
+
+    public function store(HTTPRequest $request)
     {
-        // Validate input
-        $validator = Validator::make($request->all(), [
-            'barcodes' => 'required|array|min:1',
-            'barcodes.*' => 'required|string',
-            'warehouse_id' => 'required|uuid|exists:mdx_warehouses,id',
-            'notes' => 'nullable|string|max:1000',
-        ]);
+        return $this->baseValidate(
+            $request,
+            [
+                'warehouse_id' => ['required', Rule::exists('mdx_warehouses', 'id')->whereNull('deleted_at')],
+                'barcodes_dozen' => 'required_without:barcodes_piece|array|min:1',
+                'barcodes_dozen.*' => 'required|string',
+                'barcodes_piece' => 'required_without:barcodes_dozen|array|min:1',
+                'barcodes_piece.*.barcode' => 'required|string',
+                'barcodes_piece.*.rack_id' => ['required', Rule::exists('mdx_racks', 'id')->whereNull('deleted_at')],
+                'notes' => 'nullable|string|max:1000',
+            ],
+            function ($data) {
+                $invalidDozenBarcodes = [];
+                $invalidPieceBarcodes = [];
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
-        }
+                $scannedDozenBarcodes = [];
+                $scannedPieceBarcodes = [];
+                try {
 
-        $barcodes = $request->input('barcodes');
-        $warehouseId = $request->input('warehouse_id');
-        $notes = $request->input('notes');
-        $userId = Auth::id();
+                    $barcodesDozen = $data['barcodes_dozen'] ?? [];
+                    $barcodesPiece = $data['barcodes_piece'] ?? [];
 
-        // Parse and validate barcodes
-        $parsedItems = [];
-        $errors = [];
-
-        foreach ($barcodes as $index => $barcode) {
-            try {
-                $parsed = $this->parseBarcode($barcode);
-                $parsed['original_barcode'] = $barcode;
-                $parsedItems[] = $parsed;
-            } catch (\Exception $e) {
-                $errors[] = [
-                    'barcode' => $barcode,
-                    'index' => $index,
-                    'error' => $e->getMessage()
-                ];
-            }
-        }
-
-        if (!empty($errors) && empty($parsedItems)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'All barcodes failed to parse',
-                'errors' => $errors
-            ], 400);
-        }
-
-        // Group items by request (CMT + Date)
-        $groupedByRequest = collect($parsedItems)->groupBy(function ($item) {
-            return $item['cmt_code'] . '|' . $item['request_date'];
-        });
-
-        DB::beginTransaction();
-        try {
-            $createdReceivedlogs = [];
-            $processedCount = 0;
-
-            foreach ($groupedByRequest as $groupKey => $items) {
-                $firstItem = $items->first();
-
-                // Find the request
-                $trxRequest = $this->findRequest($firstItem['cmt_code'], $firstItem['request_date']);
-
-                if (!$trxRequest) {
-                    foreach ($items as $item) {
-                        $errors[] = [
-                            'barcode' => $item['original_barcode'],
-                            'error' => "Request not found for CMT: {$firstItem['cmt_code']}, Date: {$firstItem['request_date']}"
-                        ];
-                    }
-                    continue;
-                }
-
-                // Create receivedlog header
-                $receivedlog = Receivedlog::create([
-                    'request_id' => $trxRequest->id,
-                    'warehouse_id' => $warehouseId,
-                    'user_id' => $userId,
-                    'received_date' => now(),
-                    'notes' => $notes
-                ]);
-
-                $receivedlogItems = [];
-
-                // Process each item in this request group
-                foreach ($items as $item) {
-                    try {
-                        // Find request detail that matches this item
-                        $requestDetail = $this->findRequestDetail(
-                            $trxRequest->id,
-                            $item['model_code'],
-                            $item['color_code'],
-                            $item['size_code']
-                        );
-
-                        if (!$requestDetail) {
-                            $errors[] = [
-                                'barcode' => $item['original_barcode'],
-                                'error' => "Request detail not found for Model: {$item['model_code']}, Color: {$item['color_code']}, Size: {$item['size_code']}"
-                            ];
-                            continue;
+                    // "barcodes_dozen": [
+                    //     "CMT01|20260116173826|LP|RED|XS|1|1",
+                    //     "CMT01|20260116173826|LP|RED|XS|2|7",
+                    //     "CMT01|20260116173826|LP|RED|XS|1|2",
+                    //     "CMT01|20260116173826|LP|RED|XS|1|13"
+                    // ],
+                    $currentRequest = null;
+                    if ($barcodesDozen) {
+                        foreach ($barcodesDozen as $barcode) {//harus dalam bentuk dozen semua
+                            ['prefix' => $prefix, 'group' => $group, 'sequence' => $sequence] = $this->parseBarcode($barcode);
+                            $requestDetail = $this->findRequestDetail($prefix);
+                            if (!$requestDetail) {//cek jika barcode ditemukan di database
+                                $invalidDozenBarcodes[] = $barcode;
+                                continue;
+                            }
+                            $request = $requestDetail->request;
+                            $currentRequest ??= $request;//simpan current request pertama
+                            if ($request->id !== $currentRequest->id) {
+                                $invalidDozenBarcodes[] = $barcode;
+                                continue;
+                            }
+                            //jika bukan group (disini tidak boleh ada piece yang masuk)
+                            if ($group === '' || !is_numeric($group) || !is_numeric($sequence)) {
+                                $invalidDozenBarcodes[] = $barcode;
+                                continue;
+                            }
+                            //jika group (harus group), data masuk cuma dari sini
+                            if ($group * 12 > $requestDetail->req_qty || $sequence > 12) {//cek jika barcode group diluar jangkauan, jika group sekarang dikali 12 -> menjadi total piece, lebih besar dari kuantitas yang diminta atau sequence per group lebih dari 12
+                                $invalidDozenBarcodes[] = $barcode;
+                                continue;
+                            }
+                            if (
+                                ReceivedlogDetail::where('barcode', "{$prefix}|{$group}")->exists()//jika sudah pernah discan
+                            ) {
+                                $scannedDozenBarcodes[] = $barcode;
+                            }
                         }
-
-                        // Calculate quantity (DOZEN = 12 pieces, PIECE = 1 piece)
-                        $qty = $item['type'] === 'DOZEN' ? 12 : 1;
-
-                        // Create receivedlog detail
-                        $detail = ReceivedlogDetail::create([
-                            'receivedlog_id' => $receivedlog->id,
-                            'request_detail_id' => $requestDetail->id,
-                            'model_id' => $requestDetail->model_id,
-                            'color_id' => $requestDetail->color_id,
-                            'size_id' => $requestDetail->size_id,
-                            'qty' => $qty,
-                            'barcode' => $item['original_barcode']
-                        ]);
-
-                        // Update received quantity in request detail
-                        $requestDetail->increment('rec_qty', $qty);
-
-                        $receivedlogItems[] = [
-                            'id' => $detail->id,
-                            'model' => $item['model_code'],
-                            'color' => $item['color_code'],
-                            'size' => $item['size_code'],
-                            'type' => $item['type'],
-                            'qty' => $qty,
-                            'sequence' => $item['sequence']
-                        ];
-
-                        $processedCount++;
-                    } catch (\Exception $e) {
-                        $errors[] = [
-                            'barcode' => $item['original_barcode'],
-                            'error' => 'Failed to process: ' . $e->getMessage()
-                        ];
                     }
+                    // "barcodes_piece": [
+                    //     {
+                    //         "barcode": "CMT01|20260116173826|LP|RED|XS||1",
+                    //         "rack_id": "019b85c4-c21c-7215-b374-47b05605d1b3"
+                    //     },
+                    //     {
+                    //         "barcode": "CMT01|20260116173826|LP|RED|XS||2",
+                    //         "rack_id": "019b85c4-c21c-7215-b374-47b05605d1b3"
+                    //     },
+                    //     {
+                    //         "barcode": "CMT01|20260116173826|LP|RED|XS||3",
+                    //         "rack_id": "019b85c4-c21c-7215-b374-47b05605d1b3"
+                    //     }
+                    // ],
+    
+                    if ($barcodesPiece) {
+                        foreach ($barcodesPiece as $items) {
+                            $barcode = $items['barcode'];
+                            ['prefix' => $prefix, 'group' => $group, 'sequence' => $sequence] =
+                                $this->parseBarcode($barcode);
+
+                            $requestDetail = $this->findRequestDetail($prefix);
+                            if (!$requestDetail) {//cek jika barcode ditemukan di database
+                                $invalidPieceBarcodes[] = $barcode;
+                                continue;
+                            }
+
+                            $request = $requestDetail->request;
+                            $currentRequest ??= $request;//simpan current request pertama
+    
+                            if ($request->id !== $currentRequest->id) {
+                                $invalidPieceBarcodes[] = $barcode;
+                                continue;
+                            }
+                            //jika group (tidak boleh ada group) atau sequence bukan numeric
+                            if ($group !== '' || !is_numeric($sequence)) {
+                                $invalidPieceBarcodes[] = $barcode;
+                                continue;
+                            }
+                            //jika bukan group (disini harus piece yang masuk), data cuma masuk dari sini
+                            $remain = $requestDetail->req_qty % 12;
+                            if ($remain === 0 || $sequence > $remain) {//jika (request tidak memiliki sisa piece) atau (request memiliki sisa piece dan sequence di luar dari range request piece)
+                                $invalidPieceBarcodes[] = $barcode;
+                                continue;
+                            }
+                            if (
+                                ReceivedlogDetail::where('barcode', $barcode)->exists()//jika sudah pernah discan
+                            ) {
+                                $scannedPieceBarcodes[] = $barcode;
+                            }
+                        }
+                    }
+                    $totalInvalid = count($invalidDozenBarcodes) + count($invalidPieceBarcodes) + count($scannedDozenBarcodes) + count($scannedPieceBarcodes);
+                    if ($totalInvalid == 0 && $currentRequest !== null) {//jika semuanya lolos validasi
+                        DB::transaction(function () use ($data, $currentRequest, $barcodesDozen, $barcodesPiece) {
+
+                            $receivedLog = Receivedlog::create([
+                                'request_id' => $currentRequest->id,
+                                'warehouse_id' => $data['warehouse_id'],
+                                'user_id' => Auth::id(),
+                                'received_date' => now(),
+                                'notes' => $data['notes']
+                            ]);
+
+                            foreach ($barcodesDozen as $barcode) {
+                                ['prefix' => $prefix, 'group' => $group] = $this->parseBarcode($barcode);
+                                if ($rd = $this->findRequestDetail($prefix)) {
+                                    $this->createReceivedDetail(
+                                        $receivedLog,
+                                        $rd,
+                                        "{$prefix}|{$group}",//sequence memang ga disimpan disini, biar bisa mewakili 1 lusin
+                                        12
+                                    );
+                                }
+                            }
+
+                            foreach ($barcodesPiece as $items) {
+                                ['prefix' => $prefix, 'sequence' => $sequence] =
+                                    $this->parseBarcode($items['barcode']);
+
+                                if ($rd = $this->findRequestDetail($prefix)) {
+                                    $this->createReceivedDetail(
+                                        $receivedLog,
+                                        $rd,
+                                        "{$prefix}||{$sequence}",//group sudah pasti kosong disini, jadi hasilnya pasti {$prefix}||{$sequence}
+                                        1
+                                    );
+                                }
+                            }
+
+                        });
+                        $totalScanned = count($barcodesDozen) + count($barcodesPiece);
+                        return $this->successResponse([
+                            'summary' => [
+                                'total_scanned' => $totalScanned,
+                            ],
+
+                        ], "Successfully processed {$totalScanned} items");
+                    } else {
+                        return $this->errorResponse(422, $totalInvalid . ' barcode tidak valid', [
+                            'data' => [
+                                'invalid' => [
+                                    'barcodes_dozen' => $invalidDozenBarcodes,
+                                    'barcodes_piece' => $invalidPieceBarcodes,
+                                ],
+                                'scanned' => [
+                                    'barcodes_dozen' => $scannedDozenBarcodes,
+                                    'barcode_piece' => $scannedPieceBarcodes,
+                                ],
+                            ]
+                        ]);
+                    }
+
+                } catch (\Exception $e) {
+                    return $this->errorResponse(400, $e->getMessage() . $e->getLine());
                 }
-
-                $createdReceivedlogs[] = [
-                    'id' => $receivedlog->id,
-                    'request_id' => $trxRequest->id,
-                    'cmt' => $firstItem['cmt_code'],
-                    'warehouse' => $receivedlog->warehouse->name ?? 'Unknown',
-                    'received_date' => $receivedlog->received_date->toISOString(),
-                    'items_count' => count($receivedlogItems),
-                    'items' => $receivedlogItems
-                ];
             }
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => "Successfully processed {$processedCount} items from " . count($createdReceivedlogs) . " request(s)",
-                'data' => [
-                    'summary' => [
-                        'total_scanned' => count($barcodes),
-                        'total_processed' => $processedCount,
-                        'total_failed' => count($errors),
-                        'total_receivedlogs' => count($createdReceivedlogs)
-                    ],
-                    'receivedlogs' => $createdReceivedlogs
-                ],
-                'errors' => $errors
-            ], 200);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to process inbound receiving',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        );
     }
 
-    /**
-     * Parse barcode string into components
-     * Format: CMT_CODE|REQUEST_DATE|MODEL|COLOR|SIZE|TYPE|SEQUENCE
-     */
-    private function parseBarcode(string $barcode): array
+    public function validate(HttpRequest $request)
+    {
+        return $this->baseValidate(
+            $request,
+            [
+                'barcode' => 'required|string',
+            ],
+            function ($data) {
+                $barcode = $data['barcode'];
+                ['prefix' => $prefix, 'group' => $group, 'sequence' => $sequence] = $this->parseBarcode($barcode);
+                $requestDetail = $this->findRequestDetail($prefix);
+                if (!$requestDetail) {//cek jika barcode ditemukan di database
+                    return $this->errorResponse(422, 'Barcode tidak valid');
+                }
+                //jika group tapi group bukan angka atau sequence bukan angka
+                if (($group !== '' && !is_numeric($group)) || !is_numeric($sequence)) {
+                    return $this->errorResponse(422, 'Barcode tidak valid');
+                }
+                //jika group dan total item dalam group lebih besar daripada yang diterima atau sequence lebih besar daripada 12
+                if (($group !== '' && $group * 12 > $requestDetail->req_qty) || $sequence > 12) {//cek jika barcode group diluar jangkauan, jika group sekarang dikali 12 -> menjadi total piece, lebih besar dari kuantitas yang diminta atau sequence per group lebih dari 12
+                    return $this->errorResponse(422, 'Nomor urut barcode diluar jangkauan');
+                }
+                $finalBarcode = $group === ''
+                    ? "{$prefix}||{$sequence}"   // piece
+                    : "{$prefix}|{$group}";      // dozen
+    
+                if (
+                    ReceivedlogDetail::where('barcode', $finalBarcode)->exists()//jika sudah pernah discan
+                ) {
+                    return $this->errorResponse(422, 'Barcode sudah discan');
+                }
+
+                return $this->successResponse(null);
+            }
+        );
+    }
+//FIXME: masih ada masalah barcode duplicate TODO: belum ada pembuatan product untuk item piece
+    private function parseBarcode(string $barcode)
     {
         $parts = explode('|', $barcode);
-
-        if (count($parts) !== 7) {
-            throw new \Exception("Invalid barcode format. Expected 7 parts separated by '|', got " . count($parts));
-        }
-
         return [
-            'cmt_code' => trim($parts[0]),
-            'request_date' => trim($parts[1]),
-            'model_code' => trim($parts[2]),
-            'color_code' => trim($parts[3]),
-            'size_code' => trim($parts[4]),
-            'type' => strtoupper(trim($parts[5])),
-            'sequence' => trim($parts[6])
+            'prefix' => implode('|', array_slice($parts, 0, -2)),
+            'group' => $parts[count($parts) - 2] ?? null,
+            'sequence' => $parts[count($parts) - 1] ?? null,
         ];
     }
-
-    /**
-     * Find request by CMT code and date
-     */
-    private function findRequest(string $cmtCode, string $requestDateStr): ?Request
+    private function findRequestDetail(string $prefix)
     {
-        // Find CMT by code
-        $cmt = CMT::where('code', $cmtCode)->first();
-
-        if (!$cmt) {
-            return null;
-        }
-
-        // Parse the request date and find requests created on that date
-        try {
-            $requestDate = Carbon::parse($requestDateStr);
-
-            // Find request for this CMT on the same day
-            return Request::where('cmt_id', $cmt->id)
-                ->whereDate('created_at', $requestDate->toDateString())
-                ->where('status', 'OPEN')
-                ->first();
-        } catch (\Exception $e) {
-            return null;
-        }
+        return RequestDetail::where('barcode', $prefix)->first();
     }
-
-    /**
-     * Find request detail by request and product attributes
-     */
-    private function findRequestDetail(string $requestId, string $modelCode, string $colorCode, string $sizeCode): ?RequestDetail
+    private function createReceivedDetail($receivedLog, $requestDetail, string $barcode, int $qty)
     {
-        // Find model, color, and size by their codes
-        $model = ProductModel::where('sku', $modelCode)->first();
-        $color = Color::where('code', $colorCode)->first();
-        $size = Size::where('code', $sizeCode)->first();
+        ReceivedlogDetail::create([
+            'receivedlog_id' => $receivedLog->id,
+            'request_detail_id' => $requestDetail->id,
+            'model_id' => $requestDetail->model_id,
+            'color_id' => $requestDetail->color_id,
+            'size_id' => $requestDetail->size_id,
+            'barcode' => $barcode,
+        ]);
 
-        if (!$model || !$color || !$size) {
-            return null;
-        }
-
-        // Find the request detail that matches all criteria
-        return RequestDetail::where('request_id', $requestId)
-            ->where('model_id', $model->id)
-            ->where('color_id', $color->id)
-            ->where('size_id', $size->id)
-            ->first();
+        $requestDetail->increment('rec_qty', $qty);
     }
 }
