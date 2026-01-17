@@ -18,7 +18,6 @@ class Product extends Model
     protected $keyType = 'string';
 
     protected $fillable = [
-        'sku',
         'model_id',
         'rack_id',
         'barcode',

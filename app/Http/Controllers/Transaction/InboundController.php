@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Transaction;
 
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
+use App\Models\MasterData\Product;
 use App\Models\Transactions\Receivedlog;
 use App\Models\Transactions\ReceivedlogDetail;
 use App\Models\Transactions\RequestDetail;
@@ -188,6 +189,11 @@ class InboundController extends Controller
                                         "{$prefix}||{$sequence}",//group sudah pasti kosong disini, jadi hasilnya pasti {$prefix}||{$sequence}
                                         1
                                     );
+                                    Product::create([
+                                        'rack_id' => $items['rack_id'],
+                                        'model_id' => $rd->model_id,
+                                        'barcode' => $items['barcode']
+                                    ]);
                                 }
                             }
 
@@ -220,6 +226,7 @@ class InboundController extends Controller
             }
         );
     }
+    //FIXME: masih ada masalah barcode duplicate TODO: belum ada pembuatan product untuk item piece
 
     public function validate(HttpRequest $request)
     {
@@ -257,7 +264,6 @@ class InboundController extends Controller
             }
         );
     }
-//FIXME: masih ada masalah barcode duplicate TODO: belum ada pembuatan product untuk item piece
     private function parseBarcode(string $barcode)
     {
         $parts = explode('|', $barcode);
