@@ -204,23 +204,19 @@ class InboundController extends Controller
                         });
                         $totalScanned = count($barcodesDozen) + count($barcodesPiece);
                         return $this->successResponse([
-                            'summary' => [
-                                'total_scanned' => $totalScanned,
-                            ],
+                            'total_scanned' => $totalScanned,
 
                         ], "Successfully processed {$totalScanned} items");
                     } else {
                         return $this->errorResponse(422, $totalInvalid . ' barcode tidak valid', [
-                            'data' => [
-                                'invalid' => [
-                                    'barcodes_dozen' => $invalidDozenBarcodes,
-                                    'barcodes_piece' => $invalidPieceBarcodes,
-                                ],
-                                'scanned' => [
-                                    'barcodes_dozen' => $scannedDozenBarcodes,
-                                    'barcode_piece' => $scannedPieceBarcodes,
-                                ],
-                            ]
+                            'invalid' => [
+                                'barcodes_dozen' => $invalidDozenBarcodes,
+                                'barcodes_piece' => $invalidPieceBarcodes,
+                            ],
+                            'scanned' => [
+                                'barcodes_dozen' => $scannedDozenBarcodes,
+                                'barcode_piece' => $scannedPieceBarcodes,
+                            ],
                         ]);
                     }
 
