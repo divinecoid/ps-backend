@@ -47,9 +47,9 @@ class InboundController extends Controller
             [
                 'warehouse_id' => ['required', Rule::exists('mdx_warehouses', 'id')->whereNull('deleted_at')],
                 'barcodes_dozen' => 'required_without:barcodes_piece|array|min:1',
-                'barcodes_dozen.*' => 'required|string',
+                'barcodes_dozen.*' => 'required|string|distinct',
                 'barcodes_piece' => 'required_without:barcodes_dozen|array|min:1',
-                'barcodes_piece.*.barcode' => 'required|string',
+                'barcodes_piece.*.barcode' => 'required|string|distinct',
                 'barcodes_piece.*.rack_id' => ['required', Rule::exists('mdx_racks', 'id')->whereNull('deleted_at')],
                 'notes' => 'nullable|string|max:1000',
             ],
@@ -226,7 +226,6 @@ class InboundController extends Controller
             }
         );
     }
-    //FIXME: masih ada masalah barcode duplicate TODO: belum ada pembuatan product untuk item piece
 
     public function validate(HttpRequest $request)
     {
