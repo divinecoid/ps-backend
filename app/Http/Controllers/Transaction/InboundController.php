@@ -95,7 +95,7 @@ class InboundController extends Controller
                                 continue;
                             }
                             //jika group (harus group), data masuk cuma dari sini
-                            if ($group * 12 > $requestDetail->req_qty || $sequence > 12) {//cek jika barcode group diluar jangkauan, jika group sekarang dikali 12 -> menjadi total piece, lebih besar dari kuantitas yang diminta atau sequence per group lebih dari 12
+                            if ($group * 12 > $requestDetail->req_qty || $sequence < 1 || $sequence > 12) {//cek jika barcode group diluar jangkauan, jika group sekarang dikali 12 -> menjadi total piece, lebih besar dari kuantitas yang diminta atau sequence per group lebih dari 12
                                 $invalidDozenBarcodes[] = $barcode;
                                 continue;
                             }
@@ -254,7 +254,7 @@ class InboundController extends Controller
                     return $this->errorResponse(422, 'Barcode tidak valid');
                 }
                 //jika group dan total item dalam group lebih besar daripada yang diterima atau sequence lebih besar daripada 12
-                if (($group !== '' && $group * 12 > $requestDetail->req_qty) || $sequence > 12) {//cek jika barcode group diluar jangkauan, jika group sekarang dikali 12 -> menjadi total piece, lebih besar dari kuantitas yang diminta atau sequence per group lebih dari 12
+                if (($group !== '' && $group * 12 > $requestDetail->req_qty) || $sequence < 1 || $sequence > 12) {//cek jika barcode group diluar jangkauan, jika group sekarang dikali 12 -> menjadi total piece, lebih besar dari kuantitas yang diminta atau sequence per group lebih dari 12
                     return $this->errorResponse(422, 'Nomor urut barcode diluar jangkauan');
                 }
                 $finalBarcode = $group === ''
@@ -275,7 +275,8 @@ class InboundController extends Controller
                     'cmt' => $cmt,
                     'model' => $model,
                     'color' => $color,
-                    'size' => $size
+                    'size' => $size,
+                    'is_dozen' => $group ? true : false
                 ]);
             }
         );
