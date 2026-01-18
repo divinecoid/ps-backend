@@ -4,7 +4,11 @@ namespace App\Http\Controllers\Transaction;
 
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
+use App\Models\MasterData\CMT;
+use App\Models\MasterData\Color;
 use App\Models\MasterData\Product;
+use App\Models\MasterData\ProductModel;
+use App\Models\MasterData\Size;
 use App\Models\Transactions\Receivedlog;
 use App\Models\Transactions\ReceivedlogDetail;
 use App\Models\Transactions\RequestDetail;
@@ -236,7 +240,15 @@ class InboundController extends Controller
             ],
             function ($data) {
                 $barcode = $data['barcode'];
-                ['prefix' => $prefix, 'group' => $group, 'sequence' => $sequence] = $this->parseBarcode($barcode);
+                $parts = explode('|', $barcode);
+                $cmtCode = $parts[0] ?? null;
+                $modelSku = $parts[2] ?? null;
+                $colorCode = $parts[3] ?? null;
+                $sizeCode = $parts[4] ?? null;
+                $prefix = implode('|', array_slice($parts, 0, -2));
+                $group = $parts[count($parts) - 2] ?? null;
+                $sequence = $parts[count($parts) - 1] ?? null;
+
                 $requestDetail = $this->findRequestDetail($prefix);
                 if (!$requestDetail) {//cek jika barcode ditemukan di database
                     return $this->errorResponse(422, 'Barcode tidak valid');
@@ -259,7 +271,16 @@ class InboundController extends Controller
                     return $this->errorResponse(422, 'Barcode sudah discan');
                 }
 
-                return $this->successResponse(null);
+                $cmt = CMT::where('code', $cmtCode)->first();
+                $model = ProductModel::where('sku', $modelSku)->first();
+                $color = Color::where('code', $colorCode)->first();
+                $size = Size::where('code', $sizeCode)->first();
+                return $this->successResponse([
+                    'cmt' => $cmt,
+                    'model' => $model,
+                    'color' => $color,
+                    'size' => $size
+                ]);
             }
         );
     }
