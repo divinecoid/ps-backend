@@ -221,7 +221,7 @@ class InboundController extends Controller
                     }
 
                 } catch (\Exception $e) {
-                    return $this->errorResponse(400, $e->getMessage() . $e->getLine());
+                    return $this->errorResponse(500, $e->getMessage() . " Line: " . $e->getLine());
                 }
             }
         );
