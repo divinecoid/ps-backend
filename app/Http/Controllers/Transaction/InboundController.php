@@ -89,12 +89,12 @@ class InboundController extends Controller
                                 $invalidDozenBarcodes[] = $barcode;
                                 continue;
                             }
-                            //jika bukan group (disini tidak boleh ada piece yang masuk)
-                            if ($group === '' || !is_numeric($group) || !is_numeric($sequence)) {
+                            //jika bukan group
+                            if ($group === '' || !is_numeric($group) || !is_numeric($sequence) || $sequence < 1 || $sequence > 12) {
                                 $invalidDozenBarcodes[] = $barcode;
                                 continue;
                             }
-                            //jika group (harus group), data masuk cuma dari sini
+                            //jika group, data masuk cuma dari sini
                             if ($group * 12 > $requestDetail->req_qty || $sequence < 1 || $sequence > 12) {//cek jika barcode group diluar jangkauan, jika group sekarang dikali 12 -> menjadi total piece, lebih besar dari kuantitas yang diminta atau sequence per group lebih dari 12
                                 $invalidDozenBarcodes[] = $barcode;
                                 continue;
@@ -254,8 +254,16 @@ class InboundController extends Controller
                     return $this->errorResponse(422, 'Barcode tidak valid');
                 }
                 //jika group dan total item dalam group lebih besar daripada yang diterima atau sequence lebih besar daripada 12
-                if (($group !== '' && $group * 12 > $requestDetail->req_qty) || $sequence < 1 || $sequence > 12) {//cek jika barcode group diluar jangkauan, jika group sekarang dikali 12 -> menjadi total piece, lebih besar dari kuantitas yang diminta atau sequence per group lebih dari 12
-                    return $this->errorResponse(422, 'Nomor urut barcode diluar jangkauan');
+                //cek jika barcode group diluar jangkauan, jika group sekarang dikali 12 -> menjadi total piece, lebih besar dari kuantitas yang diminta atau sequence per group lebih dari 12
+                $remain = $requestDetail->req_qty % 12;
+                if ($group === '') {
+                    if ($remain === 0 || $sequence < 1 || $sequence > $remain) {
+                        return $this->errorResponse(422, 'Nomor urut barcode piece diluar jangkauan');
+                    }
+                } else {
+                    if (!is_numeric($group) || $group < 1 || $group * 12 > $requestDetail->req_qty || $sequence < 1 || $sequence > 12) {
+                        return $this->errorResponse(422, 'Nomor urut barcode dozen diluar jangkauan');
+                    }
                 }
                 $finalBarcode = $group === ''
                     ? "{$prefix}||{$sequence}"   // piece
