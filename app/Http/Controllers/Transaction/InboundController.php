@@ -49,7 +49,7 @@ class InboundController extends Controller
         return $this->baseValidate(
             $request,
             [
-                'warehouse_id' => ['required', Rule::exists('mdx_warehouses', 'id')->whereNull('deleted_at')],
+                'warehouse_id' => ['required_if:barcodes_dozen,!=,null', Rule::exists('mdx_warehouses', 'id')->whereNull('deleted_at')],
                 'barcodes_dozen' => 'required_without:barcodes_piece|array|min:1',
                 'barcodes_dozen.*' => 'required|string|distinct',
                 'barcodes_piece' => 'required_without:barcodes_dozen|array|min:1',
@@ -164,7 +164,7 @@ class InboundController extends Controller
 
                             $receivedLog = Receivedlog::create([
                                 'request_id' => $currentRequest->id,
-                                'warehouse_id' => $data['warehouse_id'],
+                                'warehouse_id' => $data['warehouse_id']?? null,
                                 'user_id' => Auth::id(),
                                 'received_date' => now(),
                                 'notes' => $data['notes']
