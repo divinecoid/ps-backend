@@ -43,7 +43,24 @@ class InboundController extends Controller
     //     ],
     //     "notes": "Received in good condition"
     // }
-
+    private function structure()
+    {
+        return fn($data) => [
+            'id' => $data->id,
+            'warehouse_id' => $data->warehouse_id,
+            'warehouse' => (object) [
+                'name' => $data->warehouse?->name
+            ],
+            'user' => (object) [
+                'name' => $data->user?->name
+            ],
+            'received_date' => $data->received_date,
+            'notes' => $data->notes,
+            'request' => (object) [
+                'cmt' => $data->request->cmt,
+            ]
+        ];
+    }
     public function store(HTTPRequest $request)
     {
         return $this->baseValidate(
@@ -164,7 +181,7 @@ class InboundController extends Controller
 
                             $receivedLog = Receivedlog::create([
                                 'request_id' => $currentRequest->id,
-                                'warehouse_id' => $data['warehouse_id']?? null,
+                                'warehouse_id' => $data['warehouse_id'] ?? null,
                                 'user_id' => Auth::id(),
                                 'received_date' => now(),
                                 'notes' => $data['notes']
@@ -314,5 +331,16 @@ class InboundController extends Controller
         ]);
 
         $requestDetail->increment('rec_qty', $qty);
+    }
+
+    public function index(HttpRequest $request)
+    {
+        return $this->baseIndex(
+            $request,
+            Receivedlog::class,
+            [],
+            [],
+            $this->structure()
+        );
     }
 }
