@@ -204,6 +204,7 @@ Route::prefix('request')->middleware('checkrole')->group(function () {
 // Inbound Receiving
 Route::prefix('inbound')->middleware('checkrole')->group(function () {
     Route::get('/', [InboundController::class, 'index']);
+    Route::get('/{id}', [InboundController::class, 'show']);
     Route::post('/', [InboundController::class, 'store']);
     Route::post('/validate', [InboundController::class, 'validate']);
 });

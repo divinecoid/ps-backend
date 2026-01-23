@@ -57,8 +57,18 @@ class InboundController extends Controller
             'received_date' => $data->received_date,
             'notes' => $data->notes,
             'request' => (object) [
-                'cmt' => $data->request->cmt,
-            ]
+                'cmt' => (object) [
+                    'code' => $data->request->cmt->code,
+                    'name' => $data->request->cmt->name,
+                    'contact_person' => $data->request->cmt->contact_person,
+                    'phone' => $data->request->cmt->phone,
+                    'address' => $data->request->cmt->address,
+
+                ]
+            ],
+            'details' => $data->details->map(fn($detail) => [
+                'barcode' => $detail->barcode
+            ])
         ];
     }
     public function store(HTTPRequest $request)
@@ -339,6 +349,16 @@ class InboundController extends Controller
             $request,
             Receivedlog::class,
             [],
+            [],
+            $this->structure()
+        );
+    }
+
+    public function show($id)
+    {
+        return $this->baseShow(
+            Receivedlog::class,
+            $id,
             [],
             $this->structure()
         );
