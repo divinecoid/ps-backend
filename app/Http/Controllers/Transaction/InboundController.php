@@ -230,6 +230,11 @@ class InboundController extends Controller
 
                         });
                         $totalScanned = count($barcodesDozen) + count($barcodesPiece);
+
+                        if ($currentRequest->isCompleted()) {
+                            $currentRequest->update(['status' => 'CLOSED']);
+                        }
+
                         return $this->successResponse([
                             'total_scanned' => $totalScanned,
 
@@ -307,10 +312,25 @@ class InboundController extends Controller
                 $color = Color::where('code', $colorCode)->first();
                 $size = Size::where('code', $sizeCode)->first();
                 return $this->successResponse([
-                    'cmt' => $cmt,
-                    'model' => $model,
-                    'color' => $color,
-                    'size' => $size,
+                    'cmt' => (object) [
+                        'code' => $cmt->code,
+                        'name' => $cmt->name,
+                        'contact_person' => $cmt->contact_person,
+                        'phone' => $cmt->phone,
+                        'address' => $cmt->address,
+                    ],
+                    'model' => (object) [
+                        'sku' => $model->sku,
+                        'name' => $model->name,
+                    ],
+                    'color' => (object) [
+                        'code' => $color->code,
+                        'name' => $color->name,
+                    ],
+                    'size' => (object) [
+                        'code' => $size->code,
+                        'name' => $size->name,
+                    ],
                     'is_dozen' => $group ? true : false
                 ]);
             }
