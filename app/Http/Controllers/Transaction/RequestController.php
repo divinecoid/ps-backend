@@ -69,6 +69,7 @@ class RequestController extends Controller
         return $this->successResponse(
             [
                 'cmt_id' => $request->cmt_id,
+                'status' => $request->status,
                 'request_detail' => $request->request_detail
                     ->groupBy(fn($item) => $item->model_id . '|' . $item->color_id)
                     ->map(function ($group) {
