@@ -29,6 +29,11 @@ class Request extends Model
     //     return $this->belongsTo(Inventory::class, 'inventory_id');
     // }
 
+
+    public function receive_log()
+    {
+        return $this->hasMany(Receivedlog::class, 'request_id');
+    }
     public function request_detail()
     {
         return $this->hasMany(RequestDetail::class, 'request_id');

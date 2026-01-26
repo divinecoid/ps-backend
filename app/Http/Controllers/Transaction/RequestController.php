@@ -87,6 +87,7 @@ class RequestController extends Controller
                         ];
                     })
                     ->values(),
+                'receive_log' => $request->receive_log
             ]
         );
     }

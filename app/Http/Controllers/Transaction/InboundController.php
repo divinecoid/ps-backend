@@ -67,7 +67,8 @@ class InboundController extends Controller
                 ]
             ],
             'details' => $data->details->map(fn($detail) => [
-                'barcode' => $detail->barcode
+                'barcode' => $detail->barcode,
+                'rack' => $detail->racks
             ])
         ];
     }
