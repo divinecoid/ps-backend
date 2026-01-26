@@ -21,8 +21,8 @@ class OrderController extends Controller
             'read_at' => $data->read_at,
             'prepared_at' => $data->prepared_at,
             'prepare_duration' => $data->prepare_duration,
-            'readtoship_at' => $data->readtoship_at,
-            'readtoship_marketplace' => $data->readtoship_marketplace,
+            'readytoship_at' => $data->readytoship_at,
+            'readytoship_marketplace' => $data->readytoship_marketplace,
             'online_store_id' => $data->online_store_id,
             'item_count' => $data->item_count,
             'unique_item_count' => $data->unique_item_count,
@@ -45,10 +45,16 @@ class OrderController extends Controller
             $request,
             Order::class,
             [],
-            [],
-            $this->structure()
+            ["marketplace_id", "awb_code", "status", "online_store_id"],
+            $this->structure(),
+            // function ($query) use ($request) {
+            //     if ($request->filled('marketplace_id')) {
+            //         $query->where('marketplace_id', $request->marketplace_id);
+            //     }
+            // }
         );
     }
+
 
     public function show($id)
     {

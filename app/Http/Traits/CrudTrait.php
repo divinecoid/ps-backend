@@ -10,20 +10,31 @@ trait CrudTrait
 {
     use ApiFilterTrait;
 
-    public function baseIndex(Request $request, $model, array $relations = [], array $filters = [], ?callable $map = null)
-    {
+    public function baseIndex(
+        Request $request,
+        $model,
+        array $relations = [],
+        array $filters = [],
+        ?callable $map = null,
+        ?callable $queryCallback = null
+    ) {
         $perPage = (int) ($request->input('per_page', $this->getPerPageDefault()));
         $query = $model::query()->with($relations);
+
+        if (is_callable($queryCallback)) {
+            $queryCallback($query);
+        }
 
         if (method_exists($this, 'applyFilter') && !empty($filters)) {
             $query = $this->applyFilter($query, $request, $filters);
         }
 
         $data = $query->paginate($perPage);
-
         $items = collect($data->items())->map($map ?? fn($item) => $item);
+
         return response()->json($this->paginateResponse($data, $items));
     }
+
 
     public function baseMaster(Request $request, $model, array $relations = [], array $filters = [], ?callable $map = null)
     {

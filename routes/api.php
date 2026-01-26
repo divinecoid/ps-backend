@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Transaction\RequestController;
 use App\Http\Controllers\Transaction\InboundController;
+use App\Http\Controllers\Transaction\OrderItemController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\LoginController;
@@ -173,6 +174,8 @@ Route::prefix('warehouse')->middleware('checkrole:admin')->group(function () {
 
 //Order
 Route::prefix('order')->middleware('checkrole:admin')->group(function () {
+    Route::get('/', [OrderController::class, 'index']);
+    Route::get('/{id}', [OrderController::class, 'show']);
     Route::get('/lazada/{id}', [OrderController::class, 'getLazadaOrder']);
     Route::get('/tiktokshop/{id}', [OrderController::class, 'getTiktokShopOrder']);
     Route::get('/shopee/{id}', [OrderController::class, 'getShopeeOrder']);
@@ -183,6 +186,12 @@ Route::prefix('order')->middleware('checkrole:admin')->group(function () {
     Route::get('/items/lazada/{id}', [OrderController::class, 'getLazadaOrderItems']);
     Route::get('/items/tiktokshop/{id}', [OrderController::class, 'getTiktokShopOrderItems']);
     Route::get('/items/shopee/{id}', [OrderController::class, 'getShopeeOrderItems']);
+});
+
+//Outbound Operations
+Route::prefix('outbound')->middleware('checkrole')->group(function () {
+    Route::post('/validate-awb', [OrderItemController::class, 'validateAwb']);
+    Route::get('/order-items/{orderId}', [OrderItemController::class, 'getOrderItems']);
 });
 
 //Shopee Auth & Logistics
