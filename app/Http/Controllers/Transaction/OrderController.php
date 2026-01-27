@@ -165,4 +165,98 @@ class OrderController extends Controller
 
         return response()->json($response, $response['success'] ? 200 : 500);
     }
+
+    /**
+     * Submit order preparation with scanned products
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function submitPreparation(Request $request)
+    {
+        $request->validate([
+            'order_id' => 'required|exists:trx_orders,id',
+            'prepared_at' => 'required|date',
+            'scanned_barcodes' => 'required|array|min:1',
+            'scanned_barcodes.*' => 'string'
+        ]);
+
+        $orderId = $request->input('order_id');
+        $preparedAt = $request->input('prepared_at');
+        $scannedBarcodes = $request->input('scanned_barcodes');
+
+        // Find order
+        $order = Order::find($orderId);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order tidak ditemukan'
+            ], 404);
+        }
+
+        // Validate all barcodes again (check for concurrent deletions)
+        $conflictingBarcodes = [];
+        $productsToDelete = [];
+
+        foreach ($scannedBarcodes as $barcode) {
+            $product = \App\Models\MasterData\Product::where('barcode', $barcode)->first();
+
+            if (!$product) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Barcode tidak ditemukan: $barcode"
+                ], 404);
+            }
+
+            if ($product->deleted_at !== null) {
+                $conflictingBarcodes[] = [
+                    'barcode' => $barcode,
+                    'deleted_at' => $product->deleted_at
+                ];
+            } else {
+                $productsToDelete[] = $product;
+            }
+        }
+
+        // If there are conflicting barcodes, return error
+        if (count($conflictingBarcodes) > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terdapat produk yang sudah di-scan oleh user lain. Silakan refresh dan scan ulang.',
+                'conflicting_barcodes' => $conflictingBarcodes
+            ], 409);
+        }
+
+        // All validations passed, proceed with soft-delete and update order
+        $readyToShipAt = now();
+
+        // Soft-delete all scanned products
+        foreach ($productsToDelete as $product) {
+            $product->delete(); // This will set deleted_at
+        }
+
+        // Calculate prepare_duration in seconds
+        $preparedAtCarbon = \Carbon\Carbon::parse($preparedAt);
+        $readyToShipAtCarbon = \Carbon\Carbon::parse($readyToShipAt);
+        $prepareDuration = $preparedAtCarbon->diffInSeconds($readyToShipAtCarbon);
+
+        // Update order
+        $order->prepared_at = $preparedAt;
+        $order->readytoship_at = $readyToShipAt;
+        $order->prepare_duration = $prepareDuration;
+        $order->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Order berhasil diproses dan siap dikirim',
+            'data' => [
+                'order_id' => $orderId,
+                'prepared_at' => $order->prepared_at,
+                'readytoship_at' => $order->readytoship_at,
+                'prepare_duration' => $order->prepare_duration,
+                'products_scanned' => count($productsToDelete)
+            ]
+        ], 200);
+    }
 }

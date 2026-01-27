@@ -192,6 +192,8 @@ Route::prefix('order')->middleware('checkrole:admin')->group(function () {
 Route::prefix('outbound')->middleware('checkrole')->group(function () {
     Route::post('/validate-awb', [OrderItemController::class, 'validateAwb']);
     Route::get('/order-items/{orderId}', [OrderItemController::class, 'getOrderItems']);
+    Route::post('/validate-product-barcode', [OrderItemController::class, 'validateProductBarcode']);
+    Route::post('/submit-preparation', [OrderController::class, 'submitPreparation']);
 });
 
 //Shopee Auth & Logistics

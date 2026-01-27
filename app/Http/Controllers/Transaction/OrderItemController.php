@@ -138,4 +138,63 @@ class OrderItemController extends Controller
             ]
         ], 200);
     }
+
+    /**
+     * Validate product barcode during scanning
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function validateProductBarcode(Request $request)
+    {
+        $request->validate([
+            'barcode' => 'required|string'
+        ]);
+
+        $barcode = $request->input('barcode');
+
+        // Parse barcode format: {code_cmt}|{timestamp}|{sku}|{code_color}|{code_size}|{dozen_numbering}|{piece_numbering}
+        $parts = explode('|', $barcode);
+
+        if (count($parts) !== 7) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Format barcode tidak valid. Expected format: CMT|timestamp|SKU|COLOR|SIZE|dozen|piece'
+            ], 400);
+        }
+
+        // Find product by barcode
+        $product = \App\Models\MasterData\Product::where('barcode', $barcode)->first();
+
+        // Check if product exists
+        if (!$product) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Barcode tidak ditemukan dalam sistem'
+            ], 404);
+        }
+
+        // Check if product is already soft-deleted (already scanned)
+        if ($product->deleted_at !== null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Produk dengan barcode ini sudah pernah di-scan sebelumnya',
+                'scanned_at' => $product->deleted_at
+            ], 400);
+        }
+
+        // Return product details
+        return response()->json([
+            'success' => true,
+            'message' => 'Barcode valid dan produk tersedia',
+            'data' => [
+                'product' => [
+                    'id' => $product->id,
+                    'barcode' => $product->barcode,
+                    'model_id' => $product->model_id,
+                    'rack_id' => $product->rack_id,
+                ]
+            ]
+        ], 200);
+    }
 }
