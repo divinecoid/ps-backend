@@ -65,7 +65,7 @@ class RequestController extends Controller
 
     public function show($id)
     {
-        $request = \App\Models\Transactions\Request::with(['request_detail'])->findOrFail($id);
+        $request = \App\Models\Transactions\Request::with(['request_detail', 'receive_log.warehouse', 'receive_log.details'])->findOrFail($id);
         return $this->successResponse(
             [
                 'cmt_id' => $request->cmt_id,
@@ -87,7 +87,43 @@ class RequestController extends Controller
                         ];
                     })
                     ->values(),
-                'receive_log' => $request->receive_log
+                'receive_log' => $request->receive_log->map(function ($log) {
+                    return [
+                        'id' => $log->id,
+                        'request_id' => $log->request_id,
+                        'warehouse_id' => $log->warehouse_id,
+                        'warehouse' => (object) [
+                            'name' => $log->warehouse?->name
+                        ],
+                        'user_id' => $log->user_id,
+                        'user' => (object) [
+                            'name' => $log->user?->name
+                        ],
+                        'received_date' => $log->received_date,
+                        'notes' => $log->notes,
+                        'created_at' => $log->created_at,
+                        'updated_at' => $log->updated_at,
+                        'details' => $log->details->map(function ($d) {
+                            return [
+                                'model_id' => $d->model_id,
+                                'model' => (object) [
+                                    'name' => $d->model?->name
+                                ],
+                                'color_id' => $d->color_id,
+                                'color' => (object) [
+                                    'name' => $d->color?->name
+                                ],
+                                'size_id' => $d->size_id,
+                                'size' => (object) [
+                                    'name' => $d->size?->name
+                                ],
+                                'dozen_qty' => floor($d->qty / 12),
+                                'piece_qty' => $d->qty % 12,
+                            ];
+                        })->values()
+                    ];
+                })
+
             ]
         );
     }

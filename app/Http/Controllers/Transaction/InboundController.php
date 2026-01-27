@@ -353,6 +353,7 @@ class InboundController extends Controller
             'model_id' => $requestDetail->model_id,
             'color_id' => $requestDetail->color_id,
             'size_id' => $requestDetail->size_id,
+            'qty' => $qty,
             'barcode' => $barcode,
         ]);
 
