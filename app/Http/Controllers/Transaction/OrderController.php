@@ -61,7 +61,7 @@ class OrderController extends Controller
         return $this->baseShow(
             Order::class,
             $id,
-            ['order_items', 'order_note'],
+            ['order_items'],
             $this->structure()
         );
     }

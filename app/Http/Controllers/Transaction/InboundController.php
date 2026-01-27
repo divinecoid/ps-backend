@@ -229,12 +229,11 @@ class InboundController extends Controller
                                 }
                             }
 
+                            if ($currentRequest?->isCompleted()) {
+                                $currentRequest->update(['status' => 'CLOSED']);
+                            }
                         });
                         $totalScanned = count($barcodesDozen) + count($barcodesPiece);
-
-                        if ($currentRequest->isCompleted()) {
-                            $currentRequest->update(['status' => 'CLOSED']);
-                        }
 
                         return $this->successResponse([
                             'total_scanned' => $totalScanned,
@@ -270,10 +269,6 @@ class InboundController extends Controller
             function ($data) {
                 $barcode = $data['barcode'];
                 $parts = explode('|', $barcode);
-                $cmtCode = $parts[0] ?? null;
-                $modelSku = $parts[2] ?? null;
-                $colorCode = $parts[3] ?? null;
-                $sizeCode = $parts[4] ?? null;
                 $prefix = implode('|', array_slice($parts, 0, -2));
                 $group = $parts[count($parts) - 2] ?? null;
                 $sequence = $parts[count($parts) - 1] ?? null;
@@ -308,10 +303,10 @@ class InboundController extends Controller
                     return $this->errorResponse(422, 'Barcode sudah discan');
                 }
 
-                $cmt = CMT::where('code', $cmtCode)->first();
-                $model = ProductModel::where('sku', $modelSku)->first();
-                $color = Color::where('code', $colorCode)->first();
-                $size = Size::where('code', $sizeCode)->first();
+                $cmt = $requestDetail->request->cmt;
+                $model = $requestDetail->model;
+                $color = $requestDetail->color;
+                $size = $requestDetail->size;
                 return $this->successResponse([
                     'cmt' => (object) [
                         'code' => $cmt->code,
