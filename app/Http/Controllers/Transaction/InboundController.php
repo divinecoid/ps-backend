@@ -20,29 +20,30 @@ use Illuminate\Validation\Rule;
 class InboundController extends Controller
 {
     use CrudTrait;
-
-    // {
-    //     "barcodes_dozen": [
-    //         "CMT01|20260116172102|LP|RED|XS|1|1",
-    //         "CMT01|20260116172102|LP|RED|XS|1|1"
-    //     ],
-    //     "warehouse_id": "019b85c4-c21c-7215-b374-47b05605d1b3",
-    //     "barcodes_piece": [
-    //         {
-    //             "barcode": "CMT01|20260116172102|LP|RED|XS||1",
-    //             "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c5446"
-    //         },
-    //         {
-    //             "barcode": "CMT01|20260116172102|LP|RED|XS||2",
-    //             "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c5446"
-    //         },
-    //         {
-    //             "barcode": "CMT01|20260116172102|LP|RED|XS||3",
-    //             "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c5446"
-    //         }
-    //     ],
-    //     "notes": "Received in good condition"
-    // }
+    /*
+    {
+        "barcode_dozen": [
+            "CMT01|20260116172102|LP|RED|XS|DOZEN|1",
+            "CMT01|20260116172102|LP|RED|XS|DOZEN|2"
+        ],
+        "warehouse_id": "019b85c4-c21c-7215-b374-47b05605d1b3",
+        "barcodes_piece": [
+            {
+                "barcode": "CMT01|20260116172102|LP|RED|XS|PIECE|1",
+                "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c5446"
+            },
+            {
+                "barcode": "CMT01|20260116172102|LP|RED|XS|PIECE|2",
+                "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c5446"
+            },
+            {
+                "barcode": "CMT01|20260116172102|LP|RED|XS|PIECE|3",
+                "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c5446"
+            }
+        ],
+        "notes": "Received in good condition"
+    }
+     */
     private function structure()
     {
         return fn($data) => [
@@ -97,54 +98,56 @@ class InboundController extends Controller
                     $barcodesPiece = $data['barcodes_piece'] ?? [];
 
                     // "barcodes_dozen": [
-                    //     "CMT01|20260116173826|LP|RED|XS|1|1",
-                    //     "CMT01|20260116173826|LP|RED|XS|2|7",
-                    //     "CMT01|20260116173826|LP|RED|XS|1|2",
-                    //     "CMT01|20260116173826|LP|RED|XS|1|13"
+                    //     "CMT01|20260116173826|LP|RED|XS|DOZEN|1",
+                    //     "CMT01|20260116173826|LP|RED|XS|DOZEN|7",
+                    //     "CMT01|20260116173826|LP|RED|XS|DOZEN|2",
+                    //     "CMT01|20260116173826|LP|RED|XS|DOZEN|13"
                     // ],
                     $currentRequest = null;
                     if ($barcodesDozen) {
                         foreach ($barcodesDozen as $barcode) {//harus dalam bentuk dozen semua
                             ['prefix' => $prefix, 'group' => $group, 'sequence' => $sequence] = $this->parseBarcode($barcode);
-                            $requestDetail = $this->findRequestDetail($prefix);
-                            if (!$requestDetail) {//cek jika barcode ditemukan di database
+                            if ($group == 'DOZEN') {
+                                $requestDetail = $this->findRequestDetail($prefix);
+                                if (!$requestDetail) {//cek jika barcode ditemukan di database
+                                    $invalidDozenBarcodes[] = $barcode;
+                                    continue;
+                                }
+                                $request = $requestDetail->request;
+                                $currentRequest ??= $request;//simpan current request pertama
+                                if ($request->id !== $currentRequest->id) {
+                                    $invalidDozenBarcodes[] = $barcode;
+                                    continue;
+                                }
+
+                                if ($sequence * 12 > $requestDetail->req_qty) {//cek jika barcode group diluar jangkauan, jika group sekarang dikali 12 -> menjadi total piece, lebih besar dari kuantitas yang diminta atau sequence per group lebih dari 12
+                                    $invalidDozenBarcodes[] = $barcode;
+                                    continue;
+                                }
+                                if (
+                                    ReceivedlogDetail::where('barcode', $barcode)->exists()//jika sudah pernah discan
+                                ) {
+                                    $scannedDozenBarcodes[] = $barcode;
+                                }
+
+                            } else {
+                                //jika bukan group
                                 $invalidDozenBarcodes[] = $barcode;
                                 continue;
-                            }
-                            $request = $requestDetail->request;
-                            $currentRequest ??= $request;//simpan current request pertama
-                            if ($request->id !== $currentRequest->id) {
-                                $invalidDozenBarcodes[] = $barcode;
-                                continue;
-                            }
-                            //jika bukan group
-                            if ($group === '' || !is_numeric($group) || !is_numeric($sequence) || $sequence < 1 || $sequence > 12) {
-                                $invalidDozenBarcodes[] = $barcode;
-                                continue;
-                            }
-                            //jika group, data masuk cuma dari sini
-                            if ($group * 12 > $requestDetail->req_qty || $sequence < 1 || $sequence > 12) {//cek jika barcode group diluar jangkauan, jika group sekarang dikali 12 -> menjadi total piece, lebih besar dari kuantitas yang diminta atau sequence per group lebih dari 12
-                                $invalidDozenBarcodes[] = $barcode;
-                                continue;
-                            }
-                            if (
-                                ReceivedlogDetail::where('barcode', "{$prefix}|{$group}")->exists()//jika sudah pernah discan
-                            ) {
-                                $scannedDozenBarcodes[] = $barcode;
                             }
                         }
                     }
                     // "barcodes_piece": [
                     //     {
-                    //         "barcode": "CMT01|20260116173826|LP|RED|XS||1",
+                    //         "barcode": "CMT01|20260116173826|LP|RED|XS|PIECE|1",
                     //         "rack_id": "019b85c4-c21c-7215-b374-47b05605d1b3"
                     //     },
                     //     {
-                    //         "barcode": "CMT01|20260116173826|LP|RED|XS||2",
+                    //         "barcode": "CMT01|20260116173826|LP|RED|XS|PIECE|2",
                     //         "rack_id": "019b85c4-c21c-7215-b374-47b05605d1b3"
                     //     },
                     //     {
-                    //         "barcode": "CMT01|20260116173826|LP|RED|XS||3",
+                    //         "barcode": "CMT01|20260116173826|LP|RED|XS|PIECE|3",
                     //         "rack_id": "019b85c4-c21c-7215-b374-47b05605d1b3"
                     //     }
                     // ],
@@ -152,37 +155,35 @@ class InboundController extends Controller
                     if ($barcodesPiece) {
                         foreach ($barcodesPiece as $items) {
                             $barcode = $items['barcode'];
-                            ['prefix' => $prefix, 'group' => $group, 'sequence' => $sequence] =
-                                $this->parseBarcode($barcode);
+                            ['prefix' => $prefix, 'group' => $group, 'sequence' => $sequence] = $this->parseBarcode($barcode);
+                            if ($group == 'PIECE') {
+                                $requestDetail = $this->findRequestDetail($prefix);
+                                if (!$requestDetail) {//cek jika barcode ditemukan di database
+                                    $invalidPieceBarcodes[] = $barcode;
+                                    continue;
+                                }
 
-                            $requestDetail = $this->findRequestDetail($prefix);
-                            if (!$requestDetail) {//cek jika barcode ditemukan di database
-                                $invalidPieceBarcodes[] = $barcode;
-                                continue;
-                            }
-
-                            $request = $requestDetail->request;
-                            $currentRequest ??= $request;//simpan current request pertama
+                                $request = $requestDetail->request;
+                                $currentRequest ??= $request;//simpan current request pertama
     
-                            if ($request->id !== $currentRequest->id) {
+                                if ($request->id !== $currentRequest->id) {
+                                    $invalidPieceBarcodes[] = $barcode;
+                                    continue;
+                                }
+
+                                if ($sequence > $requestDetail->req_qty) {//jika (request tidak memiliki sisa piece) atau (request memiliki sisa piece dan sequence di luar dari range request piece)
+                                    $invalidPieceBarcodes[] = $barcode;
+                                    continue;
+                                }
+                                if (
+                                    ReceivedlogDetail::where('barcode', $barcode)->exists()//jika sudah pernah discan
+                                ) {
+                                    $scannedPieceBarcodes[] = $barcode;
+                                }
+                            } else {
+                                //jika bukan piece
                                 $invalidPieceBarcodes[] = $barcode;
                                 continue;
-                            }
-                            //jika group (tidak boleh ada group) atau sequence bukan numeric
-                            if ($group !== '' || !is_numeric($sequence)) {
-                                $invalidPieceBarcodes[] = $barcode;
-                                continue;
-                            }
-                            //jika bukan group (disini harus piece yang masuk), data cuma masuk dari sini
-                            $remain = $requestDetail->req_qty % 12;
-                            if ($remain === 0 || $sequence > $remain) {//jika (request tidak memiliki sisa piece) atau (request memiliki sisa piece dan sequence di luar dari range request piece)
-                                $invalidPieceBarcodes[] = $barcode;
-                                continue;
-                            }
-                            if (
-                                ReceivedlogDetail::where('barcode', $barcode)->exists()//jika sudah pernah discan
-                            ) {
-                                $scannedPieceBarcodes[] = $barcode;
                             }
                         }
                     }
@@ -199,26 +200,25 @@ class InboundController extends Controller
                             ]);
 
                             foreach ($barcodesDozen as $barcode) {
-                                ['prefix' => $prefix, 'group' => $group] = $this->parseBarcode($barcode);
+                                ['prefix' => $prefix] = $this->parseBarcode($barcode);
                                 if ($rd = $this->findRequestDetail($prefix)) {
                                     $this->createReceivedDetail(
                                         $receivedLog,
                                         $rd,
-                                        "{$prefix}|{$group}",//sequence memang ga disimpan disini, biar bisa mewakili 1 lusin
+                                        $barcode,//sequence memang ga disimpan disini, biar bisa mewakili 1 lusin
                                         12
                                     );
                                 }
                             }
 
                             foreach ($barcodesPiece as $items) {
-                                ['prefix' => $prefix, 'sequence' => $sequence] =
-                                    $this->parseBarcode($items['barcode']);
+                                ['prefix' => $prefix] = $this->parseBarcode($items['barcode']);
 
                                 if ($rd = $this->findRequestDetail($prefix)) {
                                     $this->createReceivedDetail(
                                         $receivedLog,
                                         $rd,
-                                        "{$prefix}||{$sequence}",//group sudah pasti kosong disini, jadi hasilnya pasti {$prefix}||{$sequence}
+                                        $items['barcode'],//group sudah pasti kosong disini, jadi hasilnya pasti {$prefix}||{$sequence}
                                         1
                                     );
                                     Product::create([
@@ -237,7 +237,6 @@ class InboundController extends Controller
 
                         return $this->successResponse([
                             'total_scanned' => $totalScanned,
-
                         ], "Successfully processed {$totalScanned} items");
                     } else {
                         return $this->errorResponse(422, $totalInvalid . ' barcode tidak valid', [
@@ -268,37 +267,27 @@ class InboundController extends Controller
             ],
             function ($data) {
                 $barcode = $data['barcode'];
-                $parts = explode('|', $barcode);
-                $prefix = implode('|', array_slice($parts, 0, -2));
-                $group = $parts[count($parts) - 2] ?? null;
-                $sequence = $parts[count($parts) - 1] ?? null;
+                ['prefix' => $prefix, 'group' => $group, 'sequence' => $sequence] = $this->parseBarcode($barcode);
 
                 $requestDetail = $this->findRequestDetail($prefix);
                 if (!$requestDetail) {//cek jika barcode ditemukan di database
                     return $this->errorResponse(422, 'Barcode tidak valid');
                 }
-                //jika group tapi group bukan angka atau sequence bukan angka
-                if (($group !== '' && !is_numeric($group)) || !is_numeric($sequence)) {
-                    return $this->errorResponse(422, 'Barcode tidak valid');
-                }
                 //jika group dan total item dalam group lebih besar daripada yang diterima atau sequence lebih besar daripada 12
                 //cek jika barcode group diluar jangkauan, jika group sekarang dikali 12 -> menjadi total piece, lebih besar dari kuantitas yang diminta atau sequence per group lebih dari 12
-                $remain = $requestDetail->req_qty % 12;
-                if ($group === '') {
-                    if ($remain === 0 || $sequence < 1 || $sequence > $remain) {
+                if ($group == 'DOZEN') {
+                    if ($sequence * 12 > $requestDetail->req_qty) {
+                        return $this->errorResponse(422, 'Nomor urut barcode lusin diluar jangkauan');
+                    }
+                } else if ($group == 'PIECE') {
+                    if ($sequence > $requestDetail->req_qty) {
                         return $this->errorResponse(422, 'Nomor urut barcode piece diluar jangkauan');
                     }
                 } else {
-                    if (!is_numeric($group) || $group < 1 || $group * 12 > $requestDetail->req_qty || $sequence < 1 || $sequence > 12) {
-                        return $this->errorResponse(422, 'Nomor urut barcode dozen diluar jangkauan');
-                    }
+                    return $this->errorResponse(422, 'Barcode tidak valid');
                 }
-                $finalBarcode = $group === ''
-                    ? "{$prefix}||{$sequence}"   // piece
-                    : "{$prefix}|{$group}";      // dozen
-    
                 if (
-                    ReceivedlogDetail::where('barcode', $finalBarcode)->exists()//jika sudah pernah discan
+                    ReceivedlogDetail::where('barcode', $barcode)->exists()//jika sudah pernah discan
                 ) {
                     return $this->errorResponse(422, 'Barcode sudah discan');
                 }
