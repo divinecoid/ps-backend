@@ -316,7 +316,7 @@ class InboundController extends Controller
                         'code' => $size->code,
                         'name' => $size->name,
                     ],
-                    'is_dozen' => $group ? true : false
+                    'is_dozen' => $group === 'DOZEN' ? true : false
                 ]);
             }
         );
