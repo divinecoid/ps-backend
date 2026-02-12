@@ -4,11 +4,7 @@ namespace App\Http\Controllers\Transaction;
 
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
-use App\Models\MasterData\CMT;
-use App\Models\MasterData\Color;
 use App\Models\MasterData\Product;
-use App\Models\MasterData\ProductModel;
-use App\Models\MasterData\Size;
 use App\Models\Transactions\Receivedlog;
 use App\Models\Transactions\ReceivedlogDetail;
 use App\Models\Transactions\RequestDetail;
