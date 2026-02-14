@@ -9,76 +9,56 @@ use App\Models\MasterData\ProductModel;
 use App\Models\MasterData\Rack;
 use App\Models\MasterData\Size;
 use Illuminate\Database\Seeder;
-use Str;
+use Illuminate\Support\Str;
 
 class ProductSeeder extends Seeder
 {
     public function run(): void
     {
-        // Fetch all master data
         $cmts = CMT::all();
         $colors = Color::all();
         $sizes = Size::all();
         $models = ProductModel::all();
         $racks = Rack::all();
 
-        // Generate sample products
         $products = [];
-
-        // Track used dozen+piece combinations per CMT+Model+Color+Size
-        $usedCombinations = [];
-
         $productCounter = 0;
 
-        foreach ($cmts as $cmtIndex => $cmt) {
-            foreach ($models as $modelIndex => $model) {
-                foreach ($colors as $colorIndex => $color) {
-                    foreach ($sizes as $sizeIndex => $size) {
-                        // Create a unique key for this product specification
-                        $specKey = "{$cmt->code}|{$model->sku}|{$color->code}|{$size->code}";
+        foreach ($cmts as $cmt) {
+            foreach ($models as $model) {
+                foreach ($colors as $color) {
+                    foreach ($sizes as $size) {
 
-                        // Initialize tracking array for this specification if not exists
-                        if (!isset($usedCombinations[$specKey])) {
-                            $usedCombinations[$specKey] = [];
-                        }
-
-                        // Generate 2-3 products per specification with unique dozen+piece
+                        // Generate 2–3 products per specification (pure random)
                         $productsPerSpec = rand(2, 3);
 
                         for ($i = 0; $i < $productsPerSpec; $i++) {
-                            // Generate unique dozen and piece combination
-                            $attempts = 0;
-                            do {
-                                $dozenNumber = rand(1, 5);
-                                $pieceNumber = rand(1, 12);
-                                $dozenPieceKey = "{$dozenNumber}|{$pieceNumber}";
-                                $attempts++;
 
-                                // Prevent infinite loop
-                                if ($attempts > 100) {
-                                    break 2; // Skip this product if can't find unique combination
-                                }
-                            } while (in_array($dozenPieceKey, $usedCombinations[$specKey]));
+                            // Random type
+                            $types = ['DOZEN', 'PIECE'];
+                            $type = $types[array_rand($types)];
 
-                            // Mark this combination as used
-                            $usedCombinations[$specKey][] = $dozenPieceKey;
+                            // Random number
+                            $pieceNumber = rand(1, 12);
 
-                            // Generate timestamp variation for each product
-                            $timestamp = now()->addSeconds($productCounter)->format('YmdHis');
+                            // Timestamp variation
+                            $timestamp = now()
+                                ->addSeconds($productCounter)
+                                ->format('YmdHis');
 
-                            // Build barcode according to format:
-                            // {CMT_CODE}|{Timestamp}|{MODELS_SKU}|{COLORS_CODE}|{SIZE_CODE}|{DOZEN}|{PIECE}
+                            // Barcode format:
+                            // {CMT_CODE}|{Timestamp}|{MODEL_SKU}|{COLOR_CODE}|{SIZE_CODE}|{TYPE}|{NUMBER}
                             $barcode = implode('|', [
                                 $cmt->code,
                                 $timestamp,
                                 $model->sku,
                                 $color->code,
                                 $size->code,
-                                $dozenNumber,
+                                $type,
                                 $pieceNumber
                             ]);
 
-                            // Assign to a random rack
+                            // Random rack
                             $rack = $racks->random();
 
                             $products[] = [
@@ -92,10 +72,9 @@ class ProductSeeder extends Seeder
 
                             $productCounter++;
 
-                            // Limit total products to avoid excessive data
-                            // Remove this condition if you want all combinations
+                            // Hard limit 200 products total
                             if ($productCounter >= 200) {
-                                break 5; // Break out of all loops
+                                break 5;
                             }
                         }
                     }
@@ -103,7 +82,7 @@ class ProductSeeder extends Seeder
             }
         }
 
-        // Insert products in chunks for better performance
+        // Insert in chunks
         foreach (array_chunk($products, 50) as $chunk) {
             Product::insert($chunk);
         }
