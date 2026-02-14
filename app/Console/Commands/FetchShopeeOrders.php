@@ -10,6 +10,7 @@ use App\Models\Transactions\OrderItem;
 use App\Enums\OrderStatus;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class FetchShopeeOrders extends Command
 {
@@ -58,32 +59,114 @@ class FetchShopeeOrders extends Command
                 // Set the store context for the service
                 $shopeeService->setStore($store);
 
-                $this->info("Fetching orders from " . date('Y-m-d H:i:s', $timeFrom) . " to " . date('Y-m-d H:i:s', $timeTo));
-
-                // 1. Get List of Orders
-                $response = $shopeeService->getOrderList($timeFrom, $timeTo);
-                
-                // Log response to file
-                $this->saveApiResponse('order_list', $store->store_name, $response);
-                
-                if (isset($response['error']) && !empty($response['error'])) {
-                    $this->error('Shopee API Error: ' . ($response['message'] ?? 'Unknown error'));
-                    continue; // Skip to next store
+                // Check and refresh token if needed
+                if ($store->access_token_expires_at && Carbon::parse($store->access_token_expires_at)->lt(now()->addMinutes(5))) {
+                    $this->info("Token expiring soon or expired. Refreshing...");
+                    try {
+                        $shopeeService->refreshAccessToken();
+                        $store->refresh();
+                        $this->info("Token refreshed successfully.");
+                    } catch (\Exception $e) {
+                        $this->error("Failed to refresh token: " . $e->getMessage());
+                        
+                        // Check if error is due to expired refresh token
+                        if (strpos($e->getMessage(), 'refresh_token_expired') !== false) {
+                            $this->error("Refresh token expired for store: " . $store->store_name . ". Please re-authorize.");
+                        }
+                        
+                        continue;
+                    }
                 }
 
-                $orders = $response['response']['order_list'] ?? [];
-                $count = count($orders);
-                
-                $this->info("Found {$count} orders for store {$store->store_name}.");
+                $this->info("Fetching orders from " . date('Y-m-d H:i:s', $timeFrom) . " to " . date('Y-m-d H:i:s', $timeTo));
+
+                // Split time range into 15-day chunks because Shopee API limit
+                $chunks = [];
+                $currentStart = $timeFrom;
+                while ($currentStart < $timeTo) {
+                    $currentEnd = min($currentStart + (15 * 24 * 60 * 60), $timeTo);
+                    // Ensure start < end
+                    if ($currentEnd > $currentStart) {
+                         $chunks[] = ['start' => $currentStart, 'end' => $currentEnd];
+                    }
+                    $currentStart = $currentEnd;
+                }
+
+                $allOrders = [];
+                foreach ($chunks as $index => $chunk) {
+                    $this->info(sprintf("Processing chunk %d/%d: %s to %s", 
+                        $index + 1, 
+                        count($chunks), 
+                        date('Y-m-d H:i:s', $chunk['start']), 
+                        date('Y-m-d H:i:s', $chunk['end'])
+                    ));
+
+                    // 1. Get List of Orders
+                    // Note: We might need to handle pagination (cursor) here if orders > 50 in 15 days
+                    // For now assuming getOrderList fetches first page, implementing simple loop if has_more is true
+                    
+                    $cursor = "";
+                    do {
+                        $response = $shopeeService->getOrderList($chunk['start'], $chunk['end'], 50, $cursor);
+                        
+                        // Log response to file (only first page to avoid spamming logs too much, or all pages)
+                        $this->saveApiResponse('order_list_' . ($index+1), $store->store_name, $response);
+                        
+                        if (isset($response['error']) && !empty($response['error'])) {
+                            // Check for token expiry in API response
+                            if (strpos($response['message'] ?? '', 'access_token') !== false || 
+                                ($response['error'] === 'error_auth') || 
+                                ($response['error'] === 'invalid_access_token')) {
+                                
+                                $this->info("Access token expired during fetch. Attempting refresh...");
+                                try {
+                                    $shopeeService->refreshAccessToken();
+                                    $store->refresh();
+                                    $this->info("Token refreshed. Retrying fetch...");
+                                    
+                                    // Retry the request
+                                    $response = $shopeeService->getOrderList($chunk['start'], $chunk['end'], 50, $cursor);
+                                    if (isset($response['error']) && !empty($response['error'])) {
+                                        $this->error('Retry failed: ' . ($response['message'] ?? 'Unknown error'));
+                                        break;
+                                    }
+                                } catch (\Exception $e) {
+                                    $this->error("Failed to refresh token during fetch: " . $e->getMessage());
+                                    break;
+                                }
+                            } else {
+                                $this->error('Shopee API Error: ' . ($response['message'] ?? 'Unknown error'));
+                                break; 
+                            }
+                        }
+
+                        $orders = $response['response']['order_list'] ?? [];
+                        $allOrders = array_merge($allOrders, $orders);
+                        
+                        $more = $response['response']['more'] ?? false;
+                        $cursor = $response['response']['next_cursor'] ?? "";
+                        
+                        if ($more) {
+                             $this->info("Fetching next page...");
+                        }
+
+                    } while($more && !empty($cursor));
+                }
+
+                $count = count($allOrders);
+                $this->info("Found total {$count} orders for store {$store->store_name}.");
                 
                 if ($count > 0) {
                     // Extract all Order SNs
-                    $orderSns = array_column($orders, 'order_sn');
+                    $orderSns = array_column($allOrders, 'order_sn');
+                    
+                    // Unique Order SNs just in case
+                    $orderSns = array_unique($orderSns);
                     
                     // Chunk them if necessary (Shopee might have a limit per request, e.g. 50)
-                    $chunks = array_chunk($orderSns, 50);
+                    $snChunks = array_chunk($orderSns, 50);
 
-                    foreach ($chunks as $chunk) {
+                    foreach ($snChunks as $chunk) {
                         $this->info("Fetching details for " . count($chunk) . " orders...");
                         
                         // 2. Get Details for these orders

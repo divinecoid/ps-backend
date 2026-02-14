@@ -99,6 +99,39 @@ class ShopeeController extends Controller
         }
     }
 
+    public function refreshToken($id)
+    {
+        $store = OnlineStore::findOrFail($id);
+
+        if (!$store->refresh_token) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No refresh token available',
+            ], 400);
+        }
+
+        try {
+            $this->shopeeService->setStore($store);
+            $result = $this->shopeeService->refreshAccessToken();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Refresh token berhasil',
+                'data' => $result,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Shopee refresh token failed', [
+                'error' => $e->getMessage(),
+                'store_id' => $store->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function getShippingParameter(Request $request)
     {
         $request->validate([

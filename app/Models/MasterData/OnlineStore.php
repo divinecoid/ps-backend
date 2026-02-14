@@ -21,6 +21,7 @@ class OnlineStore extends Model
         'marketplace_id',
         'store_code',
         'store_name',
+        'shop_id',
         'api_key',
         'client_id',
         'client_secret',
@@ -29,10 +30,14 @@ class OnlineStore extends Model
 
         // OAuth fields
         'redirect_uri',
+        'auth_code',
         'access_token',
         'refresh_token',
         'access_token_expires_at',
         'refresh_token_expires_at',
+
+        // Marketplace specific fields
+        'shop_cipher',
     ];
 
     /**
@@ -40,7 +45,8 @@ class OnlineStore extends Model
      */
     protected $casts = [
         'is_active' => 'boolean',
-        'expires_at' => 'datetime',
+        'access_token_expires_at' => 'datetime',
+        'refresh_token_expires_at' => 'datetime',
     ];
 
     /**
@@ -64,7 +70,7 @@ class OnlineStore extends Model
      */
     public function isTokenExpired(): bool
     {
-        return !$this->expires_at || $this->expires_at->isPast();
+        return !$this->access_token_expires_at || $this->access_token_expires_at->isPast();
     }
 
     /**
@@ -72,6 +78,6 @@ class OnlineStore extends Model
      */
     public function hasValidCredentials(): bool
     {
-        return $this->app_key && $this->app_secret && $this->redirect_uri;
+        return $this->api_key && $this->client_secret && $this->redirect_uri;
     }
 }
