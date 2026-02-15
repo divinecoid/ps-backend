@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Transaction\MutationController;
 use App\Http\Controllers\Transaction\RequestController;
 use App\Http\Controllers\Transaction\InboundController;
 use App\Http\Controllers\Transaction\OrderItemController;
@@ -225,4 +226,9 @@ Route::prefix('model_color')->middleware('checkrole:admin')->group(function () {
 });
 Route::prefix('model_size')->middleware('checkrole:admin')->group(function () {
     Route::get('/{id}', [ProductModelController::class, 'modelSize']);
+});
+
+Route::prefix('mutation')->middleware('checkrole')->group(function () {
+    Route::post('/', [MutationController::class, 'store']);
+    Route::post('/validate', [MutationController::class, 'validate']);
 });

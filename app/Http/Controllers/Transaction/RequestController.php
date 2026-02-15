@@ -117,8 +117,8 @@ class RequestController extends Controller
                                 'size' => (object) [
                                     'name' => $d->size?->name
                                 ],
-                                'dozen_qty' => floor($d->qty / 12),
-                                'piece_qty' => $d->qty % 12,
+                                'qty' => $d->qty,
+                                'barcode' => $d->barcode
                             ];
                         })->values()
                     ];
