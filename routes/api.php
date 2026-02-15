@@ -162,9 +162,11 @@ Route::prefix('rack')->middleware('checkrole:admin')->group(function () {
     Route::delete('{id}', [RackController::class, 'destroy']);
 });
 //Warehouse
+Route::prefix('warehouse')->middleware('checkrole')->group(function () {
+    Route::get('/master', [WarehouseController::class, 'master']);
+});
 Route::prefix('warehouse')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [WarehouseController::class, 'index']);
-    Route::get('/master', [WarehouseController::class, 'master']);
     Route::get('{id}', [WarehouseController::class, 'show']);
     Route::post('/', [WarehouseController::class, 'store']);
     Route::post('{id}/restore', [WarehouseController::class, 'restore']);
@@ -195,6 +197,9 @@ Route::prefix('outbound')->middleware('checkrole')->group(function () {
     Route::get('/order-items/{orderId}', [OrderItemController::class, 'getOrderItems']);
     Route::post('/validate-product-barcode', [OrderItemController::class, 'validateProductBarcode']);
     Route::post('/submit-preparation', [OrderController::class, 'submitPreparation']);
+    Route::post('/assign-order', [OrderController::class, 'assignToMe']);
+    Route::post('/unassign-order', [OrderController::class, 'unassignOrder']);
+    Route::get('/assigned-orders', [OrderController::class, 'assignedOrders']);
 });
 
 //Shopee Auth & Logistics
