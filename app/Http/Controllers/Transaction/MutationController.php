@@ -151,4 +151,65 @@ class MutationController extends Controller
             'sequence' => $parts[count($parts) - 1] ?? null,
         ];
     }
+
+    public function validate(HttpRequest $request)
+    {
+        return $this->baseValidate(
+            $request,
+            [
+                'barcode' => 'required|string',
+            ],
+            function ($data) {
+                $barcode = $data['barcode'];
+                ['prefix' => $prefix, 'group' => $group, 'sequence' => $sequence] = $this->parseBarcode($barcode);
+
+                $requestDetail = $this->findRequestDetail($prefix);
+                if (!$requestDetail) {//cek jika barcode ditemukan di database
+                    return $this->errorResponse(422, 'Barcode tidak valid');
+                }
+                //jika group dan total item dalam group lebih besar daripada yang diterima atau sequence lebih besar daripada 12
+                //cek jika barcode group diluar jangkauan, jika group sekarang dikali 12 -> menjadi total piece, lebih besar dari kuantitas yang diminta atau sequence per group lebih dari 12
+                if ($group == 'DOZEN') {
+                    return $this->errorResponse(422, 'Barcode bukan merupakan barcode piece');
+                } else if ($group == 'PIECE') {
+                    if ($sequence > $requestDetail->req_qty) {
+                        return $this->errorResponse(422, 'Nomor urut barcode piece diluar jangkauan');
+                    }
+                } else {
+                    return $this->errorResponse(422, 'Barcode tidak valid');
+                }
+                if (
+                    Product::where('barcode', $barcode)->exists()//jika sudah pernah discan
+                ) {
+                    return $this->errorResponse(422, 'Barcode sudah discan');
+                }
+
+                $cmt = $requestDetail->request->cmt;
+                $model = $requestDetail->model;
+                $color = $requestDetail->color;
+                $size = $requestDetail->size;
+                return $this->successResponse([
+                    'cmt' => (object) [
+                        'code' => $cmt->code,
+                        'name' => $cmt->name,
+                        'contact_person' => $cmt->contact_person,
+                        'phone' => $cmt->phone,
+                        'address' => $cmt->address,
+                    ],
+                    'model' => (object) [
+                        'sku' => $model->sku,
+                        'name' => $model->name,
+                    ],
+                    'color' => (object) [
+                        'code' => $color->code,
+                        'name' => $color->name,
+                    ],
+                    'size' => (object) [
+                        'code' => $size->code,
+                        'name' => $size->name,
+                    ]
+                ]);
+            }
+        );
+    }
 }

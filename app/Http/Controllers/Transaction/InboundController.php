@@ -282,7 +282,7 @@ class InboundController extends Controller
                     return $this->errorResponse(422, 'Barcode tidak valid');
                 }
                 if (
-                    ReceivedlogDetail::where('barcode', $barcode)->exists()//jika sudah pernah discan
+                    Product::where('barcode', $barcode)->exists()//jika sudah pernah discan
                 ) {
                     return $this->errorResponse(422, 'Barcode sudah discan');
                 }

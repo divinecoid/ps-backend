@@ -230,5 +230,5 @@ Route::prefix('model_size')->middleware('checkrole:admin')->group(function () {
 
 Route::prefix('mutation')->middleware('checkrole')->group(function () {
     Route::post('/', [MutationController::class, 'store']);
-    // Route::post('/validate', [MutationController::class, 'validate']);
+    Route::post('/validate', [MutationController::class, 'validate']);
 });
