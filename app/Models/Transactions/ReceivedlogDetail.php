@@ -51,4 +51,9 @@ class ReceivedlogDetail extends Model
     {
         return $this->belongsTo(Size::class, 'size_id');
     }
+
+    public function product()
+    {
+        return $this->hasOne(Product::class, 'barcode', 'barcode');
+    }
 }

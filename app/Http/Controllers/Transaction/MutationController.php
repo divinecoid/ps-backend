@@ -5,13 +5,50 @@ namespace App\Http\Controllers\Transaction;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
 use App\Models\MasterData\Product;
+use App\Models\Transactions\Receivedlog;
+use App\Models\Transactions\ReceivedlogDetail;
 use App\Models\Transactions\RequestDetail;
+use Illuminate\Support\Facades\Auth;
 use DB;
 use Illuminate\Http\Request as HttpRequest;
 use Illuminate\Validation\Rule;
 class MutationController extends Controller
 {
     use CrudTrait;
+
+    private function structure()
+    {
+        return fn($data) => [
+            'id' => $data->id,
+            'user' => (object) [
+                'name' => $data->user?->name
+            ],
+            'created_at' => $data->created_at,
+            'notes' => str_replace('[MUTATION] ', '', $data->notes),
+            'details' => $data->details->map(fn($detail) => [
+                'barcode' => $detail->barcode,
+                'rack_id' => $detail->product?->rack_id,
+                'rack' => (object) [
+                    'name' => $detail->product?->rack?->name ?? '-'
+                ]
+            ])
+        ];
+    }
+
+    public function index(HttpRequest $request)
+    {
+        return $this->baseIndex(
+            $request,
+            Receivedlog::class,
+            ['user', 'details.product.rack'],
+            ['notes' => 'like'],
+            $this->structure(),
+            function ($query) {
+                $query->where('notes', 'like', '[MUTATION]%');
+                $query->orderBy('created_at', 'desc');
+            }
+        );
+    }
     /*
         {
             "items": [
@@ -102,10 +139,27 @@ class MutationController extends Controller
                     $totalInvalid = count($invalidBarcodes) + count($scannedBarcodes);
                     if ($totalInvalid == 0 && $currentRequest !== null) {//jika semuanya lolos validasi
                         DB::transaction(function () use ($data, $currentRequest) {
+                            $log = Receivedlog::create([
+                                'request_id' => $currentRequest->id,
+                                'user_id' => Auth::id(),
+                                'received_date' => now(),
+                                'notes' => '[MUTATION] ' . ($data['notes'] ?? '')
+                            ]);
+
                             foreach ($data['items'] as $item) {
                                 foreach ($item['barcodes'] as $barcode) {
                                     ['prefix' => $prefix] = $this->parseBarcode($barcode);
                                     if ($rd = $this->findRequestDetail($prefix)) {
+                                        ReceivedlogDetail::create([
+                                            'receivedlog_id' => $log->id,
+                                            'request_detail_id' => $rd->id,
+                                            'model_id' => $rd->model_id,
+                                            'color_id' => $rd->color_id,
+                                            'size_id' => $rd->size_id,
+                                            'qty' => 1,
+                                            'barcode' => $barcode
+                                        ]);
+
                                         Product::create([
                                             'rack_id' => $item['rack_id'],
                                             'model_id' => $rd->model_id,

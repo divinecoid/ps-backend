@@ -259,4 +259,113 @@ class OrderController extends Controller
             ]
         ], 200);
     }
+
+    /**
+     * Assign the order to the currently authenticated user (preparist)
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function assignToMe(Request $request)
+    {
+        $request->validate([
+            'order_id' => 'required|exists:trx_orders,id',
+        ]);
+
+        $orderId = $request->input('order_id');
+        $user = auth()->user();
+
+        $order = Order::find($orderId);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order tidak ditemukan'
+            ], 404);
+        }
+
+        // Check if already assigned to someone else
+        if ($order->preparist_user_id && $order->preparist_user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order sudah di-assign ke user lain'
+            ], 400);
+        }
+
+        $order->preparist_user_id = $user->id;
+        $order->read_at = now();
+        $order->status = \App\Enums\OrderStatus::READ;
+        $order->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Order berhasil di-assign ke Anda',
+            'data' => $this->structure()($order)
+        ], 200);
+    }
+
+    /**
+     * Get orders assigned to the currently authenticated user
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function assignedOrders(Request $request)
+    {
+        $user = auth()->user();
+
+        return $this->baseIndex(
+            $request,
+            Order::class,
+            [],
+            ["marketplace_id", "awb_code", "status", "online_store_id"],
+            $this->structure(),
+            function ($query) use ($user) {
+                $query->where('preparist_user_id', $user->id);
+            }
+        );
+    }
+
+    /**
+     * Unassign the order from the currently authenticated user
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function unassignOrder(Request $request)
+    {
+        $request->validate([
+            'order_id' => 'required|exists:trx_orders,id',
+        ]);
+
+        $orderId = $request->input('order_id');
+        $user = auth()->user();
+
+        $order = Order::find($orderId);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order tidak ditemukan'
+            ], 404);
+        }
+
+        if ($order->preparist_user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki otoritas untuk melempar order ini'
+            ], 403);
+        }
+
+        $order->preparist_user_id = null;
+        $order->read_at = null;
+        $order->status = \App\Enums\OrderStatus::PENDING;
+        $order->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Order berhasil dilepas',
+            'data' => $this->structure()($order)
+        ], 200);
+    }
 }
