@@ -17,28 +17,28 @@ class InboundController extends Controller
 {
     use CrudTrait;
     /*
-    {
-        "barcode_dozen": [
-            "CMT01|20260116172102|LP|RED|XS|DOZEN|1",
-            "CMT01|20260116172102|LP|RED|XS|DOZEN|2"
-        ],
-        "warehouse_id": "019b85c4-c21c-7215-b374-47b05605d1b3",
-        "barcodes_piece": [
-            {
-                "barcode": "CMT01|20260116172102|LP|RED|XS|PIECE|1",
-                "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c5446"
-            },
-            {
-                "barcode": "CMT01|20260116172102|LP|RED|XS|PIECE|2",
-                "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c5446"
-            },
-            {
-                "barcode": "CMT01|20260116172102|LP|RED|XS|PIECE|3",
-                "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c5446"
-            }
-        ],
-        "notes": "Received in good condition"
-    }
+        {
+            "barcode_dozen": [
+                "CMT01|20260116172102|LP|RED|XS|DOZEN|1",
+                "CMT01|20260116172102|LP|RED|XS|DOZEN|2"
+            ],
+            "warehouse_id": "019b85c4-c21c-7215-b374-47b05605d1b3",
+            "barcodes_piece": [
+                {
+                    "barcode": "CMT01|20260116172102|LP|RED|XS|PIECE|1",
+                    "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c5446"
+                },
+                {
+                    "barcode": "CMT01|20260116172102|LP|RED|XS|PIECE|2",
+                    "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c5446"
+                },
+                {
+                    "barcode": "CMT01|20260116172102|LP|RED|XS|PIECE|3",
+                    "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c5446"
+                }
+            ],
+            "notes": "Received in good condition"
+        }
      */
     private function structure()
     {
@@ -253,7 +253,6 @@ class InboundController extends Controller
             }
         );
     }
-
     public function validate(HttpRequest $request)
     {
         return $this->baseValidate(
@@ -344,7 +343,6 @@ class InboundController extends Controller
 
         $requestDetail->increment('rec_qty', $qty);
     }
-
     public function index(HttpRequest $request)
     {
         return $this->baseIndex(
@@ -355,7 +353,6 @@ class InboundController extends Controller
             $this->structure()
         );
     }
-
     public function show($id)
     {
         return $this->baseShow(
