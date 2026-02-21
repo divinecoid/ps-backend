@@ -61,17 +61,23 @@ class FetchShopeeOrders extends Command
 
                 // Check and refresh token if needed
                 if ($store->access_token_expires_at && Carbon::parse($store->access_token_expires_at)->lt(now()->addMinutes(5))) {
-                    $this->info("Token expiring soon or expired. Refreshing...");
+                    $this->info("[" . $store->store_name . "] Token expiring soon or expired. Refreshing...");
                     try {
                         $shopeeService->refreshAccessToken();
                         $store->refresh();
-                        $this->info("Token refreshed successfully.");
+                        $this->info("[" . $store->store_name . "] Token refreshed successfully.");
                     } catch (\Exception $e) {
-                        $this->error("Failed to refresh token: " . $e->getMessage());
+                        $msg = $e->getMessage();
+                        // Downgrade to warning for known reauth scenario to avoid noisy logs before other stores succeed
+                        if (stripos($msg, 'refresh_token_expired') !== false) {
+                            $this->warn("[" . $store->store_name . "] Refresh token expired. Please re-authorize.");
+                        } else {
+                            $this->error("[" . $store->store_name . "] Failed to refresh token: " . $msg);
+                        }
                         
                         // Check if error is due to expired refresh token
-                        if (strpos($e->getMessage(), 'refresh_token_expired') !== false) {
-                            $this->error("Refresh token expired for store: " . $store->store_name . ". Please re-authorize.");
+                        if (strpos($msg, 'refresh_token_expired') !== false) {
+                            // already warned above; keep behavior to skip this store
                         }
                         
                         continue;
@@ -118,24 +124,29 @@ class FetchShopeeOrders extends Command
                                 ($response['error'] === 'error_auth') || 
                                 ($response['error'] === 'invalid_access_token')) {
                                 
-                                $this->info("Access token expired during fetch. Attempting refresh...");
+                                $this->info("[" . $store->store_name . "] Access token expired during fetch. Attempting refresh...");
                                 try {
                                     $shopeeService->refreshAccessToken();
                                     $store->refresh();
-                                    $this->info("Token refreshed. Retrying fetch...");
+                                    $this->info("[" . $store->store_name . "] Token refreshed. Retrying fetch...");
                                     
                                     // Retry the request
                                     $response = $shopeeService->getOrderList($chunk['start'], $chunk['end'], 50, $cursor);
                                     if (isset($response['error']) && !empty($response['error'])) {
-                                        $this->error('Retry failed: ' . ($response['message'] ?? 'Unknown error'));
+                                        $this->error('[' . $store->store_name . '] Retry failed: ' . ($response['message'] ?? 'Unknown error'));
                                         break;
                                     }
                                 } catch (\Exception $e) {
-                                    $this->error("Failed to refresh token during fetch: " . $e->getMessage());
+                                    $msg = $e->getMessage();
+                                    if (stripos($msg, 'refresh_token_expired') !== false) {
+                                        $this->warn('[' . $store->store_name . '] Refresh token expired during fetch. Please re-authorize.');
+                                    } else {
+                                        $this->error("[" . $store->store_name . "] Failed to refresh token during fetch: " . $msg);
+                                    }
                                     break;
                                 }
                             } else {
-                                $this->error('Shopee API Error: ' . ($response['message'] ?? 'Unknown error'));
+                                $this->error('[' . $store->store_name . '] Shopee API Error: ' . ($response['message'] ?? 'Unknown error'));
                                 break; 
                             }
                         }

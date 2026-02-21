@@ -32,10 +32,11 @@ Route::middleware('checkrole:admin')->post('/register', RegisterController::clas
 //Shopee Auth & Logistics
 Route::prefix('shopee')->middleware('checkrole:admin')->group(function () {
     Route::post('/auth-url', [ShopeeController::class, 'generateAuthUrl']);
-    Route::get('/shipping-parameter', [ShopeeController::class, 'getShippingParameter']);
     Route::post('/ship-order', [ShopeeController::class, 'shipOrder']);
     Route::post('/download-shipping-document', [ShopeeController::class, 'downloadShippingDocument']);
 });
+
+Route::get('shopee/shipping-parameter', [ShopeeController::class, 'getShippingParameter']);
 
 //MasterData
 //Role
