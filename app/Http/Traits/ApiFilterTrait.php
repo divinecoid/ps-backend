@@ -2,6 +2,8 @@
 
 namespace App\Http\Traits;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
 trait ApiFilterTrait
 {
     public function applyFilter($query, $request, $searchFields = [])
@@ -34,8 +36,32 @@ trait ApiFilterTrait
                 $sortParts = explode(',', $sortItem);
                 if (count($sortParts) == 2) {
                     $column = trim($sortParts[0]);
-                    $order = trim($sortParts[1]);
-                    $query->orderBy($column, $order);
+                    $order = strtolower(trim($sortParts[1])) === 'desc' ? 'desc' : 'asc';
+                    if (str_contains($column, '.')) {
+                        $segments = explode('.', $column);
+                        $relationName = $segments[0];
+                        $relationColumn = $segments[1];
+                        $model = $query->getModel();
+                        $relation = $model->{$relationName}();
+                        if ($relation instanceof BelongsTo) {
+                            $parentTable = $model->getTable();
+                            $relatedTable = $relation->getRelated()->getTable();
+
+                            $query->leftJoin(
+                                $relatedTable,
+                                $relation->getQualifiedForeignKeyName(),
+                                '=',
+                                $relation->getQualifiedOwnerKeyName()
+                            );
+
+                            $query->orderBy("$relatedTable.$relationColumn", $order)
+                                ->select("$parentTable.*");
+
+                        }
+
+                    } else {
+                        $query->orderBy($column, $order);
+                    }
                 }
             }
         } else {

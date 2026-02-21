@@ -51,7 +51,7 @@ trait CrudTrait
             $base = $map ? $map($item) : $item;
             return [
                 ...$base,
-                'is_deleted' => $item->deleted_at !== null,
+                'deleted_at' => $item->deleted_at !== null,
             ];
         });
         return response()->json($this->paginateResponse($data, $items));

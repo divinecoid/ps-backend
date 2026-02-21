@@ -21,7 +21,7 @@ class RequestController extends Controller
             'id' => $data->id,
             'cmt_id' => $data->cmt_id,
             'cmt' => $data->cmt,
-            'created_date' => $data->created_at,
+            'created_at' => $data->created_at,
             'status' => $data->status,
             'request_detail' => $data->request_detail->map(fn($detail) => [
                 'req_dozen_qty' => floor($detail->req_qty / 12),
