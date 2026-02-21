@@ -10,22 +10,33 @@ trait CrudTrait
 {
     use ApiFilterTrait;
 
-    public function baseIndex(Request $request, $model, array $relations = [], array $filters = [], callable $map = null)
-    {
+    public function baseIndex(
+        Request $request,
+        $model,
+        array $relations = [],
+        array $filters = [],
+        ?callable $map = null,
+        ?callable $queryCallback = null
+    ) {
         $perPage = (int) ($request->input('per_page', $this->getPerPageDefault()));
         $query = $model::query()->with($relations);
+
+        if (is_callable($queryCallback)) {
+            $queryCallback($query);
+        }
 
         if (method_exists($this, 'applyFilter') && !empty($filters)) {
             $query = $this->applyFilter($query, $request, $filters);
         }
 
         $data = $query->paginate($perPage);
-
         $items = collect($data->items())->map($map ?? fn($item) => $item);
+
         return response()->json($this->paginateResponse($data, $items));
     }
 
-    public function baseMaster(Request $request, $model, array $relations = [], array $filters = [], callable $map = null)
+
+    public function baseMaster(Request $request, $model, array $relations = [], array $filters = [], ?callable $map = null)
     {
         $perPage = (int) ($request->input('per_page', $this->getPerPageDefault()));
         $query = $model::withTrashed()->with($relations);
@@ -46,7 +57,7 @@ trait CrudTrait
         return response()->json($this->paginateResponse($data, $items));
     }
 
-    public function baseShow($model, $id, array $relations = [], callable $map = null)
+    public function baseShow($model, $id, array $relations = [], ?callable $map = null)
     {
         $item = $model::with($relations)->find($id);
         if (!$item) {
@@ -55,7 +66,7 @@ trait CrudTrait
         return $this->successResponse($map ? $map($item) : $item);
     }
 
-    public function baseStore(Request $request, $model, array $rules, callable $afterCreate = null)
+    public function baseStore(Request $request, $model, array $rules, ?callable $afterCreate = null)
     {
         $validator = Validator::make($request->all(), $rules);
         if ($validator->fails()) {
@@ -71,7 +82,7 @@ trait CrudTrait
         });
     }
 
-    public function baseUpdate(Request $request, $model, $id, array $rules, callable $afterUpdate = null)
+    public function baseUpdate(Request $request, $model, $id, array $rules, ?callable $afterUpdate = null)
     {
         $record = $model::find($id);
         if (!$record) {
@@ -113,7 +124,7 @@ trait CrudTrait
         return $this->successResponse($item);
     }
 
-    public function baseValidate(Request $request, array $rules, callable $afterValidate = null)
+    public function baseValidate(Request $request, array $rules, ?callable $afterValidate = null)
     {
         $validator = Validator::make($request->all(), $rules);
         if ($validator->fails()) {
@@ -122,12 +133,11 @@ trait CrudTrait
         $data = $request->only(array_keys($request->all()));
 
         if ($afterValidate) {
-            $afterValidate($data, $request);
+            return $afterValidate($data);
         }
-        return $this->successResponse($data);
     }
 
-    public function baseRelationIndex(Request $request, $relationQuery, array $filters = [], callable $map = null)
+    public function baseRelationIndex(Request $request, $relationQuery, array $filters = [], ?callable $map = null)
     {
         $perPage = (int) ($request->input('per_page', $this->getPerPageDefault()));
         $query = $relationQuery;

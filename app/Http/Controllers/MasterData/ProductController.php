@@ -5,7 +5,9 @@ namespace App\Http\Controllers\MasterData;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
 use App\Models\MasterData\Product;
+use App\Models\Transactions\RequestDetail;
 use Illuminate\Http\Request;
+use DB;
 use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
@@ -62,9 +64,8 @@ class ProductController extends Controller
 
     public function store(Request $request)
     {
-        return $this->baseStore(
+        return $this->baseValidate(
             $request,
-            Product::class,
             [
                 'rack_id' => [
                     'required',
@@ -74,8 +75,31 @@ class ProductController extends Controller
                     'required',
                     Rule::exists('mdx_models', 'id')->whereNull('deleted_at'),
                 ],
+                'barcode' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    'unique:mdx_products,barcode',
+                ],
             ],
-            null
+            function ($data) {
+                $request = RequestDetail::where('barcode', 'like', substr($data['barcode'], 0, strrpos($data['barcode'], '|')) . '%')->firstOrFail();
+                if (!$request) {
+                    return $this->errorResponse(422, 'Prefiks barcode tidak valid');
+                }
+                $barcodeIndex = substr($data['barcode'], strrpos($data['barcode'], '|') + 1);
+                if (!ctype_digit($barcodeIndex)) {
+                    return $this->errorResponse(422, 'Sequence barcode tidak valid');
+                }
+                $totalQuantity = $request->req_qty;
+                if ((int)$barcodeIndex < 1 || (int)$barcodeIndex > $totalQuantity) {
+                    return $this->errorResponse(422, 'Sequence barcode di luar jangkauan');
+                }
+                return DB::transaction(function () use ($data) {
+                    $product = Product::create($data);
+                    return $this->successResponse($product);
+                });
+            }
         );
     }
 
@@ -93,6 +117,12 @@ class ProductController extends Controller
                 'model_id' => [
                     'required',
                     Rule::exists('mdx_models', 'id')->whereNull('deleted_at'),
+                ],
+                'barcode' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('mdx_products', 'barcode')->ignore($id),
                 ],
             ],
             null

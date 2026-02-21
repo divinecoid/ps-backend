@@ -6,6 +6,12 @@ trait ApiFilterTrait
 {
     public function applyFilter($query, $request, $searchFields = [])
     {
+
+        foreach ($searchFields as $field) {
+            if ($request->filled($field)) {
+                $query->where($field, $request->input($field));
+            }
+        }
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search, $searchFields) {
                 foreach ($searchFields as $field) {
@@ -69,12 +75,12 @@ trait ApiFilterTrait
         ]);
     }
 
-    public function errorResponse($code = 400, $message = "Error")
+    public function errorResponse($code = 400, $message = "Error", $data = null)
     {
         return response()->json([
             'success' => false,
             'message' => $message,
-            'data' => null
+            'data' => $data
         ], $code);
     }
 

@@ -1,6 +1,9 @@
 <?php
 
+use App\Http\Controllers\Transaction\MutationController;
 use App\Http\Controllers\Transaction\RequestController;
+use App\Http\Controllers\Transaction\InboundController;
+use App\Http\Controllers\Transaction\OrderItemController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\LoginController;
@@ -160,9 +163,11 @@ Route::prefix('rack')->middleware('checkrole:admin')->group(function () {
     Route::delete('{id}', [RackController::class, 'destroy']);
 });
 //Warehouse
+Route::prefix('warehouse')->middleware('checkrole')->group(function () {
+    Route::get('/master', [WarehouseController::class, 'master']);
+});
 Route::prefix('warehouse')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [WarehouseController::class, 'index']);
-    Route::get('/master', [WarehouseController::class, 'master']);
     Route::get('{id}', [WarehouseController::class, 'show']);
     Route::post('/', [WarehouseController::class, 'store']);
     Route::post('{id}/restore', [WarehouseController::class, 'restore']);
@@ -173,6 +178,8 @@ Route::prefix('warehouse')->middleware('checkrole:admin')->group(function () {
 
 //Order
 Route::prefix('order')->middleware('checkrole:admin')->group(function () {
+    Route::get('/', [OrderController::class, 'index']);
+    Route::get('/{id}', [OrderController::class, 'show']);
     Route::get('/lazada/{id}', [OrderController::class, 'getLazadaOrder']);
     Route::get('/tiktokshop/{id}', [OrderController::class, 'getTiktokShopOrder']);
     Route::get('/shopee/{id}', [OrderController::class, 'getShopeeOrder']);
@@ -183,6 +190,17 @@ Route::prefix('order')->middleware('checkrole:admin')->group(function () {
     Route::get('/items/lazada/{id}', [OrderController::class, 'getLazadaOrderItems']);
     Route::get('/items/tiktokshop/{id}', [OrderController::class, 'getTiktokShopOrderItems']);
     Route::get('/items/shopee/{id}', [OrderController::class, 'getShopeeOrderItems']);
+});
+
+//Outbound Operations
+Route::prefix('outbound')->middleware('checkrole')->group(function () {
+    Route::post('/validate-awb', [OrderItemController::class, 'validateAwb']);
+    Route::get('/order-items/{orderId}', [OrderItemController::class, 'getOrderItems']);
+    Route::post('/validate-product-barcode', [OrderItemController::class, 'validateProductBarcode']);
+    Route::post('/submit-preparation', [OrderController::class, 'submitPreparation']);
+    Route::post('/assign-order', [OrderController::class, 'assignToMe']);
+    Route::post('/unassign-order', [OrderController::class, 'unassignOrder']);
+    Route::get('/assigned-orders', [OrderController::class, 'assignedOrders']);
 });
 
 //Shopee Auth & Logistics
@@ -198,15 +216,28 @@ Route::get('shopee/fetch-orders', [ShopeeController::class, 'fetchOrders']);
 Route::prefix('request')->middleware('checkrole')->group(function () {
     Route::get('/', [RequestController::class, 'index']);
     Route::get('/{id}', [RequestController::class, 'show']);
-    Route::get('/barcode/{id}',[RequestController::class, 'barcode']);
+    Route::get('/barcode/{id}', [RequestController::class, 'barcode']);
     Route::post('/', [RequestController::class, 'store']);
     Route::delete('/{id}', [RequestController::class, 'destroy']);
 });
 
+// Inbound Receiving
+Route::prefix('inbound')->middleware('checkrole')->group(function () {
+    Route::get('/', [InboundController::class, 'index']);
+    Route::get('/{id}', [InboundController::class, 'show']);
+    Route::post('/', [InboundController::class, 'store']);
+    Route::post('/validate', [InboundController::class, 'validate']);
+});
 
 Route::prefix('model_color')->middleware('checkrole:admin')->group(function () {
     Route::get('/{id}', [ProductModelController::class, 'modelColor']);
 });
 Route::prefix('model_size')->middleware('checkrole:admin')->group(function () {
     Route::get('/{id}', [ProductModelController::class, 'modelSize']);
+});
+
+Route::prefix('mutation')->middleware('checkrole')->group(function () {
+    Route::get('/', [MutationController::class, 'index']);
+    Route::post('/', [MutationController::class, 'store']);
+    Route::post('/validate', [MutationController::class, 'validate']);
 });

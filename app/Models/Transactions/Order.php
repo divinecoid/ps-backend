@@ -36,6 +36,7 @@ class Order extends Model
         'customer_name',
         'customer_phone',
         'customer_address',
+        'marketplace_id',
     ];
 
     protected $casts = [
@@ -64,5 +65,11 @@ class Order extends Model
     public function user()
     {
         return $this->belongsTo(User::class, 'preparist_user_id');
+    }
+
+    // Define relationship with Marketplace model
+    public function marketplace()
+    {
+        return $this->belongsTo(\App\Models\MasterData\Marketplace::class, 'marketplace_id');
     }
 }

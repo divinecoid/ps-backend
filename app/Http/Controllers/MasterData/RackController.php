@@ -31,7 +31,7 @@ class RackController extends Controller
             $request,
             Rack::class,
             [],
-            ['code', 'name'],
+            ['id', 'code', 'name'],
             $this->structure()
         );
     }

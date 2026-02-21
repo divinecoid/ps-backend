@@ -56,7 +56,12 @@ class LoginController extends Controller
                 'message' => "OK",
                 'token' => $accessToken,
                 'refresh_token' => $refreshToken->token,
-                'token_type' => 'Bearer'
+                'token_type' => 'Bearer',
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'username' => $user->username,
+                ]
             ]);
 
         } catch (ConnectionException $e) {
@@ -146,7 +151,7 @@ class LoginController extends Controller
             }
 
             $refreshToken->revoke();
-            
+
             return response()->json([
                 'success' => true,
                 'message' => "OK",

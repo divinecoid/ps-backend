@@ -21,8 +21,8 @@ class OrderController extends Controller
             'read_at' => $data->read_at,
             'prepared_at' => $data->prepared_at,
             'prepare_duration' => $data->prepare_duration,
-            'readtoship_at' => $data->readtoship_at,
-            'readtoship_marketplace' => $data->readtoship_marketplace,
+            'readytoship_at' => $data->readytoship_at,
+            'readytoship_marketplace' => $data->readytoship_marketplace,
             'online_store_id' => $data->online_store_id,
             'item_count' => $data->item_count,
             'unique_item_count' => $data->unique_item_count,
@@ -35,6 +35,7 @@ class OrderController extends Controller
             'customer_name' => $data->customer_name,
             'customer_phone' => $data->customer_phone,
             'customer_address' => $data->customer_address,
+            'marketplace_id' => $data->marketplace_id,
         ];
     }
 
@@ -44,17 +45,23 @@ class OrderController extends Controller
             $request,
             Order::class,
             [],
-            [],
-            $this->structure()
+            ["marketplace_id", "awb_code", "status", "online_store_id"],
+            $this->structure(),
+            // function ($query) use ($request) {
+            //     if ($request->filled('marketplace_id')) {
+            //         $query->where('marketplace_id', $request->marketplace_id);
+            //     }
+            // }
         );
     }
+
 
     public function show($id)
     {
         return $this->baseShow(
             Order::class,
             $id,
-            ['order_items', 'order_note'],
+            ['order_items'],
             $this->structure()
         );
     }
@@ -83,6 +90,7 @@ class OrderController extends Controller
                 'customer_name' => 'required|string|max:255',
                 'customer_phone' => 'nullable|string|max:50',
                 'customer_address' => 'nullable|string|max:500',
+                'marketplace_id' => 'nullable|exists:mdx_marketplaces,id',
             ],
             null
         );
@@ -118,6 +126,7 @@ class OrderController extends Controller
                 'customer_name' => 'required|string|max:255',
                 'customer_phone' => 'nullable|string|max:50',
                 'customer_address' => 'nullable|string|max:500',
+                'marketplace_id' => 'nullable|exists:mdx_marketplaces,id',
             ],
             null
         );
@@ -150,10 +159,213 @@ class OrderController extends Controller
         $response = $this->getMarketplaceData(
             $baseUrl,
             '/order/get',
-            ['order_id' => (int)$id, 'app_key' => $app_key, 'timestamp' => $timestamp, 'sign_method' => $signinmethod, 'sign' => $sign],
+            ['order_id' => (int) $id, 'app_key' => $app_key, 'timestamp' => $timestamp, 'sign_method' => $signinmethod, 'sign' => $sign],
             // $token
         );
 
         return response()->json($response, $response['success'] ? 200 : 500);
+    }
+
+    /**
+     * Submit order preparation with scanned products
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function submitPreparation(Request $request)
+    {
+        $request->validate([
+            'order_id' => 'required|exists:trx_orders,id',
+            'prepared_at' => 'required|date',
+            'scanned_barcodes' => 'required|array|min:1',
+            'scanned_barcodes.*' => 'string'
+        ]);
+
+        $orderId = $request->input('order_id');
+        $preparedAt = $request->input('prepared_at');
+        $scannedBarcodes = $request->input('scanned_barcodes');
+
+        // Find order
+        $order = Order::find($orderId);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order tidak ditemukan'
+            ], 404);
+        }
+
+        // Validate all barcodes again (check for concurrent deletions)
+        $conflictingBarcodes = [];
+        $productsToDelete = [];
+
+        foreach ($scannedBarcodes as $barcode) {
+            $product = \App\Models\MasterData\Product::where('barcode', $barcode)->first();
+
+            if (!$product) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Barcode tidak ditemukan: $barcode"
+                ], 404);
+            }
+
+            if ($product->deleted_at !== null) {
+                $conflictingBarcodes[] = [
+                    'barcode' => $barcode,
+                    'deleted_at' => $product->deleted_at
+                ];
+            } else {
+                $productsToDelete[] = $product;
+            }
+        }
+
+        // If there are conflicting barcodes, return error
+        if (count($conflictingBarcodes) > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terdapat produk yang sudah di-scan oleh user lain. Silakan refresh dan scan ulang.',
+                'conflicting_barcodes' => $conflictingBarcodes
+            ], 409);
+        }
+
+        // All validations passed, proceed with soft-delete and update order
+        $readyToShipAt = now();
+
+        // Soft-delete all scanned products
+        foreach ($productsToDelete as $product) {
+            $product->delete(); // This will set deleted_at
+        }
+
+        // Calculate prepare_duration in seconds
+        $preparedAtCarbon = \Carbon\Carbon::parse($preparedAt);
+        $readyToShipAtCarbon = \Carbon\Carbon::parse($readyToShipAt);
+        $prepareDuration = $preparedAtCarbon->diffInSeconds($readyToShipAtCarbon);
+
+        // Update order
+        $order->prepared_at = $preparedAt;
+        $order->readytoship_at = $readyToShipAt;
+        $order->prepare_duration = $prepareDuration;
+        $order->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Order berhasil diproses dan siap dikirim',
+            'data' => [
+                'order_id' => $orderId,
+                'prepared_at' => $order->prepared_at,
+                'readytoship_at' => $order->readytoship_at,
+                'prepare_duration' => $order->prepare_duration,
+                'products_scanned' => count($productsToDelete)
+            ]
+        ], 200);
+    }
+
+    /**
+     * Assign the order to the currently authenticated user (preparist)
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function assignToMe(Request $request)
+    {
+        $request->validate([
+            'order_id' => 'required|exists:trx_orders,id',
+        ]);
+
+        $orderId = $request->input('order_id');
+        $user = auth()->user();
+
+        $order = Order::find($orderId);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order tidak ditemukan'
+            ], 404);
+        }
+
+        // Check if already assigned to someone else
+        if ($order->preparist_user_id && $order->preparist_user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order sudah di-assign ke user lain'
+            ], 400);
+        }
+
+        $order->preparist_user_id = $user->id;
+        $order->read_at = now();
+        $order->status = \App\Enums\OrderStatus::READ;
+        $order->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Order berhasil di-assign ke Anda',
+            'data' => $this->structure()($order)
+        ], 200);
+    }
+
+    /**
+     * Get orders assigned to the currently authenticated user
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function assignedOrders(Request $request)
+    {
+        $user = auth()->user();
+
+        return $this->baseIndex(
+            $request,
+            Order::class,
+            [],
+            ["marketplace_id", "awb_code", "status", "online_store_id"],
+            $this->structure(),
+            function ($query) use ($user) {
+                $query->where('preparist_user_id', $user->id);
+            }
+        );
+    }
+
+    /**
+     * Unassign the order from the currently authenticated user
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function unassignOrder(Request $request)
+    {
+        $request->validate([
+            'order_id' => 'required|exists:trx_orders,id',
+        ]);
+
+        $orderId = $request->input('order_id');
+        $user = auth()->user();
+
+        $order = Order::find($orderId);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order tidak ditemukan'
+            ], 404);
+        }
+
+        if ($order->preparist_user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki otoritas untuk melempar order ini'
+            ], 403);
+        }
+
+        $order->preparist_user_id = null;
+        $order->read_at = null;
+        $order->status = \App\Enums\OrderStatus::PENDING;
+        $order->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Order berhasil dilepas',
+            'data' => $this->structure()($order)
+        ], 200);
     }
 }

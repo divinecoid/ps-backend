@@ -15,7 +15,7 @@ class Request extends Model
 
     protected $table = 'trx_requests';
 
-    protected $fillable = ['cmt_id'];
+    protected $fillable = ['cmt_id', 'status'];
 
     // Define relationship with Received Log model
     // public function recevied_log()
@@ -29,6 +29,11 @@ class Request extends Model
     //     return $this->belongsTo(Inventory::class, 'inventory_id');
     // }
 
+
+    public function receive_log()
+    {
+        return $this->hasMany(Receivedlog::class, 'request_id');
+    }
     public function request_detail()
     {
         return $this->hasMany(RequestDetail::class, 'request_id');
@@ -37,5 +42,12 @@ class Request extends Model
     public function cmt()
     {
         return $this->belongsTo(CMT::class, 'cmt_id');
+    }
+
+    public function isCompleted()
+    {
+        return !$this->request_detail()
+            ->whereRaw('(rec_qty + rec_bs_qty) < req_qty')
+            ->exists();
     }
 }

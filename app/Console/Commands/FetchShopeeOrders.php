@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use App\Services\ShopeeService;
 use App\Models\MasterData\OnlineStore;
+use App\Models\MasterData\Marketplace;
 use App\Models\Transactions\Order;
 use App\Models\Transactions\OrderItem;
 use App\Enums\OrderStatus;
@@ -34,7 +35,7 @@ class FetchShopeeOrders extends Command
     public function handle(ShopeeService $shopeeService)
     {
         $this->info('Starting Shopee Order Fetch...');
-        
+
         $days = $this->option('days');
         $timeTo = time();
         $timeFrom = $timeTo - ($days * 24 * 60 * 60);
@@ -42,7 +43,7 @@ class FetchShopeeOrders extends Command
         // Fetch all active Shopee stores
         $stores = OnlineStore::whereHas('marketplace', function ($q) {
             $q->where('name', 'like', '%Shopee%')
-              ->orWhere('alias', 'like', '%shopee%');
+                ->orWhere('alias', 'like', '%shopee%');
         })->where('is_active', true)->get();
 
         if ($stores->isEmpty()) {
@@ -54,132 +55,39 @@ class FetchShopeeOrders extends Command
 
         foreach ($stores as $store) {
             $this->info("Processing Store: " . $store->store_name . " (" . $store->store_code . ")");
-            
+
             try {
                 // Set the store context for the service
                 $shopeeService->setStore($store);
 
-                // Check and refresh token if needed
-                if ($store->access_token_expires_at && Carbon::parse($store->access_token_expires_at)->lt(now()->addMinutes(5))) {
-                    $this->info("[" . $store->store_name . "] Token expiring soon or expired. Refreshing...");
-                    try {
-                        $shopeeService->refreshAccessToken();
-                        $store->refresh();
-                        $this->info("[" . $store->store_name . "] Token refreshed successfully.");
-                    } catch (\Exception $e) {
-                        $msg = $e->getMessage();
-                        // Downgrade to warning for known reauth scenario to avoid noisy logs before other stores succeed
-                        if (stripos($msg, 'refresh_token_expired') !== false) {
-                            $this->warn("[" . $store->store_name . "] Refresh token expired. Please re-authorize.");
-                        } else {
-                            $this->error("[" . $store->store_name . "] Failed to refresh token: " . $msg);
-                        }
-                        
-                        // Check if error is due to expired refresh token
-                        if (strpos($msg, 'refresh_token_expired') !== false) {
-                            // already warned above; keep behavior to skip this store
-                        }
-                        
-                        continue;
-                    }
-                }
-
                 $this->info("Fetching orders from " . date('Y-m-d H:i:s', $timeFrom) . " to " . date('Y-m-d H:i:s', $timeTo));
 
-                // Split time range into 15-day chunks because Shopee API limit
-                $chunks = [];
-                $currentStart = $timeFrom;
-                while ($currentStart < $timeTo) {
-                    $currentEnd = min($currentStart + (15 * 24 * 60 * 60), $timeTo);
-                    // Ensure start < end
-                    if ($currentEnd > $currentStart) {
-                         $chunks[] = ['start' => $currentStart, 'end' => $currentEnd];
-                    }
-                    $currentStart = $currentEnd;
+                // 1. Get List of Orders
+                $response = $shopeeService->getOrderList($timeFrom, $timeTo);
+
+                // Log response to file
+                $this->saveApiResponse('order_list', $store->store_name, $response);
+
+                if (isset($response['error']) && !empty($response['error'])) {
+                    $this->error('Shopee API Error: ' . ($response['message'] ?? 'Unknown error'));
+                    continue; // Skip to next store
                 }
 
-                $allOrders = [];
-                foreach ($chunks as $index => $chunk) {
-                    $this->info(sprintf("Processing chunk %d/%d: %s to %s", 
-                        $index + 1, 
-                        count($chunks), 
-                        date('Y-m-d H:i:s', $chunk['start']), 
-                        date('Y-m-d H:i:s', $chunk['end'])
-                    ));
+                $orders = $response['response']['order_list'] ?? [];
+                $count = count($orders);
 
-                    // 1. Get List of Orders
-                    // Note: We might need to handle pagination (cursor) here if orders > 50 in 15 days
-                    // For now assuming getOrderList fetches first page, implementing simple loop if has_more is true
-                    
-                    $cursor = "";
-                    do {
-                        $response = $shopeeService->getOrderList($chunk['start'], $chunk['end'], 50, $cursor);
-                        
-                        // Log response to file (only first page to avoid spamming logs too much, or all pages)
-                        $this->saveApiResponse('order_list_' . ($index+1), $store->store_name, $response);
-                        
-                        if (isset($response['error']) && !empty($response['error'])) {
-                            // Check for token expiry in API response
-                            if (strpos($response['message'] ?? '', 'access_token') !== false || 
-                                ($response['error'] === 'error_auth') || 
-                                ($response['error'] === 'invalid_access_token')) {
-                                
-                                $this->info("[" . $store->store_name . "] Access token expired during fetch. Attempting refresh...");
-                                try {
-                                    $shopeeService->refreshAccessToken();
-                                    $store->refresh();
-                                    $this->info("[" . $store->store_name . "] Token refreshed. Retrying fetch...");
-                                    
-                                    // Retry the request
-                                    $response = $shopeeService->getOrderList($chunk['start'], $chunk['end'], 50, $cursor);
-                                    if (isset($response['error']) && !empty($response['error'])) {
-                                        $this->error('[' . $store->store_name . '] Retry failed: ' . ($response['message'] ?? 'Unknown error'));
-                                        break;
-                                    }
-                                } catch (\Exception $e) {
-                                    $msg = $e->getMessage();
-                                    if (stripos($msg, 'refresh_token_expired') !== false) {
-                                        $this->warn('[' . $store->store_name . '] Refresh token expired during fetch. Please re-authorize.');
-                                    } else {
-                                        $this->error("[" . $store->store_name . "] Failed to refresh token during fetch: " . $msg);
-                                    }
-                                    break;
-                                }
-                            } else {
-                                $this->error('[' . $store->store_name . '] Shopee API Error: ' . ($response['message'] ?? 'Unknown error'));
-                                break; 
-                            }
-                        }
+                $this->info("Found {$count} orders for store {$store->store_name}.");
 
-                        $orders = $response['response']['order_list'] ?? [];
-                        $allOrders = array_merge($allOrders, $orders);
-                        
-                        $more = $response['response']['more'] ?? false;
-                        $cursor = $response['response']['next_cursor'] ?? "";
-                        
-                        if ($more) {
-                             $this->info("Fetching next page...");
-                        }
-
-                    } while($more && !empty($cursor));
-                }
-
-                $count = count($allOrders);
-                $this->info("Found total {$count} orders for store {$store->store_name}.");
-                
                 if ($count > 0) {
                     // Extract all Order SNs
-                    $orderSns = array_column($allOrders, 'order_sn');
-                    
-                    // Unique Order SNs just in case
-                    $orderSns = array_unique($orderSns);
-                    
+                    $orderSns = array_column($orders, 'order_sn');
+
                     // Chunk them if necessary (Shopee might have a limit per request, e.g. 50)
                     $snChunks = array_chunk($orderSns, 50);
 
                     foreach ($snChunks as $chunk) {
                         $this->info("Fetching details for " . count($chunk) . " orders...");
-                        
+
                         // 2. Get Details for these orders
                         $detailResponse = $shopeeService->getOrderDetail($chunk);
 
@@ -199,14 +107,14 @@ class FetchShopeeOrders extends Command
                             $this->line("👤 Buyer      : " . ($detail['buyer_username'] ?? '-'));
                             $this->line("💰 Total      : " . ($detail['total_amount'] ?? '-'));
                             $this->line("✉️  Note       : " . ($detail['message_to_seller'] ?? '-'));
-                            
+
                             if (isset($detail['item_list'])) {
                                 $this->line("📦 Items:");
                                 foreach ($detail['item_list'] as $index => $item) {
                                     $this->line("   " . ($index + 1) . ". " . $item['item_name'] . " [x" . $item['model_quantity_purchased'] . "]");
                                 }
                             }
-                            
+
                             // Save to Database
                             $this->saveOrder($detail, $store);
                         }
@@ -276,6 +184,9 @@ class FetchShopeeOrders extends Command
 
             $this->info("   Saving Order: " . $detail['order_sn']);
 
+            // Get Shopee marketplace ID
+            $shopeeMarketplace = Marketplace::where('code', 'shopee')->first();
+
             $orderData = [
                 'online_store_id' => $store->id,
                 'status' => $status,
@@ -287,8 +198,9 @@ class FetchShopeeOrders extends Command
                 'customer_phone' => $recipient['phone'] ?? null,
                 'customer_address' => $this->formatAddress($recipient),
                 'item_count' => count($detail['item_list'] ?? []),
-                'unique_item_count' => count($detail['item_list'] ?? []), 
-                'read_at' => now(), 
+                'unique_item_count' => count($detail['item_list'] ?? []),
+                'read_at' => now(),
+                'marketplace_id' => $shopeeMarketplace?->id,
             ];
 
             $order = Order::updateOrCreate(
@@ -298,7 +210,7 @@ class FetchShopeeOrders extends Command
 
             if (isset($detail['item_list'])) {
                 foreach ($detail['item_list'] as $itemData) {
-                    
+
                     // Logic to extract color and size from model_name
                     // Assumed format "Color,Size" or similar. Shopee usually sends "VariationName, VariationName2"
                     // If model_name is "Merah,L" -> color=Merah, size=L
@@ -314,7 +226,7 @@ class FetchShopeeOrders extends Command
                     OrderItem::updateOrCreate(
                         [
                             'order_id' => $order->id,
-                            'order_item_id' => (string)$itemData['order_item_id'],
+                            'order_item_id' => (string) $itemData['order_item_id'],
                         ],
                         [
                             'item_name' => $itemData['item_name'],
@@ -345,7 +257,8 @@ class FetchShopeeOrders extends Command
 
     private function formatAddress($recipient)
     {
-        if (empty($recipient)) return null;
+        if (empty($recipient))
+            return null;
 
         $parts = [
             $recipient['full_address'] ?? '',
