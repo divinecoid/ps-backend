@@ -10,6 +10,7 @@ use App\Models\MasterData\OnlineStore;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Artisan;
 
 class ShopeeController extends Controller
 {
@@ -130,6 +131,27 @@ class ShopeeController extends Controller
                 'message' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    public function fetchOrders(Request $request)
+    {
+        $days = (int)($request->query('days', 1));
+        if ($days < 1) {
+            $days = 1;
+        }
+
+        Artisan::call('shopee:fetch-orders', [
+            '--days' => $days,
+        ]);
+
+        $output = Artisan::output();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Shopee fetch orders executed',
+            'days' => $days,
+            'raw_output' => $output,
+        ]);
     }
 
     public function getShippingParameter(Request $request)

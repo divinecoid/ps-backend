@@ -193,6 +193,8 @@ Route::prefix('shopee')->middleware('checkrole:admin')->group(function () {
     Route::post('/download-shipping-document', [ShopeeController::class, 'downloadShippingDocument']);
 });
 
+Route::get('shopee/fetch-orders', [ShopeeController::class, 'fetchOrders']);
+
 Route::prefix('request')->middleware('checkrole')->group(function () {
     Route::get('/', [RequestController::class, 'index']);
     Route::get('/{id}', [RequestController::class, 'show']);
