@@ -22,6 +22,7 @@ Route::get('/lazada/callback', [LazadaAuthController::class, 'handleCallback']);
 
 Route::get('/shopee/login/{id}', [ShopeeController::class, 'redirectToShopee']);
 Route::get('/shopee/callback', [ShopeeController::class, 'handleCallback']);
+Route::get('/shopee/refresh/{id}', [ShopeeController::class, 'refreshToken']);
 
 Route::get('/tiktok-shop/login/{id}', [TiktokAuthController::class, 'redirectToTiktok']);
 Route::get('/tiktok-shop/callback', [TiktokAuthController::class, 'handleCallback']);

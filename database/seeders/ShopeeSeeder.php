@@ -17,7 +17,7 @@ class ShopeeSeeder extends Seeder
     public function run(): void
     {
         DB::transaction(function () {
-            // Create or update Marketplace
+            // Create or update Marketplace Shopee
             $marketplace = Marketplace::updateOrCreate(
                 ['alias' => 'shopee'],
                 [
@@ -67,9 +67,9 @@ class ShopeeSeeder extends Seeder
                 [
                     'store_name' => 'Shopee Sandbox Store',
                     'marketplace_id' => $marketplaceSandbox->id,
-                    'shop_id' => '226182910', // Added explicit shop_id
-                    'client_id' => '1198129', // PARTNER_ID
-                    'client_secret' => 'shpk54746f6d6545646f4542617176486f4358775150626769675861524b714e', // PARTNER_KEY
+                    'shop_id' => '226182910',
+                    'client_id' => '1198129',
+                    'client_secret' => 'shpk54746f6d6545646f4542617176486f4358775150626769675861524b714e',
                     'store_url' => 'https://openplatform.sandbox.test-stable.shopee.sg',
                     'auth_code' => '4547624763704a53624a646b58504d6f',
                     'is_active' => true,
@@ -78,6 +78,37 @@ class ShopeeSeeder extends Seeder
                     'refresh_token' => 'eyJhbGciOiJIUzI1NiJ9.CLGQSRABGP6N7WsgAiiWw7rKBjCDqpbfDDgBQAE.yZ58IhmGo7HDnkTiUzOL5tPDEUxn9MyeKEgd2T1mmvI',
                     'access_token_expires_at' => Carbon::parse('12/27/2025, 1:54:15 AM'),
                     'refresh_token_expires_at' => Carbon::parse('12/27/2025, 1:54:15 AM')->addDays(30),
+                ]
+            );
+
+            // Create or update Marketplace TikTok Shop
+            $marketplaceTiktok = Marketplace::updateOrCreate(
+                ['alias' => 'tiktok_shop'],
+                [
+                    'name' => 'TikTok Shop',
+                    'code' => 'tiktok_shop',
+                    'base_api_url' => 'https://open-api.tiktokglobalshop.com',
+                    'description' => 'TikTok Shop Marketplace Integration',
+                    'is_need_checker' => false,
+                ]
+            );
+
+            // Create or update OnlineStore TikTok Divine Solutions
+            OnlineStore::updateOrCreate(
+                ['store_code' => 'TIKTOK_DIVINE_SOLUTIONS'],
+                [
+                    'store_name' => 'Divine Solutions',
+                    'marketplace_id' => $marketplaceTiktok->id,
+                    'api_key' => '6i5289l7qjvro',
+                    'client_id' => '7574194545879320341',
+                    'client_secret' => '6665ae720ac777940b808d597e0187e842a7d825',
+                    'store_url' => 'https://open-api.tiktokglobalshop.com',
+                    'is_active' => true,
+                    'redirect_uri' => 'https://ps-test.divineproject.my.id/tiktok-shop/callback',
+                    'access_token' => 'ROW_BHeE4QAAAABhcOyhkzK8vbv1KGMuep13vFmO9k6EVoK63L15hq0htZaeaE-6gT4z8wK6_JfyNI9M24s6Ho2rFShJseqQoH_a8ac7w-V4ZHZVe2_Rin-Ed7i2rNshVFumTAFFMCc7VsEW5TupnJzuWYdi4wYYxfZf-CCVC2ZaB5Aybnw6TmhIIg',
+                    'refresh_token' => 'ROW_zNKmQQAAAACS089RV4HMhVqhG23hrZ2OChUgHKcOVT99YW-lQYQpl97Krhm-QulI5RlwQLKq5eo',
+                    'access_token_expires_at' => null,
+                    'refresh_token_expires_at' => null,
                 ]
             );
         });

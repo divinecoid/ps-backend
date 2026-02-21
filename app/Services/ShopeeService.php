@@ -187,8 +187,11 @@ class ShopeeService
             'time_from' => $timeFrom,
             'time_to' => $timeTo,
             'page_size' => $pageSize,
-            'cursor' => $cursor
         ];
+        // Only include cursor if present to avoid invalid cursor errors
+        if (!empty($cursor)) {
+            $params['cursor'] = $cursor;
+        }
 
         return $this->request('GET', $path, $params);
     }
@@ -386,11 +389,36 @@ class ShopeeService
         $response = Http::post($host . $path . '?' . http_build_query($params), $data);
         if ($response->failed()) {
             Log::error('Shopee refreshAccessToken failed', ['body' => $response->body()]);
-            throw new \Exception("Shopee API Error: " . $response->body());
+            // Attempt fallback via auth_code if refresh token expired
+            $body = $response->body();
+            if (stripos($body, 'refresh_token_expired') !== false) {
+                $code = $store->auth_code ?? null;
+                if ($code && $store->shop_id) {
+                    try {
+                        Log::warning('Refresh token expired. Attempting exchange via auth_code fallback...');
+                        return $this->exchangeAuthCodeForToken($code, (int)$store->shop_id);
+                    } catch (\Exception $e) {
+                        throw new \Exception("Shopee API Error: refresh_token_expired; exchange via auth_code failed: " . $e->getMessage());
+                    }
+                }
+            }
+            throw new \Exception("Shopee API Error: " . $body);
         }
 
         $json = $response->json();
         if (isset($json['error']) && !empty($json['error'])) {
+            // Handle explicit refresh_token_expired with fallback via auth_code
+            if ($json['error'] === 'refresh_token_expired') {
+                $code = $store->auth_code ?? null;
+                if ($code && $store->shop_id) {
+                    try {
+                        Log::warning('Refresh token expired. Attempting exchange via auth_code fallback (JSON error path)...');
+                        return $this->exchangeAuthCodeForToken($code, (int)$store->shop_id);
+                    } catch (\Exception $e) {
+                        throw new \Exception("refresh_token_expired; exchange via auth_code failed: " . $e->getMessage());
+                    }
+                }
+            }
             throw new \Exception($json['message'] ?? 'Refresh token failed');
         }
 

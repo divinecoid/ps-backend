@@ -11,6 +11,7 @@ use App\Models\Transactions\OrderItem;
 use App\Enums\OrderStatus;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class FetchShopeeOrders extends Command
 {
@@ -82,9 +83,9 @@ class FetchShopeeOrders extends Command
                     $orderSns = array_column($orders, 'order_sn');
 
                     // Chunk them if necessary (Shopee might have a limit per request, e.g. 50)
-                    $chunks = array_chunk($orderSns, 50);
+                    $snChunks = array_chunk($orderSns, 50);
 
-                    foreach ($chunks as $chunk) {
+                    foreach ($snChunks as $chunk) {
                         $this->info("Fetching details for " . count($chunk) . " orders...");
 
                         // 2. Get Details for these orders
