@@ -5,6 +5,7 @@ namespace App\Models\Transactions;
 use App\Models\MasterData\Color;
 use App\Models\MasterData\ProductModel;
 use App\Models\MasterData\Size;
+use App\Models\MasterData\Product;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
