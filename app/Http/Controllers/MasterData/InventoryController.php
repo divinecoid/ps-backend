@@ -150,4 +150,12 @@ class InventoryController extends Controller
     {
         return $this->baseRestore(Inventory::class, $id);
     }
+
+    public function multiDestroy(Request $request)
+    {
+        return $this->baseDelete(
+            Inventory::class,
+            $request->all()
+        );
+    }
 }

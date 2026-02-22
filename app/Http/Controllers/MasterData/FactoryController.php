@@ -97,4 +97,12 @@ class FactoryController extends Controller
     {
         return $this->baseRestore(Factory::class, $id);
     }
+
+    public function multiDestroy(Request $request)
+    {
+        return $this->baseDelete(
+            Factory::class,
+            $request->all()
+        );
+    }
 }

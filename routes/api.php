@@ -50,6 +50,7 @@ Route::prefix('role')->middleware('checkrole:admin')->group(function () {
     Route::post('/', [RoleController::class, 'store']);
     Route::post('{id}/restore', [RoleController::class, 'restore']);
     Route::patch('{id}', [RoleController::class, 'update']);
+    Route::delete('/', [RoleController::class, 'multiDestroy']);
     Route::delete('{id}', [RoleController::class, 'destroy']);
 });
 //User
@@ -60,6 +61,7 @@ Route::prefix('user')->middleware('checkrole:admin')->group(function () {
     Route::post('/', [UserController::class, 'store']);
     Route::post('{id}/restore', [UserController::class, 'restore']);
     Route::patch('{id}', [UserController::class, 'update']);
+    Route::delete('/', [UserController::class, 'multiDestroy']);
     Route::delete('{id}', [UserController::class, 'destroy']);
 });
 //Marketplace
@@ -70,6 +72,7 @@ Route::prefix('marketplace')->middleware('checkrole:admin')->group(function () {
     Route::post('/', [MarketplaceController::class, 'store']);
     Route::post('{id}/restore', [MarketplaceController::class, 'restore']);
     Route::patch('{id}', [MarketplaceController::class, 'update']);
+    Route::delete('/', [MarketplaceController::class, 'multiDestroy']);
     Route::delete('{id}', [MarketplaceController::class, 'destroy']);
 });
 //Online Store
@@ -80,6 +83,7 @@ Route::prefix('onlinestore')->middleware('checkrole:admin')->group(function () {
     Route::post('/', [OnlineStoreController::class, 'store']);
     Route::post('{id}/restore', [OnlineStoreController::class, 'restore']);
     Route::patch('{id}', [OnlineStoreController::class, 'update']);
+    Route::delete('/', [OnlineStoreController::class, 'multiDestroy']);
     Route::delete('{id}', [OnlineStoreController::class, 'destroy']);
 });
 //Color
@@ -90,6 +94,7 @@ Route::prefix('color')->middleware('checkrole:admin')->group(function () {
     Route::post('/', [ColorController::class, 'store']);
     Route::post('{id}/restore', [ColorController::class, 'restore']);
     Route::patch('{id}', [ColorController::class, 'update']);
+    Route::delete('/', [ColorController::class, 'multiDestroy']);
     Route::delete('{id}', [ColorController::class, 'destroy']);
 });
 //Model
@@ -100,6 +105,7 @@ Route::prefix('model')->middleware('checkrole:admin')->group(function () {
     Route::post('/', [ProductModelController::class, 'store']);
     Route::post('{id}/restore', [ProductModelController::class, 'restore']);
     Route::patch('{id}', [ProductModelController::class, 'update']);
+    Route::delete('/', [ProductModelController::class, 'multiDestroy']);
     Route::delete('{id}', [ProductModelController::class, 'destroy']);
 });
 //Size
@@ -110,6 +116,7 @@ Route::prefix('size')->middleware('checkrole:admin')->group(function () {
     Route::post('/', [SizeController::class, 'store']);
     Route::post('{id}/restore', [SizeController::class, 'restore']);
     Route::patch('{id}', [SizeController::class, 'update']);
+    Route::delete('/', [SizeController::class, 'multiDestroy']);
     Route::delete('{id}', [SizeController::class, 'destroy']);
 });
 //Product
@@ -120,6 +127,7 @@ Route::prefix('product')->middleware('checkrole:admin')->group(function () {
     Route::post('/', [ProductController::class, 'store']);
     Route::post('{id}/restore', [ProductController::class, 'restore']);
     Route::patch('{id}', [ProductController::class, 'update']);
+    Route::delete('/', [ProductController::class, 'multiDestroy']);
     Route::delete('{id}', [ProductController::class, 'destroy']);
 });
 //Factory
@@ -130,6 +138,7 @@ Route::prefix('factory')->middleware('checkrole:admin')->group(function () {
     Route::post('/', [FactoryController::class, 'store']);
     Route::post('{id}/restore', [FactoryController::class, 'restore']);
     Route::patch('{id}', [FactoryController::class, 'update']);
+    Route::delete('/', [FactoryController::class, 'multiDestroy']);
     Route::delete('{id}', [FactoryController::class, 'destroy']);
 });
 //CMT
@@ -140,6 +149,7 @@ Route::prefix('cmt')->middleware('checkrole:admin')->group(function () {
     Route::post('/', [CMTController::class, 'store']);
     Route::post('{id}/restore', [CMTController::class, 'restore']);
     Route::patch('{id}', [CMTController::class, 'update']);
+    Route::delete('/', [CMTController::class, 'multiDestroy']);
     Route::delete('{id}', [CMTController::class, 'destroy']);
 });
 //Inventory
@@ -150,6 +160,7 @@ Route::prefix('inventory')->middleware('checkrole:admin')->group(function () {
     Route::post('/', [InventoryController::class, 'store']);
     Route::post('{id}/restore', [InventoryController::class, 'restore']);
     Route::patch('{id}', [InventoryController::class, 'update']);
+    Route::delete('/', [InventoryController::class, 'multiDestroy']);
     Route::delete('{id}', [InventoryController::class, 'destroy']);
 });
 //Rack
@@ -160,6 +171,7 @@ Route::prefix('rack')->middleware('checkrole:admin')->group(function () {
     Route::post('/', [RackController::class, 'store']);
     Route::post('{id}/restore', [RackController::class, 'restore']);
     Route::patch('{id}', [RackController::class, 'update']);
+    Route::delete('/', [RackController::class, 'multiDestroy']);
     Route::delete('{id}', [RackController::class, 'destroy']);
 });
 //Warehouse
@@ -172,6 +184,7 @@ Route::prefix('warehouse')->middleware('checkrole:admin')->group(function () {
     Route::post('/', [WarehouseController::class, 'store']);
     Route::post('{id}/restore', [WarehouseController::class, 'restore']);
     Route::patch('{id}', [WarehouseController::class, 'update']);
+    Route::delete('/', [WarehouseController::class, 'multiDestroy']);
     Route::delete('{id}', [WarehouseController::class, 'destroy']);
 });
 

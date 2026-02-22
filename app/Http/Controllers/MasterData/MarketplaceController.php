@@ -110,4 +110,12 @@ class MarketplaceController extends Controller
     {
         return $this->baseRestore(Marketplace::class, $id);
     }
+
+    public function multiDestroy(Request $request)
+    {
+        return $this->baseDelete(
+            Marketplace::class,
+            $request->all()
+        );
+    }
 }

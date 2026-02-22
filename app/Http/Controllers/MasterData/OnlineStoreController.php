@@ -137,4 +137,12 @@ class OnlineStoreController extends Controller
     {
         return $this->baseRestore(OnlineStore::class, $id);
     }
+
+    public function multiDestroy(Request $request)
+    {
+        return $this->baseDelete(
+            OnlineStore::class,
+            $request->all()
+        );
+    }
 }

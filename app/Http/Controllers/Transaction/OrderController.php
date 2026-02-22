@@ -145,6 +145,14 @@ class OrderController extends Controller
         return $this->baseRestore(Order::class, $id);
     }
 
+    public function multiDestroy(Request $request)
+    {
+        return $this->baseDelete(
+            Order::class,
+            $request->all()
+        );
+    }
+
     public function getLazadaOrder($id)
     {
         // $token = config('marketplace.lazada.access_token');

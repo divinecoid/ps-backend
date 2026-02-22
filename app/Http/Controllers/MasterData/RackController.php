@@ -109,4 +109,12 @@ class RackController extends Controller
     {
         return $this->baseRestore(Rack::class, $id);
     }
+
+    public function multiDestroy(Request $request)
+    {
+        return $this->baseDelete(
+            Rack::class,
+            $request->all()
+        );
+    }
 }

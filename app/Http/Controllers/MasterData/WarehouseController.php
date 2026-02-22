@@ -99,4 +99,12 @@ class WarehouseController extends Controller
     {
         return $this->baseRestore(Warehouse::class, $id);
     }
+
+    public function multiDestroy(Request $request)
+    {
+        return $this->baseDelete(
+            Warehouse::class,
+            $request->all()
+        );
+    }
 }

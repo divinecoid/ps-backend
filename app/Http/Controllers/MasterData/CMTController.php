@@ -106,4 +106,12 @@ class CMTController extends Controller
     {
         return $this->baseRestore(CMT::class, $id);
     }
+
+    public function multiDestroy(Request $request)
+    {
+        return $this->baseDelete(
+            CMT::class,
+            $request->all()
+        );
+    }
 }

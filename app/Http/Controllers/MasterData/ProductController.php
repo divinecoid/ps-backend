@@ -141,4 +141,12 @@ class ProductController extends Controller
     {
         return $this->baseRestore(Product::class, $id);
     }
+
+    public function multiDestroy(Request $request)
+    {
+        return $this->baseDelete(
+            Product::class,
+            $request->all()
+        );
+    }
 }

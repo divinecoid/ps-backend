@@ -230,4 +230,12 @@ class RequestController extends Controller
             $id
         );
     }
+
+    public function multiDestroy(Request $request)
+    {
+        return $this->baseDelete(
+            \App\Models\Transactions\Request::class,
+            $request->all()
+        );
+    }
 }

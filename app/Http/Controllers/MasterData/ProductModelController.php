@@ -131,6 +131,14 @@ class ProductModelController extends Controller
         return $this->baseRestore(ProductModel::class, $id);
     }
 
+    public function multiDestroy(Request $request)
+    {
+        return $this->baseDelete(
+            ProductModel::class,
+            $request->all()
+        );
+    }
+
     public function modelColor(Request $request, $id)
     {
         $model = ProductModel::find($id);

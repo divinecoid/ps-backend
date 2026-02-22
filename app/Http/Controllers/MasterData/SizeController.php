@@ -97,4 +97,12 @@ class SizeController extends Controller
     {
         return $this->baseRestore(Size::class, $id);
     }
+
+    public function multiDestroy(Request $request)
+    {
+        return $this->baseDelete(
+            Size::class,
+            $request->all()
+        );
+    }
 }

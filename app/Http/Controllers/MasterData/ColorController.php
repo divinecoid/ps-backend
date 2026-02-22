@@ -97,4 +97,12 @@ class ColorController extends Controller
     {
         return $this->baseRestore(Color::class, $id);
     }
+
+    public function multiDestroy(Request $request)
+    {
+        return $this->baseDelete(
+            Color::class,
+            $request->all()
+        );
+    }
 }

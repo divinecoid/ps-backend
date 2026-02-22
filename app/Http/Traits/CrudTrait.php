@@ -106,12 +106,28 @@ trait CrudTrait
 
     public function baseDelete($model, $id)
     {
-        $item = $model::find($id);
-        if (!$item) {
-            return $this->errorResponse(404, 'Not found');
+        if (is_array($id)) {
+            $items = [];
+            foreach ($id as $i) {
+                $item = $model::find($i);
+                if (!$item)
+                    continue;
+                $items[] = $item;
+                $item->delete();
+            }
+            if (count($items) > 0) {
+                return $this->successResponse($items);
+            } else {
+                return $this->errorResponse(404, 'Not found');
+            }
+        } else {
+            $item = $model::find($id);
+            if (!$item) {
+                return $this->errorResponse(404, 'Not found');
+            }
+            $item->delete();
+            return $this->successResponse($item);
         }
-        $item->delete();
-        return $this->successResponse($item);
     }
 
     public function baseRestore($model, $id)

@@ -127,4 +127,12 @@ class UserController extends Controller
     {
         return $this->baseRestore(User::class, $id);
     }
+
+    public function multiDestroy(Request $request)
+    {
+        return $this->baseDelete(
+            User::class,
+            $request->all()
+        );
+    }
 }

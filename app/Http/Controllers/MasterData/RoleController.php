@@ -91,4 +91,12 @@ class RoleController extends Controller
     {
         return $this->baseRestore(Role::class, $id);
     }
+
+    public function multiDestroy(Request $request)
+    {
+        return $this->baseDelete(
+            Role::class,
+            $request->all()
+        );
+    }
 }
