@@ -17,6 +17,7 @@ class OrderController extends Controller
     {
         return fn($data) => [
             'id' => $data->id,
+            'order_sn' => $data->order_sn,
             'awb_code' => $data->awb_code,
             'read_at' => $data->read_at,
             'prepared_at' => $data->prepared_at,
