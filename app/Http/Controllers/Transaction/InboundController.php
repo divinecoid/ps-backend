@@ -99,7 +99,7 @@ class InboundController extends Controller
                     //     "CMT01|20260116173826|LP|RED|XS|DOZEN|2",
                     //     "CMT01|20260116173826|LP|RED|XS|DOZEN|13"
                     // ],
-                    $currentRequest = null;
+                    $requestsFound = false;
                     if ($barcodesDozen) {
                         foreach ($barcodesDozen as $barcode) {//harus dalam bentuk dozen semua
                             ['prefix' => $prefix, 'group' => $group, 'sequence' => $sequence] = $this->parseBarcode($barcode);
@@ -109,12 +109,7 @@ class InboundController extends Controller
                                     $invalidDozenBarcodes[] = $barcode;
                                     continue;
                                 }
-                                $request = $requestDetail->request;
-                                $currentRequest ??= $request;//simpan current request pertama
-                                if ($request->id !== $currentRequest->id) {
-                                    $invalidDozenBarcodes[] = $barcode;
-                                    continue;
-                                }
+                                $requestsFound = true;
 
                                 if ($sequence * 12 > $requestDetail->req_qty) {//cek jika barcode group diluar jangkauan, jika group sekarang dikali 12 -> menjadi total piece, lebih besar dari kuantitas yang diminta atau sequence per group lebih dari 12
                                     $invalidDozenBarcodes[] = $barcode;
@@ -159,13 +154,7 @@ class InboundController extends Controller
                                     continue;
                                 }
 
-                                $request = $requestDetail->request;
-                                $currentRequest ??= $request;//simpan current request pertama
-    
-                                if ($request->id !== $currentRequest->id) {
-                                    $invalidPieceBarcodes[] = $barcode;
-                                    continue;
-                                }
+                                $requestsFound = true;
 
                                 if ($sequence > $requestDetail->req_qty) {//jika (request tidak memiliki sisa piece) atau (request memiliki sisa piece dan sequence di luar dari range request piece)
                                     $invalidPieceBarcodes[] = $barcode;
@@ -184,22 +173,30 @@ class InboundController extends Controller
                         }
                     }
                     $totalInvalid = count($invalidDozenBarcodes) + count($invalidPieceBarcodes) + count($scannedDozenBarcodes) + count($scannedPieceBarcodes);
-                    if ($totalInvalid == 0 && $currentRequest !== null) {//jika semuanya lolos validasi
-                        DB::transaction(function () use ($data, $currentRequest, $barcodesDozen, $barcodesPiece) {
-
-                            $receivedLog = Receivedlog::create([
-                                'request_id' => $currentRequest->id,
-                                'warehouse_id' => $data['warehouse_id'] ?? null,
-                                'user_id' => Auth::id(),
-                                'received_date' => now(),
-                                'notes' => $data['notes']
-                            ]);
+                    if ($totalInvalid == 0 && $requestsFound) {//jika semuanya lolos validasi
+                        DB::transaction(function () use ($data, $barcodesDozen, $barcodesPiece) {
+                            $groupedReceivedLogs = [];
+                            $requestsToComplete = [];
 
                             foreach ($barcodesDozen as $barcode) {
                                 ['prefix' => $prefix] = $this->parseBarcode($barcode);
                                 if ($rd = $this->findRequestDetail($prefix)) {
+                                    $req = $rd->request;
+                                    $reqId = $req->id;
+                                    $requestsToComplete[$reqId] = $req;
+
+                                    if (!isset($groupedReceivedLogs[$reqId])) {
+                                        $groupedReceivedLogs[$reqId] = Receivedlog::create([
+                                            'request_id' => $reqId,
+                                            'warehouse_id' => $data['warehouse_id'] ?? null,
+                                            'user_id' => Auth::id(),
+                                            'received_date' => now(),
+                                            'notes' => $data['notes']
+                                        ]);
+                                    }
+
                                     $this->createReceivedDetail(
-                                        $receivedLog,
+                                        $groupedReceivedLogs[$reqId],
                                         $rd,
                                         $barcode,//sequence memang ga disimpan disini, biar bisa mewakili 1 lusin
                                         12
@@ -211,8 +208,22 @@ class InboundController extends Controller
                                 ['prefix' => $prefix] = $this->parseBarcode($items['barcode']);
 
                                 if ($rd = $this->findRequestDetail($prefix)) {
+                                    $req = $rd->request;
+                                    $reqId = $req->id;
+                                    $requestsToComplete[$reqId] = $req;
+
+                                    if (!isset($groupedReceivedLogs[$reqId])) {
+                                        $groupedReceivedLogs[$reqId] = Receivedlog::create([
+                                            'request_id' => $reqId,
+                                            'warehouse_id' => $data['warehouse_id'] ?? null,
+                                            'user_id' => Auth::id(),
+                                            'received_date' => now(),
+                                            'notes' => $data['notes']
+                                        ]);
+                                    }
+
                                     $this->createReceivedDetail(
-                                        $receivedLog,
+                                        $groupedReceivedLogs[$reqId],
                                         $rd,
                                         $items['barcode'],//group sudah pasti kosong disini, jadi hasilnya pasti {$prefix}||{$sequence}
                                         1
@@ -225,8 +236,10 @@ class InboundController extends Controller
                                 }
                             }
 
-                            if ($currentRequest?->isCompleted()) {
-                                $currentRequest->update(['status' => 'CLOSED']);
+                            foreach ($requestsToComplete as $reqId => $req) {
+                                if ($req->isCompleted()) {
+                                    $req->update(['status' => 'CLOSED']);
+                                }
                             }
                         });
                         $totalScanned = count($barcodesDozen) + count($barcodesPiece);
