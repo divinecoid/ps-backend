@@ -20,6 +20,7 @@ class RequestController extends Controller
         return fn($data) => [
             'id' => $data->id,
             'cmt_id' => $data->cmt_id,
+            'serial_number' => $data->serial_number,
             'cmt' => $data->cmt,
             'created_at' => $data->created_at,
             'status' => $data->status,
@@ -50,6 +51,7 @@ class RequestController extends Controller
             [
                 'cmt.code',
                 'cmt.name',
+                'serial_number',
                 'request_detail.model.sku',
                 'request_detail.model.name',
                 'request_detail.color.code',
@@ -69,6 +71,7 @@ class RequestController extends Controller
         return $this->successResponse(
             [
                 'cmt_id' => $request->cmt_id,
+                'serial_number' => $request->serial_number,
                 'status' => $request->status,
                 'request_detail' => $request->request_detail
                     ->groupBy(fn($item) => $item->model_id . '|' . $item->color_id)
@@ -150,6 +153,7 @@ class RequestController extends Controller
             $request,
             [
                 'cmt_id' => 'required|uuid|exists:mdx_cmts,id',
+                'serial_number' => 'required|string|max:255',
                 'request_detail' => 'required|array|min:1',
                 'request_detail.*.model_id' => 'required|uuid',
                 'request_detail.*.color_id' => 'required|uuid',
@@ -195,7 +199,8 @@ class RequestController extends Controller
                 unset($item);
                 return DB::transaction(function () use ($data, $items, $cmt) {
                     $requestModel = \App\Models\Transactions\Request::create([
-                        'cmt_id' => $data['cmt_id']
+                        'cmt_id' => $data['cmt_id'],
+                        'serial_number' => $data['serial_number']
                     ]);
                     $details = [];
                     foreach ($items as $item) {
@@ -209,7 +214,7 @@ class RequestController extends Controller
                             'rec_qty' => 0,
                             'barcode' => implode('|', [
                                 $cmt->code,
-                                now()->format('YmdHis'),
+                                $data['serial_number'],
                                 $item['model']->sku,
                                 $item['color']->code,
                                 $item['size']->code,
