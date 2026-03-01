@@ -55,11 +55,11 @@ class InboundController extends Controller
             'notes' => $data->notes,
             'request' => (object) [
                 'cmt' => (object) [
-                    'code' => $data->request->cmt->code,
-                    'name' => $data->request->cmt->name,
-                    'contact_person' => $data->request->cmt->contact_person,
-                    'phone' => $data->request->cmt->phone,
-                    'address' => $data->request->cmt->address,
+                    'code' => $data->cmt?->code,
+                    'name' => $data->cmt?->name,
+                    'contact_person' => $data->cmt?->contact_person,
+                    'phone' => $data->cmt?->phone,
+                    'address' => $data->cmt?->address,
 
                 ]
             ],
@@ -182,12 +182,12 @@ class InboundController extends Controller
                                 ['prefix' => $prefix] = $this->parseBarcode($barcode);
                                 if ($rd = $this->findRequestDetail($prefix)) {
                                     $req = $rd->request;
-                                    $reqId = $req->id;
-                                    $requestsToComplete[$reqId] = $req;
+                                    $cmtId = $req->cmt_id;
+                                    $requestsToComplete[$req->id] = $req;
 
-                                    if (!isset($groupedReceivedLogs[$reqId])) {
-                                        $groupedReceivedLogs[$reqId] = Receivedlog::create([
-                                            'request_id' => $reqId,
+                                    if (!isset($groupedReceivedLogs[$cmtId])) {
+                                        $groupedReceivedLogs[$cmtId] = Receivedlog::create([
+                                            'cmt_id' => $cmtId,
                                             'warehouse_id' => $data['warehouse_id'] ?? null,
                                             'user_id' => Auth::id(),
                                             'received_date' => now(),
@@ -196,9 +196,9 @@ class InboundController extends Controller
                                     }
 
                                     $this->createReceivedDetail(
-                                        $groupedReceivedLogs[$reqId],
+                                        $groupedReceivedLogs[$cmtId],
                                         $rd,
-                                        $barcode,//sequence memang ga disimpan disini, biar bisa mewakili 1 lusin
+                                        $barcode,
                                         12
                                     );
                                 }
@@ -209,12 +209,12 @@ class InboundController extends Controller
 
                                 if ($rd = $this->findRequestDetail($prefix)) {
                                     $req = $rd->request;
-                                    $reqId = $req->id;
-                                    $requestsToComplete[$reqId] = $req;
+                                    $cmtId = $req->cmt_id;
+                                    $requestsToComplete[$req->id] = $req;
 
-                                    if (!isset($groupedReceivedLogs[$reqId])) {
-                                        $groupedReceivedLogs[$reqId] = Receivedlog::create([
-                                            'request_id' => $reqId,
+                                    if (!isset($groupedReceivedLogs[$cmtId])) {
+                                        $groupedReceivedLogs[$cmtId] = Receivedlog::create([
+                                            'cmt_id' => $cmtId,
                                             'warehouse_id' => $data['warehouse_id'] ?? null,
                                             'user_id' => Auth::id(),
                                             'received_date' => now(),
@@ -223,9 +223,9 @@ class InboundController extends Controller
                                     }
 
                                     $this->createReceivedDetail(
-                                        $groupedReceivedLogs[$reqId],
+                                        $groupedReceivedLogs[$cmtId],
                                         $rd,
-                                        $items['barcode'],//group sudah pasti kosong disini, jadi hasilnya pasti {$prefix}||{$sequence}
+                                        $items['barcode'],
                                         1
                                     );
                                     Product::create([
@@ -340,7 +340,7 @@ class InboundController extends Controller
     }
     private function findRequestDetail(string $prefix)
     {
-        return RequestDetail::where('barcode', $prefix)->first();
+        return RequestDetail::with(['request.cmt', 'model', 'color', 'size'])->where('barcode', $prefix)->first();
     }
     private function createReceivedDetail($receivedLog, $requestDetail, string $barcode, int $qty)
     {
