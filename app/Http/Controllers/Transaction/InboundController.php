@@ -65,8 +65,28 @@ class InboundController extends Controller
             ],
             'details' => $data->details->map(fn($detail) => [
                 'barcode' => $detail->barcode,
-                'rack' => $detail->racks
-            ])
+                'model' => $detail->model?->name,
+                'color' => $detail->color?->name,
+                'size' => $detail->size?->name,
+                'serial_number' => $detail->requestDetail?->request?->serial_number,
+                'qty' => $detail->qty,
+                'rack' => $detail->product?->rack?->code
+            ]),
+            'summary' => $data->details->groupBy(function ($detail) {
+                return $detail->model?->name . '|' .
+                    $detail->color?->name . '|' .
+                    $detail->size?->name . '|' .
+                    $detail->requestDetail?->request?->serial_number;
+            })->map(function ($group) {
+                $first = $group->first();
+                return [
+                    'model' => $first->model?->name,
+                    'color' => $first->color?->name,
+                    'size' => $first->size?->name,
+                    'serial_number' => $first->requestDetail?->request?->serial_number,
+                    'total_qty' => $group->sum('qty')
+                ];
+            })->values()
         ];
     }
     public function store(HTTPRequest $request)
@@ -362,7 +382,7 @@ class InboundController extends Controller
             $request,
             Receivedlog::class,
             [],
-            [],
+            ['cmt', 'warehouse', 'user', 'details.model', 'details.color', 'details.size', 'details.requestDetail.request', 'details.product.rack'],
             $this->structure()
         );
     }
@@ -371,7 +391,7 @@ class InboundController extends Controller
         return $this->baseShow(
             Receivedlog::class,
             $id,
-            [],
+            ['cmt', 'warehouse', 'user', 'details.model', 'details.color', 'details.size', 'details.requestDetail.request', 'details.product.rack'],
             $this->structure()
         );
     }
