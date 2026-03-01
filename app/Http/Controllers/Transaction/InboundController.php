@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Transaction;
 
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
+use App\Models\MasterData\Inventory;
 use App\Models\MasterData\Product;
 use App\Models\Transactions\Receivedlog;
 use App\Models\Transactions\ReceivedlogDetail;
@@ -19,21 +20,21 @@ class InboundController extends Controller
     /*
         {
             "barcode_dozen": [
-                "CMT01|20260116172102|LP|RED|XS|DOZEN|1",
-                "CMT01|20260116172102|LP|RED|XS|DOZEN|2"
+                "CMT01|20260116172102|LP|RED|XS|D|1",
+                "CMT01|20260116172102|LP|RED|XS|D|2"
             ],
             "warehouse_id": "019b85c4-c21c-7215-b374-47b05605d1b3",
             "barcodes_piece": [
                 {
-                    "barcode": "CMT01|20260116172102|LP|RED|XS|PIECE|1",
+                    "barcode": "CMT01|20260116172102|LP|RED|XS|P|1",
                     "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c5446"
                 },
                 {
-                    "barcode": "CMT01|20260116172102|LP|RED|XS|PIECE|2",
+                    "barcode": "CMT01|20260116172102|LP|RED|XS|P|2",
                     "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c5446"
                 },
                 {
-                    "barcode": "CMT01|20260116172102|LP|RED|XS|PIECE|3",
+                    "barcode": "CMT01|20260116172102|LP|RED|XS|P|3",
                     "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c5446"
                 }
             ],
@@ -94,16 +95,16 @@ class InboundController extends Controller
                     $barcodesPiece = $data['barcodes_piece'] ?? [];
 
                     // "barcodes_dozen": [
-                    //     "CMT01|20260116173826|LP|RED|XS|DOZEN|1",
-                    //     "CMT01|20260116173826|LP|RED|XS|DOZEN|7",
-                    //     "CMT01|20260116173826|LP|RED|XS|DOZEN|2",
-                    //     "CMT01|20260116173826|LP|RED|XS|DOZEN|13"
+                    //     "CMT01|20260116173826|LP|RED|XS|D|1",
+                    //     "CMT01|20260116173826|LP|RED|XS|D|7",
+                    //     "CMT01|20260116173826|LP|RED|XS|D|2",
+                    //     "CMT01|20260116173826|LP|RED|XS|D|13"
                     // ],
                     $currentRequest = null;
                     if ($barcodesDozen) {
                         foreach ($barcodesDozen as $barcode) {//harus dalam bentuk dozen semua
                             ['prefix' => $prefix, 'group' => $group, 'sequence' => $sequence] = $this->parseBarcode($barcode);
-                            if ($group == 'DOZEN') {
+                            if ($group == 'D') {
                                 $requestDetail = $this->findRequestDetail($prefix);
                                 if (!$requestDetail) {//cek jika barcode ditemukan di database
                                     $invalidDozenBarcodes[] = $barcode;
@@ -135,15 +136,15 @@ class InboundController extends Controller
                     }
                     // "barcodes_piece": [
                     //     {
-                    //         "barcode": "CMT01|20260116173826|LP|RED|XS|PIECE|1",
+                    //         "barcode": "CMT01|20260116173826|LP|RED|XS|P|1",
                     //         "rack_id": "019b85c4-c21c-7215-b374-47b05605d1b3"
                     //     },
                     //     {
-                    //         "barcode": "CMT01|20260116173826|LP|RED|XS|PIECE|2",
+                    //         "barcode": "CMT01|20260116173826|LP|RED|XS|P|2",
                     //         "rack_id": "019b85c4-c21c-7215-b374-47b05605d1b3"
                     //     },
                     //     {
-                    //         "barcode": "CMT01|20260116173826|LP|RED|XS|PIECE|3",
+                    //         "barcode": "CMT01|20260116173826|LP|RED|XS|P|3",
                     //         "rack_id": "019b85c4-c21c-7215-b374-47b05605d1b3"
                     //     }
                     // ],
@@ -152,7 +153,7 @@ class InboundController extends Controller
                         foreach ($barcodesPiece as $items) {
                             $barcode = $items['barcode'];
                             ['prefix' => $prefix, 'group' => $group, 'sequence' => $sequence] = $this->parseBarcode($barcode);
-                            if ($group == 'PIECE') {
+                            if ($group == 'P') {
                                 $requestDetail = $this->findRequestDetail($prefix);
                                 if (!$requestDetail) {//cek jika barcode ditemukan di database
                                     $invalidPieceBarcodes[] = $barcode;
@@ -270,11 +271,11 @@ class InboundController extends Controller
                 }
                 //jika group dan total item dalam group lebih besar daripada yang diterima atau sequence lebih besar daripada 12
                 //cek jika barcode group diluar jangkauan, jika group sekarang dikali 12 -> menjadi total piece, lebih besar dari kuantitas yang diminta atau sequence per group lebih dari 12
-                if ($group == 'DOZEN') {
+                if ($group == 'D') {
                     if ($sequence * 12 > $requestDetail->req_qty) {
                         return $this->errorResponse(422, 'Nomor urut barcode lusin diluar jangkauan');
                     }
-                } else if ($group == 'PIECE') {
+                } else if ($group == 'P') {
                     if ($sequence > $requestDetail->req_qty) {
                         return $this->errorResponse(422, 'Nomor urut barcode piece diluar jangkauan');
                     }
@@ -311,7 +312,7 @@ class InboundController extends Controller
                         'code' => $size->code,
                         'name' => $size->name,
                     ],
-                    'is_dozen' => $group === 'DOZEN' ? true : false
+                    'is_dozen' => $group === 'D' ? true : false
                 ]);
             }
         );
@@ -331,6 +332,8 @@ class InboundController extends Controller
     }
     private function createReceivedDetail($receivedLog, $requestDetail, string $barcode, int $qty)
     {
+        ['prefix' => $prefix] = $this->parseBarcode($barcode);
+        $series = $this->getSeries($prefix);
         ReceivedlogDetail::create([
             'receivedlog_id' => $receivedLog->id,
             'request_detail_id' => $requestDetail->id,
@@ -340,7 +343,18 @@ class InboundController extends Controller
             'qty' => $qty,
             'barcode' => $barcode,
         ]);
-
+        $inventory = Inventory::firstOrCreate(
+            [
+                'model_id' => $requestDetail->model_id,
+                'color_id' => $requestDetail->color_id,
+                'size_id' => $requestDetail->size_id,
+            ]
+        );
+        $detail = $inventory->detail()->firstOrCreate(
+            ['series' => $series],
+            ['quantity' => 0]
+        );
+        $detail->increment('quantity', $qty);
         $requestDetail->increment('rec_qty', $qty);
     }
     public function index(HttpRequest $request)
@@ -361,5 +375,11 @@ class InboundController extends Controller
             [],
             $this->structure()
         );
+    }
+
+    private function getSeries(string $prefix)
+    {
+        $parts = explode('|', $prefix);
+        return $parts[1] ?? null;
     }
 }
