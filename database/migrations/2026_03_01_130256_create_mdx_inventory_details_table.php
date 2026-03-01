@@ -16,6 +16,7 @@ return new class extends Migration {
             $table->string('series')->isNotEmpty();
             $table->integer('quantity')->default(0);
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 
