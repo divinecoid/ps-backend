@@ -8,6 +8,7 @@ use App\Models\MasterData\Inventory;
 use App\Models\MasterData\Product;
 use App\Models\Transactions\Receivedlog;
 use App\Models\Transactions\ReceivedlogDetail;
+use App\Models\Transactions\RejectedlogDetail;
 use App\Models\Transactions\RequestDetail;
 use Illuminate\Http\Request as HttpRequest;
 use Illuminate\Support\Facades\Auth;
@@ -71,7 +72,17 @@ class InboundController extends Controller
                 'size' => $detail->size?->name,
                 'serial_number' => $detail->requestDetail?->request?->serial_number,
                 'qty' => $detail->qty,
-                'rack' => $detail->product?->rack?->code
+                'rack' => $detail->product?->rack?->code,
+                'is_reject' => false
+            ]),
+            'rejected_details' => $data->rejectedDetails->map(fn($detail) => [
+                'barcode' => $detail->barcode,
+                'model' => $detail->model?->name,
+                'color' => $detail->color?->name,
+                'size' => $detail->size?->name,
+                'serial_number' => $detail->requestDetail?->request?->serial_number,
+                'qty' => $detail->qty,
+                'is_reject' => true
             ]),
             'summary' => $data->details->groupBy(function ($detail) {
                 return $detail->model?->name . '|' .
@@ -85,9 +96,27 @@ class InboundController extends Controller
                     'color' => $first->color?->name,
                     'size' => $first->size?->name,
                     'serial_number' => $first->requestDetail?->request?->serial_number,
-                    'total_qty' => $group->sum('qty')
+                    'total_qty' => $group->sum('qty'),
+                    'is_reject' => false
                 ];
-            })->values()
+            })->values()->concat(
+                    $data->rejectedDetails->groupBy(function ($detail) {
+                        return $detail->model?->name . '|' .
+                            $detail->color?->name . '|' .
+                            $detail->size?->name . '|' .
+                            $detail->requestDetail?->request?->serial_number;
+                    })->map(function ($group) {
+                        $first = $group->first();
+                        return [
+                            'model' => $first->model?->name,
+                            'color' => $first->color?->name,
+                            'size' => $first->size?->name,
+                            'serial_number' => $first->requestDetail?->request?->serial_number,
+                            'total_qty' => $group->sum('qty'),
+                            'is_reject' => true
+                        ];
+                    })->values()
+                )
         ];
     }
     public function store(HTTPRequest $request)
@@ -97,10 +126,12 @@ class InboundController extends Controller
             [
                 'warehouse_id' => ['required_if:barcodes_dozen,!=,null', Rule::exists('mdx_warehouses', 'id')->whereNull('deleted_at')],
                 'barcodes_dozen' => 'required_without:barcodes_piece|array|min:1',
-                'barcodes_dozen.*' => 'required|string|distinct',
+                'barcodes_dozen.*.barcode' => 'required|string|distinct',
+                'barcodes_dozen.*.is_reject' => 'nullable|boolean',
                 'barcodes_piece' => 'required_without:barcodes_dozen|array|min:1',
                 'barcodes_piece.*.barcode' => 'required|string|distinct',
-                'barcodes_piece.*.rack_id' => ['required', Rule::exists('mdx_racks', 'id')->whereNull('deleted_at')],
+                'barcodes_piece.*.rack_id' => 'required_unless:barcodes_piece.*.is_reject,true',
+                'barcodes_piece.*.is_reject' => 'nullable|boolean',
                 'notes' => 'nullable|string|max:1000',
             ],
             function ($data) {
@@ -122,7 +153,8 @@ class InboundController extends Controller
                     // ],
                     $requestsFound = false;
                     if ($barcodesDozen) {
-                        foreach ($barcodesDozen as $barcode) {//harus dalam bentuk dozen semua
+                        foreach ($barcodesDozen as $item) {//harus dalam bentuk dozen semua
+                            $barcode = $item['barcode'];
                             ['prefix' => $prefix, 'group' => $group, 'sequence' => $sequence] = $this->parseBarcode($barcode);
                             if ($group == 'D') {
                                 $requestDetail = $this->findRequestDetail($prefix);
@@ -137,7 +169,8 @@ class InboundController extends Controller
                                     continue;
                                 }
                                 if (
-                                    ReceivedlogDetail::where('barcode', $barcode)->exists()//jika sudah pernah discan
+                                    ReceivedlogDetail::where('barcode', $barcode)->exists() ||
+                                    RejectedlogDetail::where('barcode', $barcode)->exists()//jika sudah pernah discan
                                 ) {
                                     $scannedDozenBarcodes[] = $barcode;
                                 }
@@ -182,7 +215,8 @@ class InboundController extends Controller
                                     continue;
                                 }
                                 if (
-                                    ReceivedlogDetail::where('barcode', $barcode)->exists()//jika sudah pernah discan
+                                    ReceivedlogDetail::where('barcode', $barcode)->exists() ||
+                                    RejectedlogDetail::where('barcode', $barcode)->exists()//jika sudah pernah discan
                                 ) {
                                     $scannedPieceBarcodes[] = $barcode;
                                 }
@@ -199,7 +233,9 @@ class InboundController extends Controller
                             $groupedReceivedLogs = [];
                             $requestsToComplete = [];
 
-                            foreach ($barcodesDozen as $barcode) {
+                            foreach ($barcodesDozen as $item) {
+                                $barcode = $item['barcode'];
+                                $isReject = $item['is_reject'] ?? false;
                                 ['prefix' => $prefix] = $this->parseBarcode($barcode);
                                 if ($rd = $this->findRequestDetail($prefix)) {
                                     $req = $rd->request;
@@ -216,17 +252,28 @@ class InboundController extends Controller
                                         ]);
                                     }
 
-                                    $this->createReceivedDetail(
-                                        $groupedReceivedLogs[$cmtId],
-                                        $rd,
-                                        $barcode,
-                                        12
-                                    );
+                                    if ($isReject) {
+                                        $this->createRejectedDetail(
+                                            $groupedReceivedLogs[$cmtId],
+                                            $rd,
+                                            $barcode,
+                                            12
+                                        );
+                                    } else {
+                                        $this->createReceivedDetail(
+                                            $groupedReceivedLogs[$cmtId],
+                                            $rd,
+                                            $barcode,
+                                            12
+                                        );
+                                    }
                                 }
                             }
 
                             foreach ($barcodesPiece as $items) {
-                                ['prefix' => $prefix] = $this->parseBarcode($items['barcode']);
+                                $barcode = $items['barcode'];
+                                $isReject = $items['is_reject'] ?? false;
+                                ['prefix' => $prefix] = $this->parseBarcode($barcode);
 
                                 if ($rd = $this->findRequestDetail($prefix)) {
                                     $req = $rd->request;
@@ -243,17 +290,26 @@ class InboundController extends Controller
                                         ]);
                                     }
 
-                                    $this->createReceivedDetail(
-                                        $groupedReceivedLogs[$cmtId],
-                                        $rd,
-                                        $items['barcode'],
-                                        1
-                                    );
-                                    Product::create([
-                                        'rack_id' => $items['rack_id'],
-                                        'model_id' => $rd->model_id,
-                                        'barcode' => $items['barcode']
-                                    ]);
+                                    if ($isReject) {
+                                        $this->createRejectedDetail(
+                                            $groupedReceivedLogs[$cmtId],
+                                            $rd,
+                                            $barcode,
+                                            1
+                                        );
+                                    } else {
+                                        $this->createReceivedDetail(
+                                            $groupedReceivedLogs[$cmtId],
+                                            $rd,
+                                            $barcode,
+                                            1
+                                        );
+                                        Product::create([
+                                            'rack_id' => $items['rack_id'],
+                                            'model_id' => $rd->model_id,
+                                            'barcode' => $barcode
+                                        ]);
+                                    }
                                 }
                             }
 
@@ -390,12 +446,25 @@ class InboundController extends Controller
         $detail->increment('quantity', $qty);
         $requestDetail->increment('rec_qty', $qty);
     }
+
+    private function createRejectedDetail($receivedLog, $requestDetail, string $barcode, int $qty)
+    {
+        RejectedlogDetail::create([
+            'receivedlog_id' => $receivedLog->id,
+            'request_detail_id' => $requestDetail->id,
+            'model_id' => $requestDetail->model_id,
+            'color_id' => $requestDetail->color_id,
+            'size_id' => $requestDetail->size_id,
+            'qty' => $qty,
+            'barcode' => $barcode,
+        ]);
+    }
     public function index(HttpRequest $request)
     {
         return $this->baseIndex(
             $request,
             Receivedlog::class,
-            ['cmt', 'warehouse', 'user', 'details.model', 'details.color', 'details.size', 'details.requestDetail.request', 'details.product.rack'],
+            ['cmt', 'warehouse', 'user', 'details.model', 'details.color', 'details.size', 'details.requestDetail.request', 'details.product.rack', 'rejectedDetails.model', 'rejectedDetails.color', 'rejectedDetails.size'],
             [],
             $this->structure(),
             fn($query) => $query->orderBy('created_at', 'desc')
@@ -406,7 +475,7 @@ class InboundController extends Controller
         return $this->baseShow(
             Receivedlog::class,
             $id,
-            ['cmt', 'warehouse', 'user', 'details.model', 'details.color', 'details.size', 'details.requestDetail.request', 'details.product.rack'],
+            ['cmt', 'warehouse', 'user', 'details.model', 'details.color', 'details.size', 'details.requestDetail.request', 'details.product.rack', 'rejectedDetails.model', 'rejectedDetails.color', 'rejectedDetails.size'],
             $this->structure()
         );
     }

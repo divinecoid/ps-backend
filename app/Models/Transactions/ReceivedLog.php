@@ -48,4 +48,9 @@ class Receivedlog extends Model
     {
         return $this->hasMany(ReceivedlogDetail::class, 'receivedlog_id');
     }
+
+    public function rejectedDetails()
+    {
+        return $this->hasMany(RejectedlogDetail::class, 'receivedlog_id');
+    }
 }
