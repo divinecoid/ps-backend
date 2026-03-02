@@ -15,7 +15,7 @@ class Request extends Model
 
     protected $table = 'trx_requests';
 
-    protected $fillable = ['cmt_id', 'status'];
+    protected $fillable = ['cmt_id', 'status', 'serial_number'];
 
     // Define relationship with Received Log model
     // public function recevied_log()
