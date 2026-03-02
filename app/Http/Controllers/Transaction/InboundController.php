@@ -19,24 +19,28 @@ class InboundController extends Controller
     use CrudTrait;
     /*
         {
-            "barcode_dozen": [
-                "CMT01|20260116172102|LP|RED|XS|D|1",
-                "CMT01|20260116172102|LP|RED|XS|D|2"
+            "barcodes_dozen": [
+                "CMT01|2200|LP|RED|XS|D|1",
+                "CMT01|2200|LP|RED|XS|D|2"
             ],
             "warehouse_id": "019b85c4-c21c-7215-b374-47b05605d1b3",
             "barcodes_piece": [
                 {
-                    "barcode": "CMT01|20260116172102|LP|RED|XS|P|1",
+                    "barcode": "CMT01|2200|LP|RED|XS|P|1",
                     "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c5446"
                 },
                 {
-                    "barcode": "CMT01|20260116172102|LP|RED|XS|P|2",
+                    "barcode": "CMT01|2200|LP|RED|XS|P|2",
                     "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c5446"
                 },
                 {
-                    "barcode": "CMT01|20260116172102|LP|RED|XS|P|3",
+                    "barcode": "CMT01|2200|LP|RED|XS|P|3",
                     "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c5446"
                 }
+            ],
+            "barcodes_rejected": [
+                "CMT01|2200|LP|RED|XS|D|1",
+                "CMT01|2200|LP|RED|XS|D|2"
             ],
             "notes": "Received in good condition"
         }
@@ -61,10 +65,18 @@ class InboundController extends Controller
                     'contact_person' => $data->cmt?->contact_person,
                     'phone' => $data->cmt?->phone,
                     'address' => $data->cmt?->address,
-
                 ]
             ],
-            'details' => $data->details->map(fn($detail) => [
+            'details' => $data->details->filter(fn($detail) => $detail->is_rejected)->map(fn($detail) => [
+                'barcode' => $detail->barcode,
+                'model' => $detail->model?->name,
+                'color' => $detail->color?->name,
+                'size' => $detail->size?->name,
+                'serial_number' => $detail->requestDetail?->request?->serial_number,
+                'qty' => $detail->qty,
+                'rack' => $detail->product?->rack?->code
+            ]),
+            'rejected_details' => $data->details->filter(fn($detail) => !$detail->is_rejected)->map(fn($detail) => [
                 'barcode' => $detail->barcode,
                 'model' => $detail->model?->name,
                 'color' => $detail->color?->name,
@@ -96,23 +108,33 @@ class InboundController extends Controller
             $request,
             [
                 'warehouse_id' => ['required_if:barcodes_dozen,!=,null', Rule::exists('mdx_warehouses', 'id')->whereNull('deleted_at')],
-                'barcodes_dozen' => 'required_without:barcodes_piece|array|min:1',
+                'barcodes_dozen' => 'required_without_all:barcodes_piece,barcodes_rejected|array|min:1',
                 'barcodes_dozen.*' => 'required|string|distinct',
-                'barcodes_piece' => 'required_without:barcodes_dozen|array|min:1',
+                'barcodes_piece' => 'required_without_all:barcodes_dozen,barcodes_rejected|array|min:1',
                 'barcodes_piece.*.barcode' => 'required|string|distinct',
                 'barcodes_piece.*.rack_id' => ['required', Rule::exists('mdx_racks', 'id')->whereNull('deleted_at')],
+                'barcodes_rejected' => 'required_without_all:barcodes_dozen,barcodes_piece|array|min:1',
+                'barcodes_rejected.*' => 'required|string|distinct',
                 'notes' => 'nullable|string|max:1000',
             ],
             function ($data) {
                 $invalidDozenBarcodes = [];
                 $invalidPieceBarcodes = [];
+                $invalidRejectedBarcodes = [];
 
                 $scannedDozenBarcodes = [];
                 $scannedPieceBarcodes = [];
+                $scannedRejectedBarcodes = [];
+
+                $conflictBarcodes = [];
                 try {
 
                     $barcodesDozen = $data['barcodes_dozen'] ?? [];
                     $barcodesPiece = $data['barcodes_piece'] ?? [];
+
+                    $barcodesRejected = $data['barcodes_rejected'] ?? [];
+                    $conflict = array_intersect($barcodesRejected, collect($barcodesPiece)->pluck('barcode')->toArray());
+                    $conflictBarcodes = array_values($conflict);
 
                     // "barcodes_dozen": [
                     //     "CMT01|20260116173826|LP|RED|XS|D|1",
@@ -193,9 +215,39 @@ class InboundController extends Controller
                             }
                         }
                     }
-                    $totalInvalid = count($invalidDozenBarcodes) + count($invalidPieceBarcodes) + count($scannedDozenBarcodes) + count($scannedPieceBarcodes);
-                    if ($totalInvalid == 0 && $requestsFound) {//jika semuanya lolos validasi
-                        DB::transaction(function () use ($data, $barcodesDozen, $barcodesPiece) {
+
+                    if ($barcodesRejected) {
+                        foreach ($barcodesRejected as $barcode) {//harus dalam bentuk piece semua
+                            ['prefix' => $prefix, 'group' => $group, 'sequence' => $sequence] = $this->parseBarcode($barcode);
+                            if ($group == 'P') {
+                                $requestDetail = $this->findRequestDetail($prefix);
+                                if (!$requestDetail) {//cek jika barcode ditemukan di database
+                                    $invalidRejectedBarcodes[] = $barcode;
+                                    continue;
+                                }
+                                $requestsFound = true;
+
+                                if ($sequence > $requestDetail->req_qty) {//cek jika barcode piece diluar jangkauan, jika sequence, lebih besar dari kuantitas yang diminta
+                                    $invalidRejectedBarcodes[] = $barcode;
+                                    continue;
+                                }
+                                if (
+                                    ReceivedlogDetail::where('barcode', $barcode)->exists()//jika sudah pernah discan
+                                ) {
+                                    $scannedRejectedBarcodes[] = $barcode;
+                                }
+
+                            } else {
+                                //jika bukan piece
+                                $invalidRejectedBarcodes[] = $barcode;
+                                continue;
+                            }
+                        }
+                    }
+                    $totalInvalid = count($invalidDozenBarcodes) + count($invalidPieceBarcodes) + count($scannedDozenBarcodes) + count($scannedPieceBarcodes) + count($invalidRejectedBarcodes) + count($scannedRejectedBarcodes);
+                    $totalConflict = count($conflictBarcodes);
+                    if ($totalInvalid == 0 && $requestsFound && $totalConflict == 0) {//jika semuanya lolos validasi
+                        DB::transaction(function () use ($data, $barcodesDozen, $barcodesPiece, $barcodesRejected) {
                             $groupedReceivedLogs = [];
                             $requestsToComplete = [];
 
@@ -257,27 +309,57 @@ class InboundController extends Controller
                                 }
                             }
 
+                            foreach ($barcodesRejected as $barcode) {
+                                ['prefix' => $prefix] = $this->parseBarcode($barcode);
+                                if ($rd = $this->findRequestDetail($prefix)) {
+                                    $req = $rd->request;
+                                    $cmtId = $req->cmt_id;
+                                    $requestsToComplete[$req->id] = $req;
+
+                                    if (!isset($groupedReceivedLogs[$cmtId])) {
+                                        $groupedReceivedLogs[$cmtId] = Receivedlog::create([
+                                            'cmt_id' => $cmtId,
+                                            'warehouse_id' => $data['warehouse_id'] ?? null,
+                                            'user_id' => Auth::id(),
+                                            'received_date' => now(),
+                                            'notes' => $data['notes']
+                                        ]);
+                                    }
+
+                                    $this->createReceivedDetail(
+                                        $groupedReceivedLogs[$cmtId],
+                                        $rd,
+                                        $barcode,
+                                        1,
+                                        true
+                                    );
+                                }
+                            }
+
                             foreach ($requestsToComplete as $reqId => $req) {
                                 if ($req->isCompleted()) {
                                     $req->update(['status' => 'CLOSED']);
                                 }
                             }
                         });
-                        $totalScanned = count($barcodesDozen) + count($barcodesPiece);
+                        $totalScanned = count($barcodesDozen) + count($barcodesPiece) + count($barcodesRejected);
 
                         return $this->successResponse([
                             'total_scanned' => $totalScanned,
                         ], "Successfully processed {$totalScanned} items");
                     } else {
-                        return $this->errorResponse(422, $totalInvalid . ' barcode tidak valid', [
+                        return $this->errorResponse(422, $totalInvalid . ' barcode tidak valid, ' . $totalConflict . ' barcode konflik', [
                             'invalid' => [
                                 'barcodes_dozen' => $invalidDozenBarcodes,
                                 'barcodes_piece' => $invalidPieceBarcodes,
+                                'barcodes_rejected' => $invalidRejectedBarcodes,
                             ],
                             'scanned' => [
                                 'barcodes_dozen' => $scannedDozenBarcodes,
                                 'barcode_piece' => $scannedPieceBarcodes,
+                                'barcode_rejected' => $scannedRejectedBarcodes,
                             ],
+                            'conflict' => $conflictBarcodes
                         ]);
                     }
 
@@ -363,7 +445,7 @@ class InboundController extends Controller
     {
         return RequestDetail::with(['request.cmt', 'model', 'color', 'size'])->where('barcode', $prefix)->first();
     }
-    private function createReceivedDetail($receivedLog, $requestDetail, string $barcode, int $qty)
+    private function createReceivedDetail($receivedLog, $requestDetail, string $barcode, int $qty, bool $is_rejected = false)
     {
         ['prefix' => $prefix] = $this->parseBarcode($barcode);
         $series = $this->getSeries($prefix);
@@ -375,20 +457,23 @@ class InboundController extends Controller
             'size_id' => $requestDetail->size_id,
             'qty' => $qty,
             'barcode' => $barcode,
+            'is_rejected' => $is_rejected
         ]);
-        $inventory = Inventory::firstOrCreate(
-            [
-                'model_id' => $requestDetail->model_id,
-                'color_id' => $requestDetail->color_id,
-                'size_id' => $requestDetail->size_id,
-            ]
-        );
-        $detail = $inventory->detail()->firstOrCreate(
-            ['series' => $series],
-            ['quantity' => 0]
-        );
-        $detail->increment('quantity', $qty);
-        $requestDetail->increment('rec_qty', $qty);
+        if (!$is_rejected) {
+            $inventory = Inventory::firstOrCreate(
+                [
+                    'model_id' => $requestDetail->model_id,
+                    'color_id' => $requestDetail->color_id,
+                    'size_id' => $requestDetail->size_id,
+                ]
+            );
+            $detail = $inventory->detail()->firstOrCreate(
+                ['series' => $series],
+                ['quantity' => 0]
+            );
+            $detail->increment('quantity', $qty);
+            $requestDetail->increment('rec_qty', $qty);
+        }
     }
     public function index(HttpRequest $request)
     {
