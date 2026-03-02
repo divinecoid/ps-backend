@@ -480,6 +480,36 @@ class InboundController extends Controller
         );
     }
 
+    public function generateNext(HttpRequest $request)
+    {
+        return $this->baseValidate(
+            $request,
+            [
+                'barcode' => 'required|string',
+            ],
+            function ($data) {
+                $barcode = $data['barcode'];
+                ['prefix' => $prefix] = $this->parseBarcode($barcode);
+
+                $requestDetail = $this->findRequestDetail($prefix);
+                if (!$requestDetail) {
+                    return $this->errorResponse(422, 'Barcode tidak valid');
+                }
+
+                DB::transaction(function () use ($requestDetail) {
+                    $requestDetail->increment('req_qty', 1);
+                });
+
+                $newBarcode = $prefix . '|P|' . $requestDetail->req_qty;
+
+                return $this->successResponse([
+                    'barcode' => $newBarcode,
+                    'req_qty' => $requestDetail->req_qty
+                ], "Barcode baru berhasil dibuat");
+            }
+        );
+    }
+
     private function getSeries(string $prefix)
     {
         $parts = explode('|', $prefix);
