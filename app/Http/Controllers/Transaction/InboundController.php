@@ -381,9 +381,10 @@ class InboundController extends Controller
         return $this->baseIndex(
             $request,
             Receivedlog::class,
-            [],
             ['cmt', 'warehouse', 'user', 'details.model', 'details.color', 'details.size', 'details.requestDetail.request', 'details.product.rack'],
-            $this->structure()
+            [],
+            $this->structure(),
+            fn($query) => $query->orderBy('created_at', 'desc')
         );
     }
     public function show($id)
