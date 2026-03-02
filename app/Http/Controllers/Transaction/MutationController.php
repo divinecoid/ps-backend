@@ -55,16 +55,16 @@ class MutationController extends Controller
                 {
                     "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c5446",
                     "barcodes": [
-                        "CMT01|20260116172102|LP|RED|XS|PIECE|1",
-                        "CMT01|20260116172102|LP|RED|XS|PIECE|2",
-                        "CMT01|20260116172102|LP|RED|XS|PIECE|3"
+                        "CMT01|20260116172102|LP|RED|XS|P|1",
+                        "CMT01|20260116172102|LP|RED|XS|P|2",
+                        "CMT01|20260116172102|LP|RED|XS|P|3"
                     ]
                 },
                 {
                     "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c9999",
                     "barcodes": [
-                        "CMT01|20260116172102|LP|BLUE|M|PIECE|1",
-                        "CMT01|20260116172102|LP|BLUE|M|PIECE|2"
+                        "CMT01|20260116172102|LP|BLUE|M|P|1",
+                        "CMT01|20260116172102|LP|BLUE|M|P|2"
                     ]
                 }
             ]
@@ -104,7 +104,7 @@ class MutationController extends Controller
                     foreach ($data['items'] as $items) {
                         foreach ($items['barcodes'] as $barcode) {
                             ['prefix' => $prefix, 'group' => $group, 'sequence' => $sequence] = $this->parseBarcode($barcode);
-                            if ($group == 'PIECE') {
+                            if ($group == 'P') {
                                 $requestDetail = $this->findRequestDetail($prefix);
                                 if (!$requestDetail) {//cek jika barcode ditemukan di database
                                     $invalidBarcodes[] = $barcode;
@@ -223,9 +223,9 @@ class MutationController extends Controller
                 }
                 //jika group dan total item dalam group lebih besar daripada yang diterima atau sequence lebih besar daripada 12
                 //cek jika barcode group diluar jangkauan, jika group sekarang dikali 12 -> menjadi total piece, lebih besar dari kuantitas yang diminta atau sequence per group lebih dari 12
-                if ($group == 'DOZEN') {
+                if ($group == 'D') {
                     return $this->errorResponse(422, 'Barcode bukan merupakan barcode piece');
-                } else if ($group == 'PIECE') {
+                } else if ($group == 'P') {
                     if ($sequence > $requestDetail->req_qty) {
                         return $this->errorResponse(422, 'Nomor urut barcode piece diluar jangkauan');
                     }

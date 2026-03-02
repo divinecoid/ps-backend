@@ -36,10 +36,20 @@ trait CrudTrait
     }
 
 
-    public function baseMaster(Request $request, $model, array $relations = [], array $filters = [], ?callable $map = null)
-    {
+    public function baseMaster(
+        Request $request,
+        $model,
+        array $relations = [],
+        array $filters = [],
+        ?callable $map = null,
+        ?callable $queryCallback = null
+    ) {
         $perPage = (int) ($request->input('per_page', $this->getPerPageDefault()));
         $query = $model::withTrashed()->with($relations);
+
+        if (is_callable($queryCallback)) {
+            $queryCallback($query);
+        }
 
         if (method_exists($this, 'applyFilter') && !empty($filters)) {
             $query = $this->applyFilter($query, $request, $filters);

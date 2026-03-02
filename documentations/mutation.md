@@ -19,7 +19,7 @@ Endpoint ini digunakan untuk memvalidasi *barcode* saat barang discan sebelum di
 **Contoh Request:**
 ```json
 {
-    "barcode": "CMT01|20260214150001|LP|RED|XS|PIECE|6"
+    "barcode": "CMT01|20260214150001|LP|RED|XS|P|6"
 }
 ```
 
@@ -100,16 +100,16 @@ Struktur data dikirim dalam bentuk *array of objects* di dalam properti `items`.
         {
             "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c5446",
             "barcodes": [
-                "CMT01|20260214150001|LP|RED|XS|PIECE|6",
-                "CMT01|20260214150001|LP|RED|XS|PIECE|7",
-                "CMT01|20260214150001|LP|RED|XS|PIECE|8"
+                "CMT01|20260214150001|LP|RED|XS|P|6",
+                "CMT01|20260214150001|LP|RED|XS|P|7",
+                "CMT01|20260214150001|LP|RED|XS|P|8"
             ]
         },
         {
             "rack_id": "019b85c4-c21d-73b1-8e11-3521675892c6",
             "barcodes": [
-                "CMT01|20260214150001|LP|RED|XS|PIECE|9",
-                "CMT01|20260214150001|LP|RED|XS|PIECE|10"
+                "CMT01|20260214150001|LP|RED|XS|P|9",
+                "CMT01|20260214150001|LP|RED|XS|P|10"
             ]
         }
     ]
@@ -142,11 +142,11 @@ Response akan menyertakan daftar *barcode* yang `invalid` (tidak ditemukan/salah
     "data": {
         "invalid": [],
         "scanned": [
-            "CMT01|20260214150001|LP|RED|XS|PIECE|6",
-            "CMT01|20260214150001|LP|RED|XS|PIECE|7",
-            "CMT01|20260214150001|LP|RED|XS|PIECE|8",
-            "CMT01|20260214150001|LP|RED|XS|PIECE|9",
-            "CMT01|20260214150001|LP|RED|XS|PIECE|10"
+            "CMT01|20260214150001|LP|RED|XS|P|6",
+            "CMT01|20260214150001|LP|RED|XS|P|7",
+            "CMT01|20260214150001|LP|RED|XS|P|8",
+            "CMT01|20260214150001|LP|RED|XS|P|9",
+            "CMT01|20260214150001|LP|RED|XS|P|10"
         ]
     }
 }
@@ -159,11 +159,11 @@ Response akan menyertakan daftar *barcode* yang `invalid` (tidak ditemukan/salah
     "message": "3 barcode tidak valid",
     "data": {
         "invalid": [
-            "CMT01|20260214150001|LP|RED|XS|PIECE|14",
-            "CMT01|20260214150001|LP|RED|XS|PIECE|15"
+            "CMT01|20260214150001|LP|RED|XS|P|14",
+            "CMT01|20260214150001|LP|RED|XS|P|15"
         ],
         "scanned": [
-            "CMT01|20260214150001|LP|RED|XS|PIECE|13"
+            "CMT01|20260214150001|LP|RED|XS|P|13"
         ]
     }
 }

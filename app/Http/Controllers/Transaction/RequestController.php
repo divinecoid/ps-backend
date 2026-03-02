@@ -198,6 +198,7 @@ class RequestController extends Controller
                 }
                 unset($item);
                 return DB::transaction(function () use ($data, $items, $cmt) {
+                    $serial = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT); //TODO: ganti dengan input dari proses potong baju
                     $requestModel = \App\Models\Transactions\Request::create([
                         'cmt_id' => $data['cmt_id'],
                         'serial_number' => $data['serial_number']
@@ -214,7 +215,8 @@ class RequestController extends Controller
                             'rec_qty' => 0,
                             'barcode' => implode('|', [
                                 $cmt->code,
-                                $data['serial_number'],
+                                // now()->format('YmdHis'),
+                                $serial,
                                 $item['model']->sku,
                                 $item['color']->code,
                                 $item['size']->code,
