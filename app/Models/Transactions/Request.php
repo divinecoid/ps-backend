@@ -32,7 +32,7 @@ class Request extends Model
 
     public function receive_log()
     {
-        return $this->hasMany(Receivedlog::class, 'request_id');
+        return $this->hasMany(Receivedlog::class, 'cmt_id', 'cmt_id');
     }
     public function request_detail()
     {
