@@ -240,6 +240,7 @@ Route::prefix('inbound')->middleware('checkrole')->group(function () {
     Route::get('/{id}', [InboundController::class, 'show']);
     Route::post('/', [InboundController::class, 'store']);
     Route::post('/validate', [InboundController::class, 'validate']);
+    Route::post('/generate-next', [InboundController::class, 'generateNext']);
 });
 
 Route::prefix('model_color')->middleware('checkrole:admin')->group(function () {

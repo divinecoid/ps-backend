@@ -47,7 +47,7 @@ class InboundController extends Controller
      */
     private function structure()
     {
-        return fn($data) => [
+        return fn(Receivedlog $data) => [
             'id' => $data->id,
             'warehouse_id' => $data->warehouse_id,
             'warehouse' => (object) [
@@ -85,7 +85,7 @@ class InboundController extends Controller
                 'qty' => $detail->qty,
                 'rack' => $detail->product?->rack?->code
             ]),
-            'summary' => $data->details->groupBy(function ($detail) {
+            'summary' => $data->details->groupBy(function (ReceivedlogDetail $detail) {
                 return $detail->model?->name . '|' .
                     $detail->color?->name . '|' .
                     $detail->size?->name . '|' .
@@ -97,7 +97,8 @@ class InboundController extends Controller
                     'color' => $first->color?->name,
                     'size' => $first->size?->name,
                     'serial_number' => $first->requestDetail?->request?->serial_number,
-                    'total_qty' => $group->sum('qty')
+                    'total_qty' => $group->sum('qty'),
+                    'is_reject' => !!$first->is_rejected
                 ];
             })->values()
         ];
@@ -159,7 +160,7 @@ class InboundController extends Controller
                                     continue;
                                 }
                                 if (
-                                    ReceivedlogDetail::where('barcode', $barcode)->exists()//jika sudah pernah discan
+                                    ReceivedlogDetail::where('barcode', $barcode)->exists() //jika sudah pernah discan
                                 ) {
                                     $scannedDozenBarcodes[] = $barcode;
                                 }
@@ -204,7 +205,7 @@ class InboundController extends Controller
                                     continue;
                                 }
                                 if (
-                                    ReceivedlogDetail::where('barcode', $barcode)->exists()//jika sudah pernah discan
+                                    ReceivedlogDetail::where('barcode', $barcode)->exists() //jika sudah pernah discan
                                 ) {
                                     $scannedPieceBarcodes[] = $barcode;
                                 }
@@ -278,7 +279,8 @@ class InboundController extends Controller
                             }
 
                             foreach ($barcodesPiece as $items) {
-                                ['prefix' => $prefix] = $this->parseBarcode($items['barcode']);
+                                $barcode = $items['barcode'];
+                                ['prefix' => $prefix] = $this->parseBarcode($barcode);
 
                                 if ($rd = $this->findRequestDetail($prefix)) {
                                     $req = $rd->request;
@@ -298,13 +300,13 @@ class InboundController extends Controller
                                     $this->createReceivedDetail(
                                         $groupedReceivedLogs[$cmtId],
                                         $rd,
-                                        $items['barcode'],
+                                        $barcode,
                                         1
                                     );
                                     Product::create([
                                         'rack_id' => $items['rack_id'],
                                         'model_id' => $rd->model_id,
-                                        'barcode' => $items['barcode']
+                                        'barcode' => $barcode
                                     ]);
                                 }
                             }
@@ -480,9 +482,19 @@ class InboundController extends Controller
         return $this->baseIndex(
             $request,
             Receivedlog::class,
-            [],
             ['cmt', 'warehouse', 'user', 'details.model', 'details.color', 'details.size', 'details.requestDetail.request', 'details.product.rack'],
-            $this->structure()
+            [],
+            fn(ReceivedLog $data) => [
+                'id' => $data->id,
+                'cmt' => (object) [
+                    'name' => $data->cmt->name,
+                    'code' => $data->cmt->code,
+                ],
+                'received_date' => $data->received_date,
+                'items' => $data->details->sum('qty'),
+                'name' => $data->user?->name
+            ],
+            fn($query) => $query->orderBy('created_at', 'desc')
         );
     }
     public function show($id)
@@ -492,6 +504,36 @@ class InboundController extends Controller
             $id,
             ['cmt', 'warehouse', 'user', 'details.model', 'details.color', 'details.size', 'details.requestDetail.request', 'details.product.rack'],
             $this->structure()
+        );
+    }
+
+    public function generateNext(HttpRequest $request)
+    {
+        return $this->baseValidate(
+            $request,
+            [
+                'barcode' => 'required|string',
+            ],
+            function ($data) {
+                $barcode = $data['barcode'];
+                ['prefix' => $prefix] = $this->parseBarcode($barcode);
+
+                $requestDetail = $this->findRequestDetail($prefix);
+                if (!$requestDetail) {
+                    return $this->errorResponse(422, 'Barcode tidak valid');
+                }
+
+                DB::transaction(function () use ($requestDetail) {
+                    $requestDetail->increment('req_qty', 1);
+                });
+
+                $newBarcode = $prefix . '|P|' . $requestDetail->req_qty;
+
+                return $this->successResponse([
+                    'barcode' => $newBarcode,
+                    'req_qty' => $requestDetail->req_qty
+                ], "Barcode baru berhasil dibuat");
+            }
         );
     }
 
