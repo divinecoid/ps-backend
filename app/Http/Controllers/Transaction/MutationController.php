@@ -140,6 +140,7 @@ class MutationController extends Controller
                     if ($totalInvalid == 0 && $currentRequest !== null) {//jika semuanya lolos validasi
                         DB::transaction(function () use ($data, $currentRequest) {
                             $log = Receivedlog::create([
+                                'cmt_id' => $currentRequest->cmt_id,
                                 'request_id' => $currentRequest->id,
                                 'user_id' => Auth::id(),
                                 'received_date' => now(),
