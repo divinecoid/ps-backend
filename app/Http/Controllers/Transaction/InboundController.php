@@ -67,7 +67,7 @@ class InboundController extends Controller
                     'address' => $data->cmt?->address,
                 ]
             ],
-            'details' => $data->details->filter(fn($detail) => $detail->is_rejected)->map(fn($detail) => [
+            'details' => $data->details->filter(fn($detail) => !$detail->is_rejected)->map(fn($detail) => [
                 'barcode' => $detail->barcode,
                 'model' => $detail->model?->name,
                 'color' => $detail->color?->name,
@@ -76,7 +76,7 @@ class InboundController extends Controller
                 'qty' => $detail->qty,
                 'rack' => $detail->product?->rack?->code
             ]),
-            'rejected_details' => $data->details->filter(fn($detail) => !$detail->is_rejected)->map(fn($detail) => [
+            'rejected_details' => $data->details->filter(fn($detail) => $detail->is_rejected)->map(fn($detail) => [
                 'barcode' => $detail->barcode,
                 'model' => $detail->model?->name,
                 'color' => $detail->color?->name,
