@@ -89,7 +89,8 @@ class InboundController extends Controller
                 return $detail->model?->name . '|' .
                     $detail->color?->name . '|' .
                     $detail->size?->name . '|' .
-                    $detail->requestDetail?->request?->serial_number;
+                    $detail->requestDetail?->request?->serial_number . '|' .
+                    ($detail->is_rejected ? '1' : '0');
             })->map(function ($group) {
                 $first = $group->first();
                 return [
