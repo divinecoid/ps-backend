@@ -20,6 +20,7 @@ use App\Http\Controllers\MasterData\FactoryController;
 use App\Http\Controllers\MasterData\ProductController;
 use App\Http\Controllers\MasterData\RackController;
 use App\Http\Controllers\MasterData\WarehouseController;
+use App\Http\Controllers\MasterData\ConfigurationController;
 use App\Http\Controllers\Transaction\OrderController;
 use App\Http\Controllers\Api\ShopeeController;
 
@@ -255,3 +256,17 @@ Route::prefix('mutation')->middleware('checkrole')->group(function () {
     Route::post('/', [MutationController::class, 'store']);
     Route::post('/validate', [MutationController::class, 'validate']);
 });
+
+//Configuration
+Route::prefix('configuration')->middleware('checkrole:admin')->group(function () {
+    Route::get('/', [ConfigurationController::class, 'index']);
+    Route::get('/master', [ConfigurationController::class, 'master']);
+    Route::get('{id}', [ConfigurationController::class, 'show']);
+    Route::get('{id}/histories', [ConfigurationController::class, 'histories']);
+    Route::post('/', [ConfigurationController::class, 'store']);
+    Route::post('{id}/restore', [ConfigurationController::class, 'restore']);
+    Route::patch('{id}', [ConfigurationController::class, 'update']);
+    Route::delete('/', [ConfigurationController::class, 'multiDestroy']);
+    Route::delete('{id}', [ConfigurationController::class, 'destroy']);
+});
+

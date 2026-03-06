@@ -8,6 +8,7 @@ use Database\Seeders\MasterData\RoleSeeder;
 use Database\Seeders\MasterData\SizeSeeder;
 use Database\Seeders\MasterData\UserSeeder;
 use Database\Seeders\MasterData\WarehouseRackSeeder;
+use Database\Seeders\MasterData\ConfigurationSeeder;
 use Database\Seeders\ShopeeSeeder;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -29,6 +30,7 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             WarehouseRackSeeder::class,
             ShopeeSeeder::class,
+            ConfigurationSeeder::class,
         ]);
     }
 }

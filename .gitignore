@@ -26,3 +26,5 @@ Thumbs.db
 "/vendor" 
 "/.env" 
 "/node_modules" 
+
+/documentations
