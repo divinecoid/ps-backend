@@ -25,6 +25,7 @@ class OrderController extends Controller
             'readytoship_at' => $data->readytoship_at,
             'readytoship_marketplace' => $data->readytoship_marketplace,
             'online_store_id' => $data->online_store_id,
+            'online_store' => $data->online_store,
             'item_count' => $data->item_count,
             'unique_item_count' => $data->unique_item_count,
             'status' => $data->status,
@@ -33,10 +34,12 @@ class OrderController extends Controller
             'total_shipping' => $data->total_shipping,
             'total_amount' => $data->total_amount,
             'preparist_user_id' => $data->preparist_user_id,
+            'preparist_user' => $data->preparist_user,
             'customer_name' => $data->customer_name,
             'customer_phone' => $data->customer_phone,
             'customer_address' => $data->customer_address,
             'marketplace_id' => $data->marketplace_id,
+            'marketplace' => $data->marketplace
         ];
     }
 

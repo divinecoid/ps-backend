@@ -450,7 +450,7 @@ class InboundController extends Controller
     }
     private function createReceivedDetail($receivedLog, $requestDetail, string $barcode, int $qty, bool $is_rejected = false)
     {
-        ['prefix' => $prefix] = $this->parseBarcode($barcode);
+        ['prefix' => $prefix, 'group' => $group] = $this->parseBarcode($barcode);
         $series = $this->getSeries($prefix);
         ReceivedlogDetail::create([
             'receivedlog_id' => $receivedLog->id,
@@ -462,7 +462,7 @@ class InboundController extends Controller
             'barcode' => $barcode,
             'is_rejected' => $is_rejected
         ]);
-        if (!$is_rejected) {
+        if (!$is_rejected && $group == 'D') {
             $inventory = Inventory::firstOrCreate(
                 [
                     'model_id' => $requestDetail->model_id,
@@ -484,7 +484,7 @@ class InboundController extends Controller
             $request,
             Receivedlog::class,
             ['cmt', 'warehouse', 'user', 'details.model', 'details.color', 'details.size', 'details.requestDetail.request', 'details.product.rack'],
-            [],
+            ['details.barcode'],
             fn(ReceivedLog $data) => [
                 'id' => $data->id,
                 'cmt' => (object) [
