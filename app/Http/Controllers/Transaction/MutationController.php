@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Transaction;
 
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
+use App\Models\MasterData\InventoryDetail;
 use App\Models\MasterData\Product;
 use App\Models\Transactions\Receivedlog;
 use App\Models\Transactions\ReceivedlogDetail;
@@ -85,7 +86,6 @@ class MutationController extends Controller
             function ($data) {
                 try {
 
-
                     $invalidBarcodes = [];
                     $scannedBarcodes = [];
 
@@ -150,6 +150,7 @@ class MutationController extends Controller
                             foreach ($data['items'] as $item) {
                                 foreach ($item['barcodes'] as $barcode) {
                                     ['prefix' => $prefix] = $this->parseBarcode($barcode);
+                                    $series = $this->getSeries($prefix);
                                     if ($rd = $this->findRequestDetail($prefix)) {
                                         ReceivedlogDetail::create([
                                             'receivedlog_id' => $log->id,
@@ -166,6 +167,16 @@ class MutationController extends Controller
                                             'model_id' => $rd->model_id,
                                             'barcode' => $barcode
                                         ]);
+                                        InventoryDetail::where('series', $series)
+                                            ->whereHas('inventory', function ($q) use ($rd) {
+                                                $q->where([
+                                                    'model_id' => $rd->model_id,
+                                                    'color_id' => $rd->color_id,
+                                                    'size_id' => $rd->size_id
+                                                ]);
+                                            })
+                                            ->where('quantity', '>', 0)
+                                            ->decrement('quantity');
                                     }
                                 }
                             }
@@ -266,5 +277,11 @@ class MutationController extends Controller
                 ]);
             }
         );
+    }
+
+    private function getSeries(string $prefix)
+    {
+        $parts = explode('|', $prefix);
+        return $parts[1] ?? null;
     }
 }

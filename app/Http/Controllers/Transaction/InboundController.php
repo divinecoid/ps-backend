@@ -462,6 +462,7 @@ class InboundController extends Controller
             'barcode' => $barcode,
             'is_rejected' => $is_rejected
         ]);
+        $requestDetail->increment('rec_qty', $qty);
         if (!$is_rejected && $group == 'D') {
             $inventory = Inventory::firstOrCreate(
                 [
@@ -475,8 +476,7 @@ class InboundController extends Controller
                 ['quantity' => 0]
             );
             $detail->increment('quantity', $qty);
-            $requestDetail->increment('rec_qty', $qty);
-        }
+            }
     }
     public function index(HttpRequest $request)
     {
