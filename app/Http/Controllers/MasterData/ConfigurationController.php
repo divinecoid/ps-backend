@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
 use App\Models\MasterData\Configuration;
 use App\Models\MasterData\ConfigurationHistory;
+use App\Models\Transactions\Order;
+use App\Models\Transactions\OrderItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -142,6 +144,32 @@ class ConfigurationController extends Controller
                     'changed_by' => auth()->id(),
                     'changed_at' => now(),
                 ]);
+
+                // Check if the updated setting is the checker flag turned off
+                if (
+                    strtolower($request->input('config_key')) === 'is_need_checker' &&
+                    in_array(strtolower($request->input('config_value')), ['false', '0', ''])
+                ) {
+
+                    // Target orders that are not yet handed over to the courier
+                    // Statuses: pending, read, prepared, ready_to_ship, ready_to_pickup
+                    $orderIds = Order::where('is_need_checker', true)
+                        ->whereNotIn('status', ['shipped', 'delivered', 'cancelled', 'returned'])
+                        ->pluck('id');
+
+                    if ($orderIds->isNotEmpty()) {
+                        // Update Order Items
+                        OrderItem::whereIn('order_id', $orderIds)
+                            ->update(['is_checked' => true]);
+
+                        // Update Orders
+                        Order::whereIn('id', $orderIds)
+                            ->update([
+                                'is_need_checker' => false,
+                                'is_approved' => true
+                            ]);
+                    }
+                }
             }
 
             return $this->successResponse($record);
