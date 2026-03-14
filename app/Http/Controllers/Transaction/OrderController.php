@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
 use App\Http\Traits\MarketplaceApiTrait;
 use App\Models\Transactions\Order;
+use App\Models\Transactions\OrderItem;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -189,13 +190,15 @@ class OrderController extends Controller
         $request->validate([
             'order_id' => 'required|exists:trx_orders,id',
             'prepared_at' => 'required|date',
-            'scanned_barcodes' => 'required|array|min:1',
-            'scanned_barcodes.*' => 'string'
+            'order_items' => 'required|array|min:1',
+            'order_items.*.id' => 'required|exists:trx_order_items,id',
+            'order_items.*.scanned_barcodes' => 'required|array|min:1',
+            'order_items.*.scanned_barcodes.*' => 'string',
         ]);
 
         $orderId = $request->input('order_id');
         $preparedAt = $request->input('prepared_at');
-        $scannedBarcodes = $request->input('scanned_barcodes');
+        $orderItemsInput = $request->input('order_items');
 
         // Find order
         $order = Order::find($orderId);
@@ -207,28 +210,56 @@ class OrderController extends Controller
             ], 404);
         }
 
-        // Validate all barcodes again (check for concurrent deletions)
+        // Validate all barcodes per order item (check for concurrent deletions)
         $conflictingBarcodes = [];
-        $productsToDelete = [];
+        $itemsToProcess = []; // [ ['order_item_id' => ..., 'products' => [...]] ]
+        $totalProductsScanned = 0;
 
-        foreach ($scannedBarcodes as $barcode) {
-            $product = \App\Models\MasterData\Product::where('barcode', $barcode)->first();
+        foreach ($orderItemsInput as $itemInput) {
+            $orderItemId = $itemInput['id'];
+            $scannedBarcodes = $itemInput['scanned_barcodes'];
 
-            if (!$product) {
+            // Verify the order item belongs to this order
+            $orderItem = OrderItem::where('id', $orderItemId)
+                ->where('order_id', $orderId)
+                ->first();
+
+            if (!$orderItem) {
                 return response()->json([
                     'success' => false,
-                    'message' => "Barcode tidak ditemukan: $barcode"
+                    'message' => "Order item tidak ditemukan atau bukan milik order ini: $orderItemId"
                 ], 404);
             }
 
-            if ($product->deleted_at !== null) {
-                $conflictingBarcodes[] = [
-                    'barcode' => $barcode,
-                    'deleted_at' => $product->deleted_at
-                ];
-            } else {
-                $productsToDelete[] = $product;
+            $productsForItem = [];
+
+            foreach ($scannedBarcodes as $barcode) {
+                $product = \App\Models\MasterData\Product::where('barcode', $barcode)->first();
+
+                if (!$product) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Barcode tidak ditemukan: $barcode"
+                    ], 404);
+                }
+
+                if ($product->deleted_at !== null) {
+                    $conflictingBarcodes[] = [
+                        'order_item_id' => $orderItemId,
+                        'barcode' => $barcode,
+                        'deleted_at' => $product->deleted_at
+                    ];
+                } else {
+                    $productsForItem[] = $product;
+                }
             }
+
+            $itemsToProcess[] = [
+                'order_item_id' => $orderItemId,
+                'order_item' => $orderItem,
+                'products' => $productsForItem,
+            ];
+            $totalProductsScanned += count($productsForItem);
         }
 
         // If there are conflicting barcodes, return error
@@ -240,12 +271,24 @@ class OrderController extends Controller
             ], 409);
         }
 
-        // All validations passed, proceed with soft-delete and update order
+        // All validations passed, proceed with associating products to order items and soft-delete
         $readyToShipAt = now();
 
-        // Soft-delete all scanned products
-        foreach ($productsToDelete as $product) {
-            $product->delete(); // This will set deleted_at
+        foreach ($itemsToProcess as $item) {
+            $orderItem = $item['order_item'];
+
+            foreach ($item['products'] as $product) {
+                // Associate product to order item
+                $product->order_item_id = $orderItem->id;
+                $product->save();
+
+                // Soft-delete the product
+                $product->delete();
+            }
+
+            // Mark order item as prepared
+            $orderItem->item_prepared_at = $readyToShipAt;
+            $orderItem->save();
         }
 
         // Calculate prepare_duration in seconds
@@ -267,7 +310,8 @@ class OrderController extends Controller
                 'prepared_at' => $order->prepared_at,
                 'readytoship_at' => $order->readytoship_at,
                 'prepare_duration' => $order->prepare_duration,
-                'products_scanned' => count($productsToDelete)
+                'products_scanned' => $totalProductsScanned,
+                'order_items_processed' => count($itemsToProcess),
             ]
         ], 200);
     }
