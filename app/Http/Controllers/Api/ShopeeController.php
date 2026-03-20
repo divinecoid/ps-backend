@@ -363,6 +363,7 @@ class ShopeeController extends Controller
 
             // Return as downloadable PDF
             return response($fileContent)
+                ->header('Access-Control-Expose-Headers', 'Content-Disposition')
                 ->header('Content-Type', 'application/pdf')
                 ->header('Content-Disposition', 'attachment; filename="shipping_document_' . $request->order_sn . '.pdf"');
 
