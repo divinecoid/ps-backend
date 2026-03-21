@@ -50,7 +50,7 @@ class OrderController extends Controller
             $request,
             Order::class,
             [],
-            ["marketplace_id", "awb_code", "status", "online_store_id"],
+            ["marketplace_id", "order_sn", "awb_code", "status", "online_store_id"],
             $this->structure(),
             // function ($query) use ($request) {
             //     if ($request->filled('marketplace_id')) {
