@@ -32,14 +32,6 @@ Route::prefix('auth')->group(function () {
 
 Route::middleware('checkrole:admin')->post('/register', RegisterController::class);
 
-//Shopee Auth & Logistics
-Route::prefix('shopee')->middleware('checkrole:admin')->group(function () {
-    Route::post('/auth-url', [ShopeeController::class, 'generateAuthUrl']);
-    Route::get('shopee/shipping-parameter', [ShopeeController::class, 'getShippingParameter']);
-    Route::post('/ship-order', [ShopeeController::class, 'shipOrder']);
-    Route::post('/download-shipping-document', [ShopeeController::class, 'downloadShippingDocument']);
-});
-
 
 //MasterData
 //Role
@@ -221,9 +213,12 @@ Route::prefix('shopee')->middleware('checkrole:admin')->group(function () {
     Route::post('/auth-url', [ShopeeController::class, 'generateAuthUrl']);
     Route::get('/shipping-parameter', [ShopeeController::class, 'getShippingParameter']);
     Route::post('/ship-order', [ShopeeController::class, 'shipOrder']);
+    Route::post('/create-shipping-document', [ShopeeController::class, 'createShippingDocument']);
     Route::post('/download-shipping-document', [ShopeeController::class, 'downloadShippingDocument']);
+    Route::get('/redirect/{id}', [ShopeeController::class, 'redirectToShopee']);
 });
 
+Route::get('shopee/callback', [ShopeeController::class, 'handleCallback']);
 Route::get('shopee/fetch-orders', [ShopeeController::class, 'fetchOrders']);
 
 Route::prefix('request')->middleware('checkrole')->group(function () {
