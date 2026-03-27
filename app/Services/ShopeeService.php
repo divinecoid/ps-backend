@@ -310,13 +310,14 @@ class ShopeeService
 
         try {
             $response = $execute();
+            $body = $response->body();
+            $contentType = $response->header('Content-Type');
 
             // Check if response is JSON (error) or Binary (PDF)
             $isJson = false;
             $json = [];
             
-            // Simple check: if content-type is json OR if body starts with {
-            if (strpos($response->header('Content-Type'), 'application/json') !== false || substr(trim($response->body()), 0, 1) === '{') {
+            if (strpos($contentType, 'application/json') !== false || substr(trim($body), 0, 1) === '{') {
                 $json = $response->json();
                 $isJson = true;
             }
@@ -324,7 +325,8 @@ class ShopeeService
             // Handle Token Error
             $isTokenError = false;
             if ($isJson) {
-                if (isset($json['error']) && ($json['error'] === 'error_auth' || $json['error'] === 'invalid_access_token' || $json['error'] === 'invalid_acceess_token')) {
+                $errorCode = $json['error'] ?? $json['err_code'] ?? null;
+                if (in_array($errorCode, ['error_auth', 'invalid_access_token', 'invalid_acceess_token'])) {
                     $isTokenError = true;
                 }
                 if (isset($json['message']) && stripos($json['message'], 'access_token') !== false) {
@@ -339,14 +341,21 @@ class ShopeeService
                 
                 // Retry
                 $response = $execute();
+                $body = $response->body();
+                // Re-evaluate JSON after retry
+                if (strpos($response->header('Content-Type'), 'application/json') !== false || substr(trim($body), 0, 1) === '{') {
+                    $json = $response->json();
+                    $isJson = true;
+                }
             }
 
-            if ($response->failed()) {
-                Log::error('Shopee downloadShippingDocument failed', ['body' => $response->body()]);
-                throw new \Exception("Shopee API Error: " . $response->body());
+            if ($response->failed() || ($isJson && (isset($json['error']) || isset($json['err_code'])) && !empty($json['error'] ?? $json['err_code']))) {
+                $errorBody = $isJson ? json_encode($json) : $body;
+                Log::error('Shopee downloadShippingDocument failed', ['body' => $errorBody]);
+                throw new \Exception("Shopee API Error: " . $errorBody);
             }
 
-            return $response->body(); // Return raw content (likely PDF)
+            return $body; // Return raw content (likely PDF)
 
         } catch (\Exception $e) {
             Log::error('Shopee downloadShippingDocument exception', ['message' => $e->getMessage()]);
