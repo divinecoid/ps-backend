@@ -22,6 +22,7 @@ use App\Http\Controllers\MasterData\RackController;
 use App\Http\Controllers\MasterData\WarehouseController;
 use App\Http\Controllers\Transaction\OrderController;
 use App\Http\Controllers\Api\ShopeeController;
+use App\Http\Controllers\Api\MarketplaceAuthController;
 
 //Auth
 Route::prefix('auth')->group(function () {
@@ -31,6 +32,11 @@ Route::prefix('auth')->group(function () {
 });
 
 Route::middleware('checkrole:admin')->post('/register', RegisterController::class);
+
+// Marketplace Generic Auth
+Route::prefix('marketplace-auth')->middleware('checkrole:admin')->group(function () {
+    Route::post('/refresh-token', [MarketplaceAuthController::class, 'refreshToken']);
+});
 
 
 //MasterData
@@ -215,6 +221,7 @@ Route::prefix('shopee')->middleware('checkrole:admin')->group(function () {
     Route::post('/ship-order', [ShopeeController::class, 'shipOrder']);
     Route::post('/create-shipping-document', [ShopeeController::class, 'createShippingDocument']);
     Route::post('/download-shipping-document', [ShopeeController::class, 'downloadShippingDocument']);
+    Route::get('/sync-shipping-logistics', [ShopeeController::class, 'syncShippingLogistics']);
     Route::get('/redirect/{id}', [ShopeeController::class, 'redirectToShopee']);
 });
 

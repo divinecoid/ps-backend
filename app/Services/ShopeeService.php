@@ -363,6 +363,12 @@ class ShopeeService
         }
     }
 
+    public function getChannelList()
+    {
+        $path = "/api/v2/logistics/get_channel_list";
+        return $this->request('GET', $path);
+    }
+
     public function refreshAccessToken()
     {
         $store = $this->getStore();

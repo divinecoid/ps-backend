@@ -21,6 +21,29 @@ Digunakan untuk mendapatkan Bearer Token sebelum mengakses API Shopee lainnya.
 
 ---
 
+### B. Marketplace Refresh Token (Generic)
+Endpoint umum untuk memperbarui `access_token` marketplace (Shopee, dll) menggunakan `refresh_token` yang tersimpan di DB.
+
+- **URL**: `http://localhost:8000/api/marketplace-auth/refresh-token`
+- **Method**: `POST`
+- **Headers**:
+  ```json
+  {
+    "Authorization": "Bearer <TOKEN>",
+    "Content-Type": "application/json",
+    "Accept": "application/json"
+  }
+  ```
+- **Body**:
+  ```json
+  {
+    "online_store_id": "UUID-ONLINE-STORE"
+  }
+  ```
+- **Logic**: Menggunakan `switch-case` di backend untuk menentukan marketplace mana yang akan di-refresh (saat ini mendukung `shopee`).
+
+---
+
 ## 2. Shopee Logistics API
 
 *Note: Semua API di bawah ini wajib menggunakan Header `Authorization: Bearer <TOKEN>`.*
@@ -110,6 +133,24 @@ Menarik data pesanan terbaru dari Shopee ke database lokal.
 - **Method**: `GET`
 - **Query Params**:
   - `days`: (Optional) Jumlah hari ke belakang (default 1).
+
+---
+
+### B. Sync Shipping Logistics
+Menarik daftar kurir (Logistics Channels) dari Shopee ke database lokal.
+
+- **URL**: `http://localhost:8000/api/shopee/sync-shipping-logistics`
+- **Method**: `GET`
+- **Headers**:
+  ```json
+  {
+    "Authorization": "Bearer <TOKEN>",
+    "Accept": "application/json"
+  }
+  ```
+- **Query Params**:
+  - `online_store_id`: (Required) UUID dari Online Store.
+- **Logic**: Menggunakan `updateOrCreate`. Jika `logistic_id` sudah ada di database, maka nama dan statusnya akan diupdate. Jika belum ada, akan dibuat data baru.
 
 ---
 
