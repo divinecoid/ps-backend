@@ -319,6 +319,46 @@ class ShopeeController extends Controller
     }
 
     /**
+     * Create Shipping Document (Trigger Print)
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function createShippingDocument(Request $request)
+    {
+        $request->validate([
+            'order_sn' => 'required|string',
+        ]);
+
+        try {
+            $order = Order::where('order_sn', $request->order_sn)->first();
+            if (!$order) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Order not found.'
+                ], 404);
+            }
+
+            if ($order->online_store) {
+                $this->shopeeService->setStore($order->online_store);
+            }
+
+            $result = $this->shopeeService->createShippingDocument($request->order_sn);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Shipping document creation initiated.',
+                'data' => $result
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Download Shipping Document
      * 
      * @param Request $request
@@ -360,6 +400,26 @@ class ShopeeController extends Controller
 
             $type = $request->shipping_document_type ?? 'NORMAL_AIR_WAYBILL';
             $fileContent = $this->shopeeService->downloadShippingDocument($request->order_sn, $type);
+
+            // Robust check: PDF files MUST start with %PDF-
+            if (strpos($fileContent, '%PDF-') !== 0) {
+                Log::warning('Shopee download returned invalid PDF content', ['order_sn' => $request->order_sn, 'preview' => substr($fileContent, 0, 100)]);
+                
+                // If it looks like JSON, return as JSON
+                if (strpos(trim($fileContent), '{') === 0) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Shopee returned an error message instead of a PDF file.',
+                        'shopee_response' => json_decode($fileContent)
+                    ], 400);
+                }
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Received invalid PDF content from Shopee.',
+                    'preview' => substr($fileContent, 0, 50)
+                ], 500);
+            }
 
             // Return as downloadable PDF
             return response($fileContent)
