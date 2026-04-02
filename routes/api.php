@@ -23,6 +23,8 @@ use App\Http\Controllers\MasterData\WarehouseController;
 use App\Http\Controllers\MasterData\ConfigurationController;
 use App\Http\Controllers\Transaction\OrderController;
 use App\Http\Controllers\Api\ShopeeController;
+use App\Http\Controllers\Transaction\CheckerController;
+use Illuminate\Http\JsonResponse;
 
 //Auth
 Route::prefix('auth')->group(function () {
@@ -270,3 +272,9 @@ Route::prefix('configuration')->middleware('checkrole:admin')->group(function ()
     Route::delete('{id}', [ConfigurationController::class, 'destroy']);
 });
 
+Route::prefix('checker')->middleware('checkrole:admin')->group(function () {
+    Route::get('/assigned-orders', [CheckerController::class, 'assignedOrders']);
+    Route::get('/order-items/{orderId}', [CheckerController::class, 'getOrderItems']);
+    Route::post('/validate-product-barcode', [CheckerController::class, 'validateProductBarcode']);
+    Route::patch('/approve-order/{id}', [CheckerController::class, 'approveOrder']);
+});
