@@ -28,6 +28,63 @@ class CheckerController extends Controller
         ]);
     }
 
+    public function searchOrders(Request $request): JsonResponse
+    {
+        $search = trim($request->input('search', ''));
+        $marketplaceId = $request->input('marketplace_id');
+        $perPage = (int) $request->input('per_page', 15);
+
+        $query = Order::query()
+            ->where('is_need_checker', 1)
+            ->where('is_approved', 0)
+            ->with(['online_store', 'marketplace', 'checkedBy']);
+
+        // Apply search filter if provided
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->whereRaw('LOWER(order_sn) LIKE ?', ['%' . strtolower($search) . '%'])
+                  ->orWhereRaw('LOWER(awb_code) LIKE ?', ['%' . strtolower($search) . '%'])
+                  ->orWhereRaw('LOWER(customer_name) LIKE ?', ['%' . strtolower($search) . '%']);
+            });
+        }
+
+        // Apply marketplace filter if provided
+        if (!empty($marketplaceId)) {
+            $query->where('marketplace_id', $marketplaceId);
+        }
+
+        $orders = $query->latest()->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Search results retrieved successfully',
+            'data' => $orders,
+        ]);
+    }
+
+    public function getOrderBySerial(string $serial): JsonResponse
+    {
+        $order = Order::query()
+            ->whereRaw('LOWER(order_sn) = ?', [strtolower(trim($serial))])
+            ->where('is_need_checker', 1)
+            ->where('is_approved', 0)
+            ->with(['online_store', 'marketplace', 'checkedBy'])
+            ->first();
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order not found or no longer requires checker',
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Order retrieved successfully',
+            'data' => $order->toArray(),
+        ]);
+    }
+
     public function approveOrder(string $id): JsonResponse
     {
         $order = Order::find($id);
@@ -144,10 +201,7 @@ class CheckerController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Order approved successfully',
-            'data' => [
-                ...$order->toArray(),
-                'checked_by_name' => $order->checkedBy?->name,
-            ],
+            'data' => $order->toArray(),
         ]);
     }
 
@@ -162,8 +216,8 @@ class CheckerController extends Controller
         if (!$order) {
             return response()->json([
                 'success' => false,
-                'message' => 'Order not found or no longer requires checker',
-            ], 404);
+                'message' => 'Barcode not found or invalid',
+            ]);
         }
 
         $orderItems = OrderItem::query()
@@ -223,8 +277,8 @@ class CheckerController extends Controller
         if (!$parsed) {
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid barcode format. Expected format: CMT|timestamp|SKU|COLOR|SIZE|dozen|piece',
-            ], 400);
+                'message' => 'Barcode not found or invalid',
+            ]);
         }
 
         $matchedOrderItem = OrderItem::query()
@@ -237,13 +291,13 @@ class CheckerController extends Controller
         if (!$matchedOrderItem) {
             return response()->json([
                 'success' => false,
-                'message' => 'Scanned product is not part of this order',
+                'message' => 'Barcode not found or invalid',
                 'data' => [
                     'sku' => $parsed['sku'],
                     'color' => $parsed['color'],
                     'size' => $parsed['size'],
                 ],
-            ], 400);
+            ]);
         }
 
         return response()->json([

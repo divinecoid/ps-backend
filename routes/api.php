@@ -274,6 +274,8 @@ Route::prefix('configuration')->middleware('checkrole:admin')->group(function ()
 
 Route::prefix('checker')->middleware('checkrole:admin')->group(function () {
     Route::get('/assigned-orders', [CheckerController::class, 'assignedOrders']);
+    Route::get('/search', [CheckerController::class, 'searchOrders']);
+    Route::get('/search-by-serial/{serial}', [CheckerController::class, 'getOrderBySerial']);
     Route::get('/order-items/{orderId}', [CheckerController::class, 'getOrderItems']);
     Route::post('/validate-product-barcode', [CheckerController::class, 'validateProductBarcode']);
     Route::patch('/approve-order/{id}', [CheckerController::class, 'approveOrder']);
