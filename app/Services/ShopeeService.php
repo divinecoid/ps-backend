@@ -171,6 +171,101 @@ class ShopeeService
     }
 
     /**
+     * Common Request Handler with Auto-Refresh Token but returns status false on error
+     */
+    private function requestWithStatus($method, $path, $params = [], $data = [])
+    {
+        $store = $this->getStore();
+        
+        $host = $store->marketplace->base_api_url;
+        $partnerId = (int)$store->client_id;
+        $partnerKey = $store->client_secret;
+        $shopId = (int)($store->shop_id ?? $store->store_code);
+        
+        // 1. Get Token & Prepare Params
+        $accessToken = $store->access_token;
+        if (!$accessToken) {
+             throw new \Exception("Access token missing for store: " . $store->store_name);
+        }
+
+        $timestamp = time();
+        
+        // Base String Construction
+        $baseString = sprintf("%s%s%s%s%s", $partnerId, $path, $timestamp, $accessToken, $shopId);
+        $sign = hash_hmac('sha256', $baseString, $partnerKey);
+
+        // Merge Common Params
+        $commonParams = [
+            'partner_id' => $partnerId,
+            'timestamp' => $timestamp,
+            'access_token' => $accessToken,
+            'shop_id' => $shopId,
+            'sign' => $sign
+        ];
+        $finalParams = array_merge($commonParams, $params);
+
+        // 2. Execute Request
+        $url = $host . $path;
+        $response = null;
+
+        try {
+            if (strtoupper($method) === 'POST') {
+                $response = Http::post($url . '?' . http_build_query($finalParams), $data);
+            } else {
+                $response = Http::get($url, $finalParams);
+            }
+        } catch (\Exception $e) {
+            Log::error("Shopee API Exception: {$path}", ['message' => $e->getMessage()]);
+            throw $e;
+        }
+
+        // 3. Handle Token Expiration (Auto Refresh)
+        $json = $response->json();
+        $isTokenError = false;
+        
+        // Check for common token errors
+        if (isset($json['error']) && ($json['error'] === 'error_auth' || $json['error'] === 'invalid_access_token' || $json['error'] === 'invalid_acceess_token')) {
+            $isTokenError = true;
+        }
+        if (isset($json['message']) && stripos($json['message'], 'access_token') !== false) {
+            $isTokenError = true;
+        }
+
+        if ($isTokenError) {
+            Log::info("Shopee Token Expired/Invalid. Refreshing... Path: {$path}");
+            try {
+                $this->refreshAccessToken();
+                
+                // Retry with new token
+                $store->refresh(); // Reload from DB
+                $accessToken = $store->access_token;
+                
+                $timestamp = time();
+                $baseString = sprintf("%s%s%s%s%s", $partnerId, $path, $timestamp, $accessToken, $shopId);
+                $sign = hash_hmac('sha256', $baseString, $partnerKey);
+                
+                $finalParams['timestamp'] = $timestamp;
+                $finalParams['access_token'] = $accessToken;
+                $finalParams['sign'] = $sign;
+
+                if (strtoupper($method) === 'POST') {
+                    $response = Http::post($url . '?' . http_build_query($finalParams), $data);
+                } else {
+                    $response = Http::get($url, $finalParams);
+                }
+                
+
+
+            } catch (\Exception $e) {
+                Log::error("Shopee Token Refresh & Retry Failed: {$path}", ['message' => $e->getMessage()]);
+                throw new \Exception('Token refresh failed: ' . $e->getMessage());
+            }
+        }
+
+        return $response;
+    }
+
+    /**
      * Get Order List from Shopee
      * 
      * @param int $timeFrom
@@ -224,7 +319,25 @@ class ShopeeService
         $path = "/api/v2/logistics/get_shipping_parameter";
         $params = ['order_sn' => $orderSn];
         
-        return $this->request('GET', $path, $params);
+        try {
+            $response = $this->requestWithStatus('GET', $path, $params);
+            $json = $response->json() ?? [];
+
+            $isSuccess = $response->successful() && empty($json['error']);
+
+            return [
+                'success' => $isSuccess,
+                'data' => $json
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'data' => [
+                    'error' => 'exception',
+                    'message' => $e->getMessage()
+                ]
+            ];
+        }
     }
 
     /**
