@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\LazadaController;
 use App\Http\Controllers\Transaction\MutationController;
 use App\Http\Controllers\Transaction\RequestController;
 use App\Http\Controllers\Transaction\InboundController;
@@ -226,6 +227,10 @@ Route::prefix('shopee')->middleware('checkrole:admin')->group(function () {
     Route::post('/download-shipping-document', [ShopeeController::class, 'downloadShippingDocument']);
     Route::get('/sync-shipping-logistics', [ShopeeController::class, 'syncShippingLogistics']);
     Route::get('/redirect/{id}', [ShopeeController::class, 'redirectToShopee']);
+});
+
+Route::prefix('lazada')->middleware('checkrole:admin')->group(function() {
+    Route::get('/get-order/{id}', [LazadaController::class, 'getOrder']);
 });
 
 Route::get('shopee/callback', [ShopeeController::class, 'handleCallback']);
