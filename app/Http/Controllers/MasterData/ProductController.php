@@ -26,7 +26,8 @@ class ProductController extends Controller
             'rack' => (object) [
                 'name' => $data->rack->name
             ],
-            'barcode' => $data->barcode
+            'barcode' => $data->barcode,
+            'series' => $data->series
         ];
     }
 

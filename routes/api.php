@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\LazadaController;
+use App\Http\Controllers\MasterData\SmallInventoryController;
 use App\Http\Controllers\Transaction\MutationController;
 use App\Http\Controllers\Transaction\RequestController;
 use App\Http\Controllers\Transaction\InboundController;
@@ -155,6 +156,11 @@ Route::prefix('cmt')->middleware('checkrole:admin')->group(function () {
     Route::delete('{id}', [CMTController::class, 'destroy']);
 });
 //Inventory
+Route::prefix('small-inventory')->middleware('checkrole:admin')->group(function () {
+    Route::get('/', [SmallInventoryController::class, 'index']);
+    Route::get('/master', [SmallInventoryController::class, 'master']);
+    Route::get('{id}', [SmallInventoryController::class, 'show']);
+});
 Route::prefix('inventory')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [InventoryController::class, 'index']);
     Route::get('/master', [InventoryController::class, 'master']);

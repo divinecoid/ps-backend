@@ -282,7 +282,7 @@ class InboundController extends Controller
                             foreach ($barcodesPiece as $items) {
                                 $barcode = $items['barcode'];
                                 ['prefix' => $prefix] = $this->parseBarcode($barcode);
-
+                                $series = $this->getSeries($prefix);
                                 if ($rd = $this->findRequestDetail($prefix)) {
                                     $req = $rd->request;
                                     $cmtId = $req->cmt_id;
@@ -307,6 +307,7 @@ class InboundController extends Controller
                                     Product::create([
                                         'rack_id' => $items['rack_id'],
                                         'model_id' => $rd->model_id,
+                                        'series' => $series,
                                         'barcode' => $barcode
                                     ]);
                                 }
@@ -476,7 +477,7 @@ class InboundController extends Controller
                 ['quantity' => 0]
             );
             $detail->increment('quantity', $qty);
-            }
+        }
     }
     public function index(HttpRequest $request)
     {

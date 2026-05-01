@@ -5,6 +5,7 @@ namespace App\Http\Controllers\MasterData;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
 use App\Models\MasterData\Inventory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 class InventoryController extends Controller
@@ -43,7 +44,7 @@ class InventoryController extends Controller
             ['model', 'color', 'size'],
             ['model_id', 'model.name', 'color_id', 'color.name', 'size_id', 'size.name'],
             $this->structure(),
-            function ($query) {
+            function (Builder $query) {
                 $query->withSum('detail', 'quantity');
             }
         );
@@ -57,7 +58,7 @@ class InventoryController extends Controller
             ['model', 'color', 'size'],
             ['model_id', 'model.name', 'color_id', 'color.name', 'size_id', 'size.name'],
             $this->structure(),
-            function ($query) {
+            function (Builder $query) {
                 $query->withSum('detail', 'quantity');
             }
         );
