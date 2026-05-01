@@ -11,10 +11,12 @@ use Illuminate\Support\Facades\Log;
 class MarketplaceAuthController extends Controller
 {
     protected ShopeeService $shopeeService;
+    protected LazadaController $lazadaService;
 
-    public function __construct(ShopeeService $shopeeService)
+    public function __construct(ShopeeService $shopeeService, LazadaController $lazadaService)
     {
         $this->shopeeService = $shopeeService;
+        $this->lazadaService = $lazadaService;
     }
 
     /**
@@ -37,13 +39,21 @@ class MarketplaceAuthController extends Controller
                 case 'shopee':
                     $this->shopeeService->setStore($store);
                     $result = $this->shopeeService->refreshAccessToken();
-                    
+
                     return response()->json([
                         'success' => true,
                         'message' => 'Shopee token refreshed successfully.',
                         'data' => $result
                     ]);
 
+                case 'lazada':
+                    $result = $this->lazadaService->refreshToken($request->online_store_id);
+
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Lazada token refreshed successfully.',
+                        'data' => $result
+                    ]);
                 // Future cases can be added here
                 // case 'lazada':
                 //     ...
@@ -58,7 +68,7 @@ class MarketplaceAuthController extends Controller
 
         } catch (\Exception $e) {
             Log::error("Marketplace Refresh Token Error ({$request->online_store_id}): " . $e->getMessage());
-            
+
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage()
