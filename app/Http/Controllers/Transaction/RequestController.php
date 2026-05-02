@@ -67,7 +67,7 @@ class RequestController extends Controller
 
     public function show($id)
     {
-        $request = \App\Models\Transactions\Request::with(['request_detail', 'receive_log.warehouse', 'receive_log.details'])->findOrFail($id);
+        $request = \App\Models\Transactions\Request::with(['request_detail', 'request_detail.receivedlog_detail.receivedlog.warehouse', 'request_detail.receivedlog_detail.receivedlog'])->findOrFail($id);
         return $this->successResponse(
             [
                 'cmt_id' => $request->cmt_id,
@@ -90,42 +90,45 @@ class RequestController extends Controller
                         ];
                     })
                     ->values(),
-                'receive_log' => $request->receive_log->map(function ($log) {
-                    return [
-                        'id' => $log->id,
-                        'request_id' => $log->request_id,
-                        'warehouse_id' => $log->warehouse_id,
-                        'warehouse' => (object) [
-                            'name' => $log->warehouse?->name
-                        ],
-                        'user_id' => $log->user_id,
-                        'user' => (object) [
-                            'name' => $log->user?->name
-                        ],
-                        'received_date' => $log->received_date,
-                        'notes' => $log->notes,
-                        'created_at' => $log->created_at,
-                        'updated_at' => $log->updated_at,
-                        'details' => $log->details->map(function ($d) {
-                            return [
-                                'model_id' => $d->model_id,
-                                'model' => (object) [
-                                    'name' => $d->model?->name
-                                ],
-                                'color_id' => $d->color_id,
-                                'color' => (object) [
-                                    'name' => $d->color?->name
-                                ],
-                                'size_id' => $d->size_id,
-                                'size' => (object) [
-                                    'name' => $d->size?->name
-                                ],
-                                'qty' => $d->qty,
-                                'barcode' => $d->barcode
-                            ];
-                        })->values()
-                    ];
-                })
+                'receive_log' => $request->request_detail->flatMap(function ($detail) {
+                        return $detail->receivedlog_detail
+                            ->map(fn($rd) => $rd->receivedlog);
+                    })->filter()->unique('id')->values()->map(function ($log) {
+                        return [
+                            'id' => $log->id,
+                            'request_id' => $log->request_id,
+                            'warehouse_id' => $log->warehouse_id,
+                            'warehouse' => (object) [
+                                'name' => $log->warehouse?->name
+                            ],
+                            'user_id' => $log->user_id,
+                            'user' => (object) [
+                                'name' => $log->user?->name
+                            ],
+                            'received_date' => $log->received_date,
+                            'notes' => $log->notes,
+                            'created_at' => $log->created_at,
+                            'updated_at' => $log->updated_at,
+                            'details' => $log->details->map(function ($d) {
+                                return [
+                                    'model_id' => $d->model_id,
+                                    'model' => (object) [
+                                        'name' => $d->model?->name
+                                    ],
+                                    'color_id' => $d->color_id,
+                                    'color' => (object) [
+                                        'name' => $d->color?->name
+                                    ],
+                                    'size_id' => $d->size_id,
+                                    'size' => (object) [
+                                        'name' => $d->size?->name
+                                    ],
+                                    'qty' => $d->qty,
+                                    'barcode' => $d->barcode
+                                ];
+                            })->values()
+                        ];
+                    })
 
             ]
         );
@@ -153,7 +156,7 @@ class RequestController extends Controller
             $request,
             [
                 'cmt_id' => 'required|uuid|exists:mdx_cmts,id',
-                // 'serial_number' => 'required|string|max:255',
+                'serial_number' => 'required|string|max:255',
                 'request_detail' => 'required|array|min:1',
                 'request_detail.*.model_id' => 'required|uuid',
                 'request_detail.*.color_id' => 'required|uuid',
@@ -198,11 +201,11 @@ class RequestController extends Controller
                 }
                 unset($item);
                 return DB::transaction(function () use ($data, $items, $cmt) {
-                    $serial = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT); //TODO: ganti dengan input dari proses potong baju
+                    // $serial = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT); //TODO: ganti dengan input dari proses potong baju
                     $requestModel = \App\Models\Transactions\Request::create([
                         'cmt_id' => $data['cmt_id'],
-                        // 'serial_number' => $data['serial_number']
-                        'serial_number' => $serial
+                        'serial_number' => $data['serial_number']
+                        // 'serial_number' => $serial
                     ]);
                     $details = [];
                     foreach ($items as $item) {
@@ -217,7 +220,8 @@ class RequestController extends Controller
                             'barcode' => implode('|', [
                                 $cmt->code,
                                 // now()->format('YmdHis'),
-                                $serial,
+                                // $serial,
+                                $data['serial_number'],
                                 $item['model']->sku,
                                 $item['color']->code,
                                 $item['size']->code,

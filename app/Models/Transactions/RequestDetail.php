@@ -45,4 +45,9 @@ class RequestDetail extends Model
         return $this->belongsTo(Size::class, 'size_id');
     }
 
+    public function receivedlog_detail ()
+    {
+        return $this->hasMany(ReceivedlogDetail::class, 'request_detail_id');
+    }
+
 }
