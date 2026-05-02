@@ -144,7 +144,10 @@ class RequestController extends Controller
                 'request_detail' => $data->request_detail->map(fn($detail) => [
                     'req_dozen_qty' => floor($detail->req_qty / 12),
                     'req_piece_qty' => $detail->req_qty % 12,
-                    'barcode' => $detail->barcode
+                    'serial_number' => $data->serial_number,
+                    'colors' => $detail->color->code,
+                    'sizes' => $detail->size->code,
+                    'barcode' => $detail->barcode,
                 ]),
             ]
         );
