@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Transaction;
 
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
+use App\Models\MasterData\InventoryDetail;
 use App\Models\MasterData\Product;
 use App\Models\Transactions\Receivedlog;
 use App\Models\Transactions\ReceivedlogDetail;
@@ -55,16 +56,16 @@ class MutationController extends Controller
                 {
                     "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c5446",
                     "barcodes": [
-                        "CMT01|20260116172102|LP|RED|XS|PIECE|1",
-                        "CMT01|20260116172102|LP|RED|XS|PIECE|2",
-                        "CMT01|20260116172102|LP|RED|XS|PIECE|3"
+                        "CMT01|20260116172102|LP|RED|XS|P|1",
+                        "CMT01|20260116172102|LP|RED|XS|P|2",
+                        "CMT01|20260116172102|LP|RED|XS|P|3"
                     ]
                 },
                 {
                     "rack_id": "019b85c4-c219-71f9-a7f8-0a5add1c9999",
                     "barcodes": [
-                        "CMT01|20260116172102|LP|BLUE|M|PIECE|1",
-                        "CMT01|20260116172102|LP|BLUE|M|PIECE|2"
+                        "CMT01|20260116172102|LP|BLUE|M|P|1",
+                        "CMT01|20260116172102|LP|BLUE|M|P|2"
                     ]
                 }
             ]
@@ -85,7 +86,6 @@ class MutationController extends Controller
             function ($data) {
                 try {
 
-
                     $invalidBarcodes = [];
                     $scannedBarcodes = [];
 
@@ -104,7 +104,7 @@ class MutationController extends Controller
                     foreach ($data['items'] as $items) {
                         foreach ($items['barcodes'] as $barcode) {
                             ['prefix' => $prefix, 'group' => $group, 'sequence' => $sequence] = $this->parseBarcode($barcode);
-                            if ($group == 'PIECE') {
+                            if ($group == 'P') {
                                 $requestDetail = $this->findRequestDetail($prefix);
                                 if (!$requestDetail) {//cek jika barcode ditemukan di database
                                     $invalidBarcodes[] = $barcode;
@@ -140,6 +140,7 @@ class MutationController extends Controller
                     if ($totalInvalid == 0 && $currentRequest !== null) {//jika semuanya lolos validasi
                         DB::transaction(function () use ($data, $currentRequest) {
                             $log = Receivedlog::create([
+                                'cmt_id' => $currentRequest->cmt_id,
                                 'request_id' => $currentRequest->id,
                                 'user_id' => Auth::id(),
                                 'received_date' => now(),
@@ -149,6 +150,7 @@ class MutationController extends Controller
                             foreach ($data['items'] as $item) {
                                 foreach ($item['barcodes'] as $barcode) {
                                     ['prefix' => $prefix] = $this->parseBarcode($barcode);
+                                    $series = $this->getSeries($prefix);
                                     if ($rd = $this->findRequestDetail($prefix)) {
                                         ReceivedlogDetail::create([
                                             'receivedlog_id' => $log->id,
@@ -163,8 +165,19 @@ class MutationController extends Controller
                                         Product::create([
                                             'rack_id' => $item['rack_id'],
                                             'model_id' => $rd->model_id,
+                                            'series' => $series,
                                             'barcode' => $barcode
                                         ]);
+                                        InventoryDetail::where('series', $series)
+                                            ->whereHas('inventory', function ($q) use ($rd) {
+                                                $q->where([
+                                                    'model_id' => $rd->model_id,
+                                                    'color_id' => $rd->color_id,
+                                                    'size_id' => $rd->size_id
+                                                ]);
+                                            })
+                                            ->where('quantity', '>', 0)
+                                            ->decrement('quantity');
                                     }
                                 }
                             }
@@ -223,9 +236,9 @@ class MutationController extends Controller
                 }
                 //jika group dan total item dalam group lebih besar daripada yang diterima atau sequence lebih besar daripada 12
                 //cek jika barcode group diluar jangkauan, jika group sekarang dikali 12 -> menjadi total piece, lebih besar dari kuantitas yang diminta atau sequence per group lebih dari 12
-                if ($group == 'DOZEN') {
+                if ($group == 'D') {
                     return $this->errorResponse(422, 'Barcode bukan merupakan barcode piece');
-                } else if ($group == 'PIECE') {
+                } else if ($group == 'P') {
                     if ($sequence > $requestDetail->req_qty) {
                         return $this->errorResponse(422, 'Nomor urut barcode piece diluar jangkauan');
                     }
@@ -265,5 +278,11 @@ class MutationController extends Controller
                 ]);
             }
         );
+    }
+
+    private function getSeries(string $prefix)
+    {
+        $parts = explode('|', $prefix);
+        return $parts[1] ?? null;
     }
 }

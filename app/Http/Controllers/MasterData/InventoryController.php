@@ -5,8 +5,8 @@ namespace App\Http\Controllers\MasterData;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
 use App\Models\MasterData\Inventory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class InventoryController extends Controller
 {
@@ -16,25 +16,23 @@ class InventoryController extends Controller
     {
         return fn($data) => [
             'id' => $data->id,
-            'serial_number' => $data->serial_number,
-            'product_id' => $data->product_id,
-            'factory_id' => $data->factory_id,
-            'quantity' => $data->quantity,
-            'cmt_id' => $data->cmt_id,
-            'rack_id' => $data->rack_id,
-            'barcode_group' => $data->barcode_group,
-            'cmt' => (object) [
-                'name' => $data->cmt->name
+            'model_id' => $data->model_id,
+            'model' => (object) [
+                'name' => $data->model->name
             ],
-            'rack' => (object) [
-                'name' => $data->rack->name
+            'color_id' => $data->color_id,
+            'color' => (object) [
+                'name' => $data->color->name
             ],
-            'product' => (object) [
-                'sku' => $data->product->sku
+            'size_id' => $data->size_id,
+            'size' => (object) [
+                'name' => $data->size->name
             ],
-            'factory' => (object) [
-                'name' => $data->factory->name
-            ],
+            'detail' => $data->detail->map(fn($d) => [
+                'series' => $d->series,
+                'quantity' => $d->quantity,
+            ]),
+            'total' => (int) ($data->detail_sum_quantity ?? 0)
         ];
     }
 
@@ -43,9 +41,12 @@ class InventoryController extends Controller
         return $this->baseIndex(
             $request,
             Inventory::class,
-            [],
-            ['serial_number', 'product_id', 'factory_id', 'quantity', 'cmt_id', 'rack_id', 'barcode_group'],
-            $this->structure()
+            ['model', 'color', 'size'],
+            ['model_id', 'model.name', 'color_id', 'color.name', 'size_id', 'size.name'],
+            $this->structure(),
+            function (Builder $query) {
+                $query->withSum('detail', 'quantity');
+            }
         );
     }
 
@@ -54,9 +55,12 @@ class InventoryController extends Controller
         return $this->baseMaster(
             $request,
             Inventory::class,
-            [],
-            ['serial_number', 'product_id', 'factory_id', 'quantity', 'cmt_id', 'rack_id', 'barcode_group'],
-            $this->structure()
+            ['model', 'color', 'size'],
+            ['model_id', 'model.name', 'color_id', 'color.name', 'size_id', 'size.name'],
+            $this->structure(),
+            function (Builder $query) {
+                $query->withSum('detail', 'quantity');
+            }
         );
     }
 
@@ -65,77 +69,77 @@ class InventoryController extends Controller
         return $this->baseShow(
             Inventory::class,
             $id,
-            ['scanned_item', 'request'],
+            ['model', 'color', 'size'],
             $this->structure()
         );
     }
 
     public function store(Request $request)
     {
-        return $this->baseStore(
-            $request,
-            Inventory::class,
-            [
-                'serial_number' => 'required|string|unique:mdx_inventories,serial_number|max:255',
-                'product_id' => [
-                    'required',
-                    Rule::exists('mdx_products', 'id')->whereNull('deleted_at'),
-                ],
-                'factory_id' => [
-                    'required',
-                    Rule::exists('mdx_factories', 'id')->whereNull('deleted_at'),
-                ],
-                'quantity' => 'required|integer|min:1',
-                'cmt_id' =>
-                    [
-                        'required',
-                        Rule::exists('mdx_cmts', 'id')->whereNull('deleted_at'),
-                    ],
-                'rack_id' => [
-                    'required',
-                    Rule::exists('mdx_racks', 'id')->whereNull('deleted_at'),
-                ],
-                'barcode_group' => 'nullable|string|max:255',
-            ],
-            null
-        );
+        // return $this->baseStore(
+        //     $request,
+        //     Inventory::class,
+        //     [
+        //         'serial_number' => 'required|string|unique:mdx_inventories,serial_number|max:255',
+        //         'product_id' => [
+        //             'required',
+        //             Rule::exists('mdx_products', 'id')->whereNull('deleted_at'),
+        //         ],
+        //         'factory_id' => [
+        //             'required',
+        //             Rule::exists('mdx_factories', 'id')->whereNull('deleted_at'),
+        //         ],
+        //         'quantity' => 'required|integer|min:1',
+        //         'cmt_id' =>
+        //             [
+        //                 'required',
+        //                 Rule::exists('mdx_cmts', 'id')->whereNull('deleted_at'),
+        //             ],
+        //         'rack_id' => [
+        //             'required',
+        //             Rule::exists('mdx_racks', 'id')->whereNull('deleted_at'),
+        //         ],
+        //         'barcode_group' => 'nullable|string|max:255',
+        //     ],
+        //     null
+        // );
     }
 
     public function update(Request $request, $id)
     {
-        return $this->baseUpdate(
-            $request,
-            Inventory::class,
-            $id,
-            [
-                'serial_number' => [
-                    'required',
-                    'string',
-                    'max:255',
-                    Rule::unique('mdx_inventories', 'serial_number')->ignore($id)
-                ],
-                'product_id' => [
-                    'required',
-                    Rule::exists('mdx_products', 'id')->whereNull('deleted_at'),
-                ],
-                'factory_id' => [
-                    'required',
-                    Rule::exists('mdx_factories', 'id')->whereNull('deleted_at'),
-                ],
-                'quantity' => 'required|integer|min:1',
-                'cmt_id' =>
-                    [
-                        'required',
-                        Rule::exists('mdx_cmts', 'id')->whereNull('deleted_at'),
-                    ],
-                'rack_id' => [
-                    'required',
-                    Rule::exists('mdx_racks', 'id')->whereNull('deleted_at'),
-                ],
-                'barcode_group' => 'nullable|string|max:255',
-            ],
-            null
-        );
+        // return $this->baseUpdate(
+        //     $request,
+        //     Inventory::class,
+        //     $id,
+        //     [
+        //         'serial_number' => [
+        //             'required',
+        //             'string',
+        //             'max:255',
+        //             Rule::unique('mdx_inventories', 'serial_number')->ignore($id)
+        //         ],
+        //         'product_id' => [
+        //             'required',
+        //             Rule::exists('mdx_products', 'id')->whereNull('deleted_at'),
+        //         ],
+        //         'factory_id' => [
+        //             'required',
+        //             Rule::exists('mdx_factories', 'id')->whereNull('deleted_at'),
+        //         ],
+        //         'quantity' => 'required|integer|min:1',
+        //         'cmt_id' =>
+        //             [
+        //                 'required',
+        //                 Rule::exists('mdx_cmts', 'id')->whereNull('deleted_at'),
+        //             ],
+        //         'rack_id' => [
+        //             'required',
+        //             Rule::exists('mdx_racks', 'id')->whereNull('deleted_at'),
+        //         ],
+        //         'barcode_group' => 'nullable|string|max:255',
+        //     ],
+        //     null
+        // );
     }
 
     public function destroy($id)

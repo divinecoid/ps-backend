@@ -37,10 +37,16 @@ class Order extends Model
         'customer_phone',
         'customer_address',
         'marketplace_id',
+        'is_need_checker',
+        'checked_by',
+        'is_approved',
     ];
 
     protected $casts = [
         'status' => \App\Enums\OrderStatus::class,
+        'read_at' => 'datetime',
+        'prepared_at' => 'datetime',
+        'readytoship_at' => 'datetime',
     ];
 
     // Define relationship with Order Item model
@@ -65,6 +71,12 @@ class Order extends Model
     public function user()
     {
         return $this->belongsTo(User::class, 'preparist_user_id');
+    }
+
+    // Define relationship with checker
+    public function checkedBy()
+    {
+        return $this->belongsTo(User::class, 'checked_by');
     }
 
     // Define relationship with Marketplace model

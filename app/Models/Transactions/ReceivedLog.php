@@ -4,6 +4,7 @@ namespace App\Models\Transactions;
 
 use App\Models\MasterData\Warehouse;
 use App\Models\MasterData\User;
+use App\Models\MasterData\CMT;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -16,7 +17,7 @@ class Receivedlog extends Model
     protected $table = 'trx_receivedlogs';
 
     protected $fillable = [
-        'request_id',
+        'cmt_id',
         'warehouse_id',
         'user_id',
         'received_date',
@@ -28,9 +29,9 @@ class Receivedlog extends Model
     ];
 
     // Relationships
-    public function request()
+    public function cmt()
     {
-        return $this->belongsTo(Request::class, 'request_id');
+        return $this->belongsTo(CMT::class, 'cmt_id');
     }
 
     public function warehouse()
@@ -47,4 +48,9 @@ class Receivedlog extends Model
     {
         return $this->hasMany(ReceivedlogDetail::class, 'receivedlog_id');
     }
+
+    // public function rejectedDetails()
+    // {
+    //     return $this->hasMany(RejectedlogDetail::class, 'receivedlog_id');
+    // }
 }

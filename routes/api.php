@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\LazadaController;
+use App\Http\Controllers\MasterData\SmallInventoryController;
 use App\Http\Controllers\Transaction\MutationController;
 use App\Http\Controllers\Transaction\RequestController;
 use App\Http\Controllers\Transaction\InboundController;
@@ -20,8 +22,11 @@ use App\Http\Controllers\MasterData\FactoryController;
 use App\Http\Controllers\MasterData\ProductController;
 use App\Http\Controllers\MasterData\RackController;
 use App\Http\Controllers\MasterData\WarehouseController;
+use App\Http\Controllers\MasterData\ConfigurationController;
 use App\Http\Controllers\Transaction\OrderController;
 use App\Http\Controllers\Api\ShopeeController;
+use App\Http\Controllers\Transaction\CheckerController;
+use Illuminate\Http\JsonResponse;
 use App\Http\Controllers\Api\MarketplaceAuthController;
 
 //Auth
@@ -151,6 +156,11 @@ Route::prefix('cmt')->middleware('checkrole:admin')->group(function () {
     Route::delete('{id}', [CMTController::class, 'destroy']);
 });
 //Inventory
+Route::prefix('small-inventory')->middleware('checkrole:admin')->group(function () {
+    Route::get('/', [SmallInventoryController::class, 'index']);
+    Route::get('/master', [SmallInventoryController::class, 'master']);
+    Route::get('{id}', [SmallInventoryController::class, 'show']);
+});
 Route::prefix('inventory')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [InventoryController::class, 'index']);
     Route::get('/master', [InventoryController::class, 'master']);
@@ -225,6 +235,10 @@ Route::prefix('shopee')->middleware('checkrole:admin')->group(function () {
     Route::get('/redirect/{id}', [ShopeeController::class, 'redirectToShopee']);
 });
 
+Route::prefix('lazada')->middleware('checkrole:admin')->group(function() {
+    Route::get('/get-order/{id}', [LazadaController::class, 'getOrder']);
+});
+
 Route::get('shopee/callback', [ShopeeController::class, 'handleCallback']);
 Route::get('shopee/fetch-orders', [ShopeeController::class, 'fetchOrders']);
 
@@ -242,6 +256,7 @@ Route::prefix('inbound')->middleware('checkrole')->group(function () {
     Route::get('/{id}', [InboundController::class, 'show']);
     Route::post('/', [InboundController::class, 'store']);
     Route::post('/validate', [InboundController::class, 'validate']);
+    Route::post('/generate-next', [InboundController::class, 'generateNext']);
 });
 
 Route::prefix('model_color')->middleware('checkrole:admin')->group(function () {
@@ -255,4 +270,26 @@ Route::prefix('mutation')->middleware('checkrole')->group(function () {
     Route::get('/', [MutationController::class, 'index']);
     Route::post('/', [MutationController::class, 'store']);
     Route::post('/validate', [MutationController::class, 'validate']);
+});
+
+//Configuration
+Route::prefix('configuration')->middleware('checkrole:admin')->group(function () {
+    Route::get('/', [ConfigurationController::class, 'index']);
+    Route::get('/master', [ConfigurationController::class, 'master']);
+    Route::get('{id}', [ConfigurationController::class, 'show']);
+    Route::get('{id}/histories', [ConfigurationController::class, 'histories']);
+    Route::post('/', [ConfigurationController::class, 'store']);
+    Route::post('{id}/restore', [ConfigurationController::class, 'restore']);
+    Route::patch('{id}', [ConfigurationController::class, 'update']);
+    Route::delete('/', [ConfigurationController::class, 'multiDestroy']);
+    Route::delete('{id}', [ConfigurationController::class, 'destroy']);
+});
+
+Route::prefix('checker')->middleware('checkrole:admin')->group(function () {
+    Route::get('/assigned-orders', [CheckerController::class, 'assignedOrders']);
+    Route::get('/search', [CheckerController::class, 'searchOrders']);
+    Route::get('/search-by-serial/{serial}', [CheckerController::class, 'getOrderBySerial']);
+    Route::get('/order-items/{orderId}', [CheckerController::class, 'getOrderItems']);
+    Route::post('/validate-product-barcode', [CheckerController::class, 'validateProductBarcode']);
+    Route::patch('/approve-order/{id}', [CheckerController::class, 'approveOrder']);
 });

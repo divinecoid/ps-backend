@@ -15,7 +15,7 @@ class Request extends Model
 
     protected $table = 'trx_requests';
 
-    protected $fillable = ['cmt_id', 'status'];
+    protected $fillable = ['cmt_id', 'status', 'serial_number'];
 
     // Define relationship with Received Log model
     // public function recevied_log()
@@ -32,7 +32,7 @@ class Request extends Model
 
     public function receive_log()
     {
-        return $this->hasMany(Receivedlog::class, 'request_id');
+        return $this->hasMany(Receivedlog::class, 'cmt_id', 'cmt_id');
     }
     public function request_detail()
     {

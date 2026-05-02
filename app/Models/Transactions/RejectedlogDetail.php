@@ -10,12 +10,11 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class ReceivedlogDetail extends Model
+class RejectedlogDetail extends Model
 {
-    /** @use HasFactory<\Database\Factories\Transactions\ReceivedlogDetailFactory> */
     use HasFactory, HasUuids;
 
-    protected $table = 'trx_receivedlog_details';
+    protected $table = 'trx_rejectedlog_details';
 
     protected $fillable = [
         'receivedlog_id',
@@ -24,8 +23,7 @@ class ReceivedlogDetail extends Model
         'color_id',
         'size_id',
         'qty',
-        'barcode',
-        'is_rejected'
+        'barcode'
     ];
 
     // Relationships

@@ -35,7 +35,7 @@ class OrderItemSeeder extends Seeder
 
             foreach ($selectedProducts as $product) {
                 // Parse barcode to extract information
-                // Barcode format: {CMT_CODE}|{Timestamp}|{MODELS_SKU}|{COLORS_CODE}|{SIZE_CODE}|{DOZEN}|{PIECE}
+                // Barcode format: {CMT_CODE}|{Timestamp}|{MODELS_SKU}|{COLORS_CODE}|{SIZE_CODE}|{D}|{P}
                 $barcodeParts = explode('|', $product->barcode);
 
                 if (count($barcodeParts) >= 7) {

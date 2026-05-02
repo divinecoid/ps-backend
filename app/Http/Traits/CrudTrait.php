@@ -16,7 +16,8 @@ trait CrudTrait
         array $relations = [],
         array $filters = [],
         ?callable $map = null,
-        ?callable $queryCallback = null
+        ?callable $queryCallback = null,
+        ?array $defaultSort = null
     ) {
         $perPage = (int) ($request->input('per_page', $this->getPerPageDefault()));
         $query = $model::query()->with($relations);
@@ -26,7 +27,7 @@ trait CrudTrait
         }
 
         if (method_exists($this, 'applyFilter') && !empty($filters)) {
-            $query = $this->applyFilter($query, $request, $filters);
+            $query = $this->applyFilter($query, $request, $filters, $defaultSort);
         }
 
         $data = $query->paginate($perPage);
@@ -36,13 +37,24 @@ trait CrudTrait
     }
 
 
-    public function baseMaster(Request $request, $model, array $relations = [], array $filters = [], ?callable $map = null)
-    {
+    public function baseMaster(
+        Request $request,
+        $model,
+        array $relations = [],
+        array $filters = [],
+        ?callable $map = null,
+        ?callable $queryCallback = null,
+        ?array $defaultSort = null
+    ) {
         $perPage = (int) ($request->input('per_page', $this->getPerPageDefault()));
         $query = $model::withTrashed()->with($relations);
 
+        if (is_callable($queryCallback)) {
+            $queryCallback($query);
+        }
+
         if (method_exists($this, 'applyFilter') && !empty($filters)) {
-            $query = $this->applyFilter($query, $request, $filters);
+            $query = $this->applyFilter($query, $request, $filters, $defaultSort);
         }
 
         $data = $query->paginate($perPage);

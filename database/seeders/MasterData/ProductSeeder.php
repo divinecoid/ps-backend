@@ -35,7 +35,7 @@ class ProductSeeder extends Seeder
                         for ($i = 0; $i < $productsPerSpec; $i++) {
 
                             // Random type
-                            $types = ['DOZEN', 'PIECE'];
+                            $types = ['D', 'P'];
                             $type = $types[array_rand($types)];
 
                             // Random number
