@@ -15,7 +15,9 @@ class CheckerController extends Controller
         $perPage = (int) $request->input('per_page', 15);
 
         $orders = Order::query()
-            ->where('is_need_checker', 1)
+            ->whereHas('marketplace', function ($query) {
+                $query->where('is_need_checker', 1);
+            })
             ->where('is_approved', 0)
             ->with(['online_store', 'marketplace', 'checkedBy'])
             ->latest()
@@ -35,7 +37,9 @@ class CheckerController extends Controller
         $perPage = (int) $request->input('per_page', 15);
 
         $query = Order::query()
-            ->where('is_need_checker', 1)
+            ->whereHas('marketplace', function ($query) {
+                $query->where('is_need_checker', 1);
+            })
             ->where('is_approved', 0)
             ->with(['online_store', 'marketplace', 'checkedBy']);
 
@@ -66,7 +70,9 @@ class CheckerController extends Controller
     {
         $order = Order::query()
             ->whereRaw('LOWER(order_sn) = ?', [strtolower(trim($serial))])
-            ->where('is_need_checker', 1)
+            ->whereHas('marketplace', function ($query) {
+                $query->where('is_need_checker', 1);
+            })
             ->where('is_approved', 0)
             ->with(['online_store', 'marketplace', 'checkedBy'])
             ->first();
@@ -96,7 +102,9 @@ class CheckerController extends Controller
             ], 404);
         }
 
-        if ((int) $order->is_need_checker !== 1) {
+        $order->loadMissing('marketplace');
+
+        if (!$order->marketplace || (int) $order->marketplace->is_need_checker !== 1) {
             return response()->json([
                 'success' => false,
                 'message' => 'Order does not require checker',
@@ -209,7 +217,9 @@ class CheckerController extends Controller
     {
         $order = Order::query()
             ->where('id', $orderId)
-            ->where('is_need_checker', 1)
+            ->whereHas('marketplace', function ($query) {
+                $query->where('is_need_checker', 1);
+            })
             ->where('is_approved', 0)
             ->first();
 
@@ -261,7 +271,9 @@ class CheckerController extends Controller
 
         $order = Order::query()
             ->where('id', $request->input('order_id'))
-            ->where('is_need_checker', 1)
+            ->whereHas('marketplace', function ($query) {
+                $query->where('is_need_checker', 1);
+            })
             ->where('is_approved', 0)
             ->first();
 
