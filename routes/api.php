@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\LazadaController;
+use App\Http\Controllers\MasterData\SmallInventoryController;
 use App\Http\Controllers\Transaction\MutationController;
 use App\Http\Controllers\Transaction\RequestController;
 use App\Http\Controllers\Transaction\InboundController;
@@ -23,6 +25,9 @@ use App\Http\Controllers\MasterData\WarehouseController;
 use App\Http\Controllers\MasterData\ConfigurationController;
 use App\Http\Controllers\Transaction\OrderController;
 use App\Http\Controllers\Api\ShopeeController;
+use App\Http\Controllers\Transaction\CheckerController;
+use Illuminate\Http\JsonResponse;
+use App\Http\Controllers\Api\MarketplaceAuthController;
 
 //Auth
 Route::prefix('auth')->group(function () {
@@ -32,6 +37,11 @@ Route::prefix('auth')->group(function () {
 });
 
 Route::middleware('checkrole:admin')->post('/register', RegisterController::class);
+
+// Marketplace Generic Auth
+Route::prefix('marketplace-auth')->middleware('checkrole:admin')->group(function () {
+    Route::post('/refresh-token', [MarketplaceAuthController::class, 'refreshToken']);
+});
 
 
 //MasterData
@@ -146,6 +156,11 @@ Route::prefix('cmt')->middleware('checkrole:admin')->group(function () {
     Route::delete('{id}', [CMTController::class, 'destroy']);
 });
 //Inventory
+Route::prefix('small-inventory')->middleware('checkrole:admin')->group(function () {
+    Route::get('/', [SmallInventoryController::class, 'index']);
+    Route::get('/master', [SmallInventoryController::class, 'master']);
+    Route::get('{id}', [SmallInventoryController::class, 'show']);
+});
 Route::prefix('inventory')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [InventoryController::class, 'index']);
     Route::get('/master', [InventoryController::class, 'master']);
@@ -216,7 +231,15 @@ Route::prefix('shopee')->middleware('checkrole:admin')->group(function () {
     Route::post('/ship-order', [ShopeeController::class, 'shipOrder']);
     Route::post('/create-shipping-document', [ShopeeController::class, 'createShippingDocument']);
     Route::post('/download-shipping-document', [ShopeeController::class, 'downloadShippingDocument']);
+    Route::get('/sync-shipping-logistics', [ShopeeController::class, 'syncShippingLogistics']);
     Route::get('/redirect/{id}', [ShopeeController::class, 'redirectToShopee']);
+});
+
+Route::prefix('lazada')->middleware('checkrole:admin')->group(function() {
+    Route::get('/get-order/{id}', [LazadaController::class, 'getOrderList']);
+    Route::get('/get-order/{id}/{orderId}', [LazadaController::class, 'getOrder']);
+    Route::get('/get-order/{id}/{orderId}/pickup', [LazadaController::class, 'pickupOrder']);
+    Route::get('/get-order/{id}/{orderId}/download', [LazadaController::class, 'getReceipt']);
 });
 
 Route::get('shopee/callback', [ShopeeController::class, 'handleCallback']);
@@ -265,3 +288,11 @@ Route::prefix('configuration')->middleware('checkrole:admin')->group(function ()
     Route::delete('{id}', [ConfigurationController::class, 'destroy']);
 });
 
+Route::prefix('checker')->middleware('checkrole:admin')->group(function () {
+    Route::get('/assigned-orders', [CheckerController::class, 'assignedOrders']);
+    Route::get('/search', [CheckerController::class, 'searchOrders']);
+    Route::get('/search-by-serial/{serial}', [CheckerController::class, 'getOrderBySerial']);
+    Route::get('/order-items/{orderId}', [CheckerController::class, 'getOrderItems']);
+    Route::post('/validate-product-barcode', [CheckerController::class, 'validateProductBarcode']);
+    Route::patch('/approve-order/{id}', [CheckerController::class, 'approveOrder']);
+});

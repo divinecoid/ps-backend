@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 trait ApiFilterTrait
 {
-    public function applyFilter($query, $request, $searchFields = [])
+    public function applyFilter($query, $request, $searchFields = [], ?array $defaultSort = null)
     {
 
         foreach ($searchFields as $field) {
@@ -64,10 +64,14 @@ trait ApiFilterTrait
                     }
                 }
             }
-        } else {
-            $sortBy = $request->input('sort_by', 'id');
+        } elseif ($request->filled('sort_by')) {
+            $sortBy = $request->input('sort_by');
             $order = $request->input('order', 'asc');
             $query->orderBy($sortBy, $order);
+        } elseif ($defaultSort) {
+            foreach ($defaultSort as $column => $direction) {
+                $query->orderBy($column, $direction);
+            }
         }
         return $query;
     }

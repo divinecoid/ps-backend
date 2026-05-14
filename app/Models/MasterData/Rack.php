@@ -36,4 +36,9 @@ class Rack extends Model
     {
         return $this->hasMany(Inventory::class, 'rack_id');
     }
+
+    public function product()
+    {
+        return $this->hasMany(Product::class, 'rack_id');
+    }
 }

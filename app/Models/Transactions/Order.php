@@ -44,6 +44,9 @@ class Order extends Model
 
     protected $casts = [
         'status' => \App\Enums\OrderStatus::class,
+        'read_at' => 'datetime',
+        'prepared_at' => 'datetime',
+        'readytoship_at' => 'datetime',
     ];
 
     // Define relationship with Order Item model

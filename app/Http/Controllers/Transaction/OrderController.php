@@ -20,10 +20,10 @@ class OrderController extends Controller
             'id' => $data->id,
             'order_sn' => $data->order_sn,
             'awb_code' => $data->awb_code,
-            'read_at' => $data->read_at,
-            'prepared_at' => $data->prepared_at,
+            'read_at' => $data->read_at?->utc()->toISOString(),
+            'prepared_at' => $data->prepared_at?->utc()->toISOString(),
             'prepare_duration' => $data->prepare_duration,
-            'readytoship_at' => $data->readytoship_at,
+            'readytoship_at' => $data->readytoship_at?->utc()->toISOString(),
             'readytoship_marketplace' => $data->readytoship_marketplace,
             'online_store_id' => $data->online_store_id,
             'online_store' => $data->online_store,
@@ -50,13 +50,10 @@ class OrderController extends Controller
             $request,
             Order::class,
             [],
-            ["marketplace_id", "awb_code", "status", "online_store_id"],
+            ["marketplace_id", "order_sn", "awb_code", "status", "online_store_id"],
             $this->structure(),
-            // function ($query) use ($request) {
-            //     if ($request->filled('marketplace_id')) {
-            //         $query->where('marketplace_id', $request->marketplace_id);
-            //     }
-            // }
+            null,
+            ['read_at' => 'desc']
         );
     }
 

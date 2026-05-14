@@ -187,10 +187,10 @@ class FetchShopeeOrders extends Command
             // Get Shopee marketplace ID
             $shopeeMarketplace = Marketplace::where('code', 'shopee')->first();
 
+            // Prepare order data
             $orderData = [
                 'online_store_id' => $store->id,
                 'status' => $status,
-                'awb_code' => null, // Empty for now as requested
                 'total_price' => $detail['goods_to_declare'] ?? 0,
                 'total_shipping' => $detail['estimated_shipping_fee'] ?? 0,
                 'total_amount' => $detail['total_amount'] ?? 0,
@@ -203,10 +203,35 @@ class FetchShopeeOrders extends Command
                 'marketplace_id' => $shopeeMarketplace?->id,
             ];
 
-            $order = Order::updateOrCreate(
-                ['order_sn' => $detail['order_sn']],
-                $orderData
-            );
+            // Find existing order by order_sn
+            $order = Order::where('order_sn', $detail['order_sn'])->first();
+
+            if ($order) {
+                // Jika order sudah ada, HANYA UPDATE STATUS.
+                // Jangan timpa data lain seperti customer_address, awb_code, dll yang mungkin sudah diubah manual/sistem lain.
+                $order->update([
+                    'status' => $status,
+                    'read_at' => now(), // Update waktu terakhir ditarik
+                ]);
+
+                // Update AWB HANYA jika di database masih kosong DAN Shopee punya data barunya
+                if (empty($order->awb_code) && !empty($detail['tracking_number'])) {
+                    $order->update(['awb_code' => $detail['tracking_number']]);
+                }
+
+                $this->info("   Updating Order Status only: " . $detail['order_sn'] . " -> " . $detail['order_status']);
+            } else {
+                // Jika order belum ada (baru), buat data lengkap
+                $orderData['order_sn'] = $detail['order_sn'];
+                
+                // Tambahkan AWB jika ada dari Shopee
+                if (!empty($detail['tracking_number'])) {
+                    $orderData['awb_code'] = $detail['tracking_number'];
+                }
+
+                $order = Order::create($orderData);
+                $this->info("   Creating New Order: " . $detail['order_sn']);
+            }
 
             if (isset($detail['item_list'])) {
                 foreach ($detail['item_list'] as $itemData) {

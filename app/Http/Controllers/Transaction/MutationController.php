@@ -165,6 +165,7 @@ class MutationController extends Controller
                                         Product::create([
                                             'rack_id' => $item['rack_id'],
                                             'model_id' => $rd->model_id,
+                                            'series' => $series,
                                             'barcode' => $barcode
                                         ]);
                                         InventoryDetail::where('series', $series)

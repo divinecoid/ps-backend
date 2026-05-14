@@ -7,10 +7,10 @@ use App\Models\Transactions\Order;
 use App\Enums\OrderStatus;
 use App\Services\ShopeeService;
 use App\Models\MasterData\OnlineStore;
+use App\Models\MasterData\ShippingLogistic;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
 
 class ShopeeController extends Controller
 {
@@ -19,6 +19,65 @@ class ShopeeController extends Controller
     public function __construct(ShopeeService $shopeeService)
     {
         $this->shopeeService = $shopeeService;
+    }
+
+    /**
+     * Sync Shipping Logistics from Shopee API
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function syncShippingLogistics(Request $request)
+    {
+        $request->validate([
+            'online_store_id' => 'required|exists:mdx_online_stores,id',
+        ]);
+
+        try {
+            $store = OnlineStore::findOrFail($request->online_store_id);
+            $this->shopeeService->setStore($store);
+
+            $response = $this->shopeeService->getChannelList();
+            
+            if (isset($response['error']) && !empty($response['error'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Shopee API Error: ' . ($response['message'] ?? $response['error']),
+                    'shopee_response' => $response
+                ], 400);
+            }
+
+            $logisticsList = $response['response']['logistics_channel_list'] ?? [];
+            $count = 0;
+
+            foreach ($logisticsList as $item) {
+                ShippingLogistic::updateOrCreate(
+                    [
+                        'marketplace_id' => $store->marketplace_id,
+                        'logistic_id' => (string)$item['logistics_channel_id']
+                    ],
+                    [
+                        'logistic_name' => $item['logistics_channel_name'],
+                        'logistic_type' => $item['preferred_delivery_time'] ?? null, // Or any other field you prefer
+                        'is_active' => $item['enabled'] ?? true
+                    ]
+                );
+                $count++;
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "Successfully synced {$count} shipping logistics for store: {$store->store_name}",
+                'data' => $logisticsList
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Shopee syncShippingLogistics failed', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function redirectToShopee($id)
@@ -182,10 +241,7 @@ class ShopeeController extends Controller
             }
 
             $data = $this->shopeeService->getShippingParameter($request->order_sn);
-            return response()->json([
-                'success' => true,
-                'data' => $data
-            ]);
+            return $data;
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -423,6 +479,7 @@ class ShopeeController extends Controller
 
             // Return as downloadable PDF
             return response($fileContent)
+                ->header('Access-Control-Expose-Headers', 'Content-Disposition')
                 ->header('Content-Type', 'application/pdf')
                 ->header('Content-Disposition', 'attachment; filename="shipping_document_' . $request->order_sn . '.pdf"');
 
