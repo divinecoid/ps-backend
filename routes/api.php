@@ -25,6 +25,7 @@ use App\Http\Controllers\MasterData\WarehouseController;
 use App\Http\Controllers\MasterData\ConfigurationController;
 use App\Http\Controllers\Transaction\OrderController;
 use App\Http\Controllers\Api\ShopeeController;
+use App\Http\Controllers\Api\TiktokShopController;
 use App\Http\Controllers\Transaction\CheckerController;
 use Illuminate\Http\JsonResponse;
 use App\Http\Controllers\Api\MarketplaceAuthController;
@@ -43,6 +44,12 @@ Route::prefix('marketplace-auth')->middleware('checkrole:admin')->group(function
     Route::post('/refresh-token', [MarketplaceAuthController::class, 'refreshToken']);
 });
 
+Route::prefix('tiktok-shop')->middleware('checkrole:admin')->group(function () {
+    Route::get('/get-shop-cipher', [TiktokShopController::class, 'getShopCipher']);
+    Route::get('/get-product/{productId}', [TiktokShopController::class, 'getProduct']);
+    Route::get('/get-order-list', [TiktokShopController::class, 'getOrderList']);
+    Route::get('/get-order/{orderId}', [TiktokShopController::class, 'getOrder']);
+});
 
 //MasterData
 //Role
