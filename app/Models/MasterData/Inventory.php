@@ -19,7 +19,8 @@ class Inventory extends Model
     protected $fillable = [
         'model_id',
         'color_id',
-        'size_id'
+        'size_id',
+        'rack_id'
     ];
 
     public function model()
@@ -37,6 +38,10 @@ class Inventory extends Model
         return $this->belongsTo(Size::class, 'size_id');
     }
 
+    public function rack()
+    {
+        return $this->belongsTo(Rack::class, 'rack_id');
+    }
 
     public function detail()
     {

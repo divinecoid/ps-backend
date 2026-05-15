@@ -38,7 +38,7 @@ class Rack extends Model
     }
 
     // Define relationship with Inventory model
-    public function inventory()
+    public function inventories()
     {
         return $this->hasMany(Inventory::class, 'rack_id');
     }
