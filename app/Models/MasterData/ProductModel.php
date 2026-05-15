@@ -33,4 +33,10 @@ class ProductModel extends Model
     {
         return $this->belongsToMany(Size::class, 'models_sizes', 'model_id', 'size_id');
     }
+
+    // Define relationship with Rack model (1 model -> many racks)
+    public function racks()
+    {
+        return $this->hasMany(Rack::class, 'model_id');
+    }
 }

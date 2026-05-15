@@ -17,12 +17,18 @@ class Rack extends Model
     public $incrementing = false;
     protected $keyType = 'string';
 
-    protected $fillable = ['code', 'name', 'warehouse_id'];
+    protected $fillable = ['code', 'name', 'warehouse_id', 'model_id'];
 
     // Define relationship with Warehouse model
     public function warehouse()
     {
         return $this->belongsTo(Warehouse::class, 'warehouse_id');
+    }
+
+    // Define relationship with ProductModel (many racks -> 1 model)
+    public function model()
+    {
+        return $this->belongsTo(ProductModel::class, 'model_id');
     }
 
     // Define relationship with Scanned Item model
