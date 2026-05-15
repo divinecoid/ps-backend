@@ -22,15 +22,27 @@ class SmallInventoryController extends Controller
             'warehouse' => (object) [
                 'name' => $data->warehouse->name
             ],
-            'products' => $data->product?->map(fn($product) => [
-                'id' => $product->id,
-                'model_id' => $product->model_id,
-                'model' => (object) [
-                    'name' => $product->model?->name
-                ],
-                'barcode' => $product->barcode,
-                'series' => $product->series
-            ])
+            'products' => $data->product?->groupBy('series')->map(function ($items, $series) {
+                return [
+                    'series' => $series,
+                    'count' => $items->count(),
+                    'items' => $items->map(fn($product) => [
+                        'id' => $product->id,
+                        'model_id' => $product->model_id,
+                        'model' => (object) [
+                            'name' => $product->model?->name
+                        ],
+                        'color' => (object) [
+                            'name' => $product->model?->color?->name
+                        ],
+                        'size' => (object) [
+                            'name' => $product->model?->size?->name
+                        ],
+                        'barcode' => $product->barcode,
+                        'series' => $product->series
+                    ])->values()
+                ];
+            })->values()
         ];
     }
 
@@ -53,7 +65,7 @@ class SmallInventoryController extends Controller
         return $this->baseIndex(
             $request,
             Rack::class,
-            ['product', 'product.model'],
+            ['product'],
             ['id', 'code', 'name'],
             $this->overviewStructure(),
             function (Builder $query) {
@@ -67,7 +79,7 @@ class SmallInventoryController extends Controller
         return $this->baseMaster(
             $request,
             Rack::class,
-            ['product', 'product.model'],
+            ['product'],
             ['id', 'code', 'name'],
             $this->overviewStructure(),
             function (Builder $query) {
@@ -80,7 +92,7 @@ class SmallInventoryController extends Controller
         return $this->baseShow(
             Rack::class,
             $id,
-            ['product', 'product.model'],
+            ['product', 'product.model', 'product.model.colors', 'product.model.sizes'],
             $this->detailStructure()
         );
     }

@@ -165,6 +165,8 @@ class MutationController extends Controller
                                         Product::create([
                                             'rack_id' => $item['rack_id'],
                                             'model_id' => $rd->model_id,
+                                            'color_id' => $rd->color_id,
+                                            'size_id' => $rd->size_id,
                                             'series' => $series,
                                             'barcode' => $barcode
                                         ]);
