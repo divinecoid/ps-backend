@@ -164,12 +164,12 @@ class FetchShopeeOrders extends Command
                 'UNPAID' => null, // Skip per user request
                 'READY_TO_SHIP' => OrderStatus::READY_TO_SHIP,
                 'RETRY_SHIP' => OrderStatus::RETRY_SHIP,
-                'PROCESSED' => OrderStatus::READY_TO_PICKUP,
+                'PROCESSED' => OrderStatus::WAIT_COURIER,
                 'SHIPPED' => OrderStatus::SHIPPED,
                 'TO_CONFIRM_RECEIVE' => OrderStatus::SHIPPED,
-                'COMPLETED' => OrderStatus::SHIPPED,
+                'COMPLETED' => OrderStatus::COMPLETED,
                 'CANCELLED' => OrderStatus::CANCELLED,
-                'TO_RETURN' => OrderStatus::CANCELLED,
+                'TO_RETURN' => OrderStatus::RETURNED,
             ];
 
             $status = $statusMap[$detail['order_status']] ?? null;

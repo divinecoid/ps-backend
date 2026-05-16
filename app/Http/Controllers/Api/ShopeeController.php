@@ -315,7 +315,7 @@ class ShopeeController extends Controller
                 
                 Log::info("Attempting to update order status to READY_TO_PICKUP for order: " . $request->order_sn);
 
-                // Try to fetch AWB
+                // Try to fetch AWB + logistics channel mapping
                 $detailResponse = $this->shopeeService->getOrderDetail([$request->order_sn]);
                 $detail = $detailResponse['response']['order_list'][0] ?? null;
                 
@@ -326,6 +326,20 @@ class ShopeeController extends Controller
                     }
                     if (isset($detail['order_status'])) {
                         $updateData['readytoship_marketplace'] = $detail['order_status'];
+                    }
+
+                    // Map logistics_channel_id from package_list to local ShippingLogistic
+                    $logisticsChannelId = $detail['package_list'][0]['logistics_channel_id'] ?? null;
+                    if ($logisticsChannelId) {
+                        $logistic = \App\Models\MasterData\ShippingLogistic::where('marketplace_id', $order->marketplace_id)
+                            ->where('logistic_id', (string) $logisticsChannelId)
+                            ->first();
+                        if ($logistic) {
+                            $updateData['shipping_logistic_id'] = $logistic->id;
+                            Log::info("Mapped logistics_channel_id {$logisticsChannelId} to ShippingLogistic: {$logistic->logistic_name}");
+                        } else {
+                            Log::warning("No local ShippingLogistic found for logistics_channel_id: {$logisticsChannelId} (marketplace: {$order->marketplace_id})");
+                        }
                     }
                 }
 
