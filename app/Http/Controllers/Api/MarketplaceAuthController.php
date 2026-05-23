@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\MasterData\OnlineStore;
+use App\Services\LazadaService;
 use App\Services\ShopeeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -11,9 +12,9 @@ use Illuminate\Support\Facades\Log;
 class MarketplaceAuthController extends Controller
 {
     protected ShopeeService $shopeeService;
-    protected LazadaController $lazadaService;
+    protected LazadaService $lazadaService;
 
-    public function __construct(ShopeeService $shopeeService, LazadaController $lazadaService)
+    public function __construct(ShopeeService $shopeeService, LazadaService $lazadaService)
     {
         $this->shopeeService = $shopeeService;
         $this->lazadaService = $lazadaService;
@@ -47,7 +48,7 @@ class MarketplaceAuthController extends Controller
                     ]);
 
                 case 'lazada':
-                    $result = $this->lazadaService->refreshToken($request->online_store_id);
+                    $result = $this->lazadaService->setStore($store)->refreshToken();
 
                     return response()->json([
                         'success' => true,
