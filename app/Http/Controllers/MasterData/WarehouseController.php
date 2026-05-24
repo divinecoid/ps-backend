@@ -18,7 +18,8 @@ class WarehouseController extends Controller
             'id' => $data->id,
             'code' => $data->code,
             'name' => $data->name,
-            'priority' => $data->priority
+            'priority' => $data->priority,
+            'type' => $data->type
         ];
     }
 
@@ -62,6 +63,7 @@ class WarehouseController extends Controller
                 'code' => 'required|string|unique:mdx_warehouses,code|max:255',
                 'name' => 'required|string|max:255',
                 'priority' => 'required|integer',
+                'type' => 'nullable|string|in:BIG,SMALL',
             ],
             null
         );
@@ -82,6 +84,7 @@ class WarehouseController extends Controller
                 ],
                 'name' => 'required|string|max:255',
                 'priority' => 'required|integer',
+                'type' => 'nullable|string|in:BIG,SMALL',
             ],
             null
         );
