@@ -30,13 +30,13 @@ class SmallInventoryController extends Controller
                         'id' => $product->id,
                         'model_id' => $product->model_id,
                         'model' => (object) [
-                            'name' => $product->model?->name
+                            'name' => $product->model->name
                         ],
                         'color' => (object) [
-                            'name' => $product->model?->color?->name
+                            'name' => $product->color->name
                         ],
                         'size' => (object) [
-                            'name' => $product->model?->size?->name
+                            'name' => $product->size->name
                         ],
                         'barcode' => $product->barcode,
                         'series' => $product->series
@@ -92,7 +92,7 @@ class SmallInventoryController extends Controller
         return $this->baseShow(
             Rack::class,
             $id,
-            ['product', 'product.model', 'product.model.colors', 'product.model.sizes'],
+            ['product', 'product.model', 'product.color', 'product.size'],
             $this->detailStructure()
         );
     }

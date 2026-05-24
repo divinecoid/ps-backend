@@ -3,82 +3,32 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Traits\ApiFilterTrait;
-use App\Http\Traits\CrudTrait;
-use App\Models\MasterData\Marketplace;
 use App\Models\MasterData\OnlineStore;
-use LazopClient;
-use LazopRequest;
+use App\Services\LazadaService;
 
 class LazadaController extends Controller
 {
-
-    /**
-     * $id = online store id
-     */
-    use CrudTrait, ApiFilterTrait;
-
-    private function getClient($onlinestore)
+    public function refreshToken($id, LazadaService $lazada)
     {
-        $marketplace = Marketplace::find($onlinestore->marketplace_id);
-        return new LazopClient($marketplace->base_api_url, $onlinestore->api_key, $onlinestore->client_secret);
+        $store = OnlineStore::findOrFail($id);
+        return $lazada->setStore($store)->refreshToken();
     }
 
-    public function refreshToken($id)
+    public function getOrderList($id, LazadaService $lazada)
     {
-        $onlinestore = OnlineStore::with('marketplace')->find($id);
-        $c = $this->getClient($onlinestore);
-        $request = new LazopRequest('/auth/token/refresh');
-        $request->addApiParam('refresh_token', $onlinestore->refresh_token);
-        $result = json_decode($c->execute($request, $onlinestore->access_token));
-
-        $onlinestore->update([
-            'access_token' => $result->access_token,
-            'refresh_token' => $result->refresh_token,
-            'access_token_expires_at' => now()->addSeconds($result->expires_in),
-            'refresh_token_expires_at' => now()->addSeconds($result->refresh_expires_in),
-        ]);
-
-        return $result;
+        $store = OnlineStore::findOrFail($id);
+        return $lazada->setStore($store)->getOrderList(now()->subDay(), now());
     }
 
-    public function getOrderList($id)
+    public function getOrder($id, $orderId, LazadaService $lazada)
     {
-        $onlinestore = OnlineStore::with('marketplace')->find($id);
-        $c = $this->getClient($onlinestore);
-
-        $request = new LazopRequest('/orders/get', 'GET');
-        $request->addApiParam('status', 'shipped');
-        return json_decode($c->execute($request, $onlinestore->access_token));
+        $store = OnlineStore::findOrFail($id);
+        return $lazada->setStore($store)->getOrder($orderId);
     }
 
-    public function getOrder($id, $orderId)
+    public function getReceipt($id, $orderItemId, LazadaService $lazada)
     {
-        $onlinestore = OnlineStore::with('marketplace')->find($id);
-        $c = $this->getClient($onlinestore);
-
-        $request = new LazopRequest('/order/get', 'GET');
-        $request->addApiParam('order_id', $orderId);
-        return json_decode($c->execute($request, $onlinestore->access_token));
-
+        $store = OnlineStore::findOrFail($id);
+        return $lazada->setStore($store)->getReceipt($orderItemId);
     }
-
-    public function pickupOrder($id, $orderId)
-    {
-        $onlinestore = OnlineStore::with('marketplace')->find($id);
-        $c = $this->getClient($onlinestore);
-
-    }
-
-    public function getReceipt($id, $orderId)
-    {
-        $onlinestore = OnlineStore::with('marketplace')->find($id);
-        $c = $this->getClient($onlinestore);
-
-        $request = new LazopRequest('/order/document/get', 'GET');
-        $request->addApiParam('doc_type', 'shippingLabel');
-        $request->addApiParam('order_item_ids', json_encode([$orderId]));
-        return json_decode($c->execute($request, $onlinestore->access_token));
-    }
-
 }
