@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\LazadaController;
+use App\Http\Controllers\MasterData\ClothController;
+use App\Http\Controllers\MasterData\RollSizeController;
 use App\Http\Controllers\MasterData\SmallInventoryController;
 use App\Http\Controllers\Transaction\MutationController;
 use App\Http\Controllers\Transaction\RequestController;
@@ -194,6 +196,27 @@ Route::prefix('warehouse')->middleware('checkrole:admin')->group(function () {
     Route::patch('{id}', [WarehouseController::class, 'update']);
     Route::delete('/', [WarehouseController::class, 'multiDestroy']);
     Route::delete('{id}', [WarehouseController::class, 'destroy']);
+});
+//Roll size
+Route::prefix('roll-size')->middleware('checkrole:admin')->group(function () {
+    Route::get('/', [RollSizeController::class, 'index']);
+    Route::get('/master', [RollSizeController::class, 'master']);
+    Route::get('{id}', [RollSizeController::class, 'show']);
+    Route::post('/', [RollSizeController::class, 'store']);
+    Route::post('{id}/restore', [RollSizeController::class, 'restore']);
+    Route::patch('{id}', [RollSizeController::class, 'update']);
+    Route::delete('/', [RollSizeController::class, 'multiDestroy']);
+    Route::delete('{id}', [RollSizeController::class, 'destroy']);
+});
+Route::prefix('cloth')->middleware('checkrole:admin')->group(function () {
+    Route::get('/', [ClothController::class, 'index']);
+    Route::get('/master', [ClothController::class, 'master']);
+    Route::get('{id}', [ClothController::class, 'show']);
+    Route::post('/', [ClothController::class, 'store']);
+    Route::post('{id}/restore', [ClothController::class, 'restore']);
+    Route::patch('{id}', [ClothController::class, 'update']);
+    Route::delete('/', [ClothController::class, 'multiDestroy']);
+    Route::delete('{id}', [ClothController::class, 'destroy']);
 });
 
 
