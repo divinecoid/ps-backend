@@ -20,8 +20,16 @@ class RackController extends Controller
             'name' => $data->name,
             'warehouse_id' => $data->warehouse_id,
             'warehouse' => (object) [
-                'name' => $data->warehouse->name
-            ]
+                'name' => $data->warehouse?->name
+            ],
+            'model_id' => $data->model_id,
+            'model' => $data->model ? (object) [
+                'name' => $data->model->name
+            ] : null,
+            'color_id' => $data->color_id,
+            'color' => $data->color ? (object) [
+                'name' => $data->color->name
+            ] : null,
         ];
     }
 
@@ -30,8 +38,8 @@ class RackController extends Controller
         return $this->baseIndex(
             $request,
             Rack::class,
-            [],
-            ['id', 'code', 'name'],
+            ['warehouse', 'model', 'color'],
+            ['id', 'code', 'name', 'warehouse.name', 'model.name', 'color.name'],
             $this->structure()
         );
     }
@@ -41,8 +49,8 @@ class RackController extends Controller
         return $this->baseMaster(
             $request,
             Rack::class,
-            [],
-            ['code', 'name'],
+            ['warehouse', 'model', 'color'],
+            ['code', 'name', 'warehouse.name', 'model.name', 'color.name'],
             $this->structure()
         );
     }
@@ -52,7 +60,7 @@ class RackController extends Controller
         return $this->baseShow(
             Rack::class,
             $id,
-            [],
+            ['warehouse', 'model', 'color'],
             $this->structure()
         );
     }
@@ -68,6 +76,14 @@ class RackController extends Controller
                 'warehouse_id' => [
                     'required',
                     Rule::exists('mdx_warehouses', 'id')->whereNull('deleted_at'),
+                ],
+                'model_id' => [
+                    'nullable',
+                    Rule::exists('mdx_models', 'id')->whereNull('deleted_at'),
+                ],
+                'color_id' => [
+                    'nullable',
+                    Rule::exists('mdx_colors', 'id')->whereNull('deleted_at'),
                 ],
             ],
             null
@@ -91,6 +107,14 @@ class RackController extends Controller
                 'warehouse_id' => [
                     'required',
                     Rule::exists('mdx_warehouses', 'id')->whereNull('deleted_at'),
+                ],
+                'model_id' => [
+                    'nullable',
+                    Rule::exists('mdx_models', 'id')->whereNull('deleted_at'),
+                ],
+                'color_id' => [
+                    'nullable',
+                    Rule::exists('mdx_colors', 'id')->whereNull('deleted_at'),
                 ],
             ],
             null

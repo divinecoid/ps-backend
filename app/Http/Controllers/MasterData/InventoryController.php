@@ -28,6 +28,11 @@ class InventoryController extends Controller
             'size' => (object) [
                 'name' => $data->size->name
             ],
+            'rack_id' => $data->rack_id,
+            'rack' => $data->rack ? (object) [
+                'code' => $data->rack->code,
+                'name' => $data->rack->name
+            ] : null,
             'detail' => $data->detail->map(fn($d) => [
                 'series' => $d->series,
                 'quantity' => $d->quantity,
@@ -41,8 +46,8 @@ class InventoryController extends Controller
         return $this->baseIndex(
             $request,
             Inventory::class,
-            ['model', 'color', 'size'],
-            ['model_id', 'model.name', 'color_id', 'color.name', 'size_id', 'size.name'],
+            ['model', 'color', 'size', 'rack'],
+            ['model_id', 'model.name', 'color_id', 'color.name', 'size_id', 'size.name', 'rack_id', 'rack.code', 'rack.name'],
             $this->structure(),
             function (Builder $query) {
                 $query->withSum('detail', 'quantity');
@@ -55,8 +60,8 @@ class InventoryController extends Controller
         return $this->baseMaster(
             $request,
             Inventory::class,
-            ['model', 'color', 'size'],
-            ['model_id', 'model.name', 'color_id', 'color.name', 'size_id', 'size.name'],
+            ['model', 'color', 'size', 'rack'],
+            ['model_id', 'model.name', 'color_id', 'color.name', 'size_id', 'size.name', 'rack_id', 'rack.code', 'rack.name'],
             $this->structure(),
             function (Builder $query) {
                 $query->withSum('detail', 'quantity');
@@ -69,7 +74,7 @@ class InventoryController extends Controller
         return $this->baseShow(
             Inventory::class,
             $id,
-            ['model', 'color', 'size'],
+            ['model', 'color', 'size', 'rack'],
             $this->structure()
         );
     }
