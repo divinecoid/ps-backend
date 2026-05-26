@@ -16,7 +16,7 @@ class Warehouse extends Model
     public $incrementing = false;
     protected $keyType = 'string';
 
-    protected $fillable = ['code', 'name', 'priority'];
+    protected $fillable = ['code', 'name', 'priority', 'type'];
 
     // Define relationship with Rack model
     public function rack()

@@ -66,6 +66,9 @@ class ProductSeeder extends Seeder
                                 'model_id' => $model->id,
                                 'rack_id' => $rack->id,
                                 'barcode' => $barcode,
+                                'series' => $timestamp,
+                                'color_id' => $color->id,
+                                'size_id' => $size->id,
                                 'created_at' => now(),
                                 'updated_at' => now(),
                             ];

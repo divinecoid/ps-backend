@@ -19,6 +19,14 @@ class RoleMiddleware
         try {
             $user = JWTAuth::parseToken()->authenticate();
 
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found',
+                    'data' => null
+                ], 401);
+            }
+
             if ($roles) {
                 $roleArray = explode(',', $roles);
                 $hasRole = false;
