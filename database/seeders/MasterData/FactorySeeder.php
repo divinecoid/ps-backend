@@ -2,14 +2,14 @@
 
 namespace Database\Seeders\MasterData;
 
-use App\Models\MasterData\CMT;
+use App\Models\MasterData\Factory;
 use Illuminate\Database\Seeder;
 
 class FactorySeeder extends Seeder
 {
     public function run(): void
     {
-        $cmts = [
+        $factories = [
             [
                 'code' => 'FCT1',
                 'name' => 'Pabrik 1',
@@ -20,8 +20,8 @@ class FactorySeeder extends Seeder
             ],
         ];
 
-        foreach ($cmts as $cmt) {
-            CMT::create($cmt);
+        foreach ($factories as $factory) {
+            Factory::create($factory);
         }
     }
 }

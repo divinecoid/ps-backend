@@ -9,6 +9,9 @@ use Database\Seeders\MasterData\SizeSeeder;
 use Database\Seeders\MasterData\UserSeeder;
 use Database\Seeders\MasterData\WarehouseRackSeeder;
 use Database\Seeders\MasterData\ConfigurationSeeder;
+use Database\Seeders\MasterData\ProductModelSeeder;
+use Database\Seeders\MasterData\FactorySeeder;
+use Database\Seeders\MasterData\ProductSeeder;
 use Database\Seeders\ShopeeSeeder;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -18,8 +21,8 @@ class DatabaseSeeder extends Seeder
     use WithoutModelEvents;
 
     /**
-     * Seed the application's database.
-     */
+      * Seed the application's database.
+      */
     public function run(): void
     {
         $this->call([
@@ -31,6 +34,9 @@ class DatabaseSeeder extends Seeder
             WarehouseRackSeeder::class,
             ShopeeSeeder::class,
             ConfigurationSeeder::class,
+            ProductModelSeeder::class,
+            FactorySeeder::class,
+            ProductSeeder::class,
         ]);
     }
 }

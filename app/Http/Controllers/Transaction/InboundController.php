@@ -411,6 +411,32 @@ class InboundController extends Controller
                 $model = $requestDetail->model;
                 $color = $requestDetail->color;
                 $size = $requestDetail->size;
+
+                $recommendedRack = null;
+                if ($group === 'P') {
+                    $modelId = $requestDetail->model_id;
+                    $colorId = $requestDetail->color_id;
+
+                    $recommendedRack = \App\Models\MasterData\Rack::with('warehouse')
+                        ->where('model_id', $modelId)
+                        ->where('color_id', $colorId)
+                        ->first();
+
+                    if (!$recommendedRack) {
+                        $recommendedRack = \App\Models\MasterData\Rack::with('warehouse')
+                            ->where('model_id', $modelId)
+                            ->whereNull('color_id')
+                            ->first();
+                    }
+
+                    if (!$recommendedRack) {
+                        $recommendedRack = \App\Models\MasterData\Rack::with('warehouse')
+                            ->whereNull('model_id')
+                            ->whereNull('color_id')
+                            ->first();
+                    }
+                }
+
                 return $this->successResponse([
                     'cmt' => (object) [
                         'code' => $cmt->code,
@@ -431,7 +457,16 @@ class InboundController extends Controller
                         'code' => $size->code,
                         'name' => $size->name,
                     ],
-                    'is_dozen' => $group === 'D' ? true : false
+                    'is_dozen' => $group === 'D' ? true : false,
+                    'rack' => $recommendedRack ? (object) [
+                        'id' => $recommendedRack->id,
+                        'code' => $recommendedRack->code,
+                        'name' => $recommendedRack->name,
+                        'warehouse' => (object) [
+                            'id' => $recommendedRack->warehouse->id,
+                            'name' => $recommendedRack->warehouse->name
+                        ]
+                    ] : null,
                 ]);
             }
         );
