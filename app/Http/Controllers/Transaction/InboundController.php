@@ -109,7 +109,7 @@ class InboundController extends Controller
         return $this->baseValidate(
             $request,
             [
-                'warehouse_id' => ['required_if:barcodes_dozen,!=,null', Rule::exists('mdx_warehouses', 'id')->whereNull('deleted_at')],
+                'warehouse_id' => ['nullable', Rule::exists('mdx_warehouses', 'id')->whereNull('deleted_at')],
                 'barcodes_dozen' => 'required_without_all:barcodes_piece,barcodes_rejected|array|min:1',
                 'barcodes_dozen.*' => 'required|string|distinct',
                 'barcodes_piece' => 'required_without_all:barcodes_dozen,barcodes_rejected|array|min:1',
@@ -253,6 +253,43 @@ class InboundController extends Controller
                             $groupedReceivedLogs = [];
                             $requestsToComplete = [];
 
+                            $warehouseId = $data['warehouse_id'] ?? null;
+                            if (!$warehouseId) {
+                                if (count($barcodesDozen) > 0) {
+                                    ['prefix' => $prefix] = $this->parseBarcode($barcodesDozen[0]);
+                                    if ($rd = $this->findRequestDetail($prefix)) {
+                                        $recRack = \App\Models\MasterData\Rack::whereHas('warehouse', function ($q) {
+                                                $q->where('type', 'BIG');
+                                            })
+                                            ->where('model_id', $rd->model_id)
+                                            ->where('color_id', $rd->color_id)
+                                            ->first();
+                                        if (!$recRack) {
+                                            $recRack = \App\Models\MasterData\Rack::whereHas('warehouse', function ($q) {
+                                                    $q->where('type', 'BIG');
+                                                })
+                                                ->where('model_id', $rd->model_id)
+                                                ->whereNull('color_id')
+                                                ->first();
+                                        }
+                                        if (!$recRack) {
+                                            $recRack = \App\Models\MasterData\Rack::whereHas('warehouse', function ($q) {
+                                                    $q->where('type', 'BIG');
+                                                })
+                                                ->whereNull('model_id')
+                                                ->whereNull('color_id')
+                                                ->first();
+                                        }
+                                        if ($recRack) {
+                                            $warehouseId = $recRack->warehouse_id;
+                                        }
+                                    }
+                                }
+                                if (!$warehouseId && count($barcodesPiece) > 0) {
+                                    $warehouseId = \App\Models\MasterData\Rack::where('id', $barcodesPiece[0]['rack_id'])->value('warehouse_id');
+                                }
+                            }
+
                             foreach ($barcodesDozen as $barcode) {
                                 ['prefix' => $prefix] = $this->parseBarcode($barcode);
                                 if ($rd = $this->findRequestDetail($prefix)) {
@@ -263,7 +300,7 @@ class InboundController extends Controller
                                     if (!isset($groupedReceivedLogs[$cmtId])) {
                                         $groupedReceivedLogs[$cmtId] = Receivedlog::create([
                                             'cmt_id' => $cmtId,
-                                            'warehouse_id' => $data['warehouse_id'] ?? null,
+                                            'warehouse_id' => $warehouseId,
                                             'user_id' => Auth::id(),
                                             'received_date' => now(),
                                             'notes' => $data['notes']
@@ -291,7 +328,7 @@ class InboundController extends Controller
                                     if (!isset($groupedReceivedLogs[$cmtId])) {
                                         $groupedReceivedLogs[$cmtId] = Receivedlog::create([
                                             'cmt_id' => $cmtId,
-                                            'warehouse_id' => $data['warehouse_id'] ?? null,
+                                            'warehouse_id' => $warehouseId,
                                             'user_id' => Auth::id(),
                                             'received_date' => now(),
                                             'notes' => $data['notes']
@@ -307,6 +344,8 @@ class InboundController extends Controller
                                     Product::create([
                                         'rack_id' => $items['rack_id'],
                                         'model_id' => $rd->model_id,
+                                        'color_id' => $rd->color_id,
+                                        'size_id' => $rd->size_id,
                                         'series' => $series,
                                         'barcode' => $barcode
                                     ]);
@@ -323,7 +362,7 @@ class InboundController extends Controller
                                     if (!isset($groupedReceivedLogs[$cmtId])) {
                                         $groupedReceivedLogs[$cmtId] = Receivedlog::create([
                                             'cmt_id' => $cmtId,
-                                            'warehouse_id' => $data['warehouse_id'] ?? null,
+                                            'warehouse_id' => $warehouseId,
                                             'user_id' => Auth::id(),
                                             'received_date' => now(),
                                             'notes' => $data['notes']
