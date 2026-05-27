@@ -3,6 +3,7 @@
 namespace App\Models\Transactions;
 
 use App\Models\MasterData\OnlineStore;
+use App\Models\MasterData\ShippingLogistic;
 use App\Models\MasterData\User;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -37,6 +38,7 @@ class Order extends Model
         'customer_phone',
         'customer_address',
         'marketplace_id',
+        'shipping_logistic_id',
         'is_need_checker',
         'checked_by',
         'is_approved',
@@ -83,5 +85,11 @@ class Order extends Model
     public function marketplace()
     {
         return $this->belongsTo(\App\Models\MasterData\Marketplace::class, 'marketplace_id');
+    }
+
+    // Define relationship with ShippingLogistic model
+    public function shippingLogistic()
+    {
+        return $this->belongsTo(ShippingLogistic::class, 'shipping_logistic_id');
     }
 }

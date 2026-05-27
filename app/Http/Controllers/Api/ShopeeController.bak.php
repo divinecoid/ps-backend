@@ -37,6 +37,7 @@ class ShopeeController extends Controller
             $store = OnlineStore::findOrFail($request->online_store_id);
             $this->shopeeService->setStore($store);
 
+            // 1. Hit Shopee API get_channel_list
             $response = $this->shopeeService->getChannelList();
             
             if (isset($response['error']) && !empty($response['error'])) {
@@ -50,6 +51,7 @@ class ShopeeController extends Controller
             $logisticsList = $response['response']['logistics_channel_list'] ?? [];
             $count = 0;
 
+            // 2. Process and Sync to Database
             foreach ($logisticsList as $item) {
                 ShippingLogistic::updateOrCreate(
                     [
@@ -58,7 +60,7 @@ class ShopeeController extends Controller
                     ],
                     [
                         'logistic_name' => $item['logistics_channel_name'],
-                        'logistic_type' => $item['preferred_delivery_time'] ?? null, // Or any other field you prefer
+                        'logistic_type' => $item['preferred_delivery_time'] ?? null,
                         'is_active' => $item['enabled'] ?? true
                     ]
                 );
@@ -176,18 +178,13 @@ class ShopeeController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Refresh token berhasil',
-                'data' => $result,
+                'message' => 'Token refreshed successfully',
+                'data' => $result
             ]);
         } catch (\Exception $e) {
-            Log::error('Shopee refresh token failed', [
-                'error' => $e->getMessage(),
-                'store_id' => $store->id,
-            ]);
-
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => $e->getMessage()
             ], 500);
         }
     }
@@ -232,16 +229,9 @@ class ShopeeController extends Controller
                 $this->shopeeService->setStore($order->online_store);
             }
 
-            $statusValue = $order->status instanceof OrderStatus ? $order->status->value : (string) $order->status;
-            if (!in_array($statusValue, [OrderStatus::READY_TO_SHIP->value, OrderStatus::RETRY_SHIP->value])) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Order status must be ready_to_ship or retry_ship.'
-                ], 422);
-            }
+            $result = $this->shopeeService->getShippingParameter($request->order_sn);
 
-            $data = $this->shopeeService->getShippingParameter($request->order_sn);
-            return $data;
+            return response()->json($result);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -250,18 +240,13 @@ class ShopeeController extends Controller
         }
     }
 
-    /**
-     * Ship Order (Request Pickup) & Create Shipping Document
-     * 
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function shipOrder(Request $request)
     {
         $request->validate([
             'order_sn' => 'required|string',
-            'address_id' => 'required', // ID can be int, but sometimes string from API, better not strict int
-            'pickup_time_id' => 'required|string',
+            // Optional for pickup, depends on shopee service implementation
+            'address_id' => 'nullable',
+            'pickup_time_id' => 'nullable',
         ]);
 
         try {
@@ -277,100 +262,16 @@ class ShopeeController extends Controller
                 $this->shopeeService->setStore($order->online_store);
             }
 
-            $statusValue = $order->status instanceof OrderStatus ? $order->status->value : (string) $order->status;
-            if (!in_array($statusValue, [OrderStatus::READY_TO_SHIP->value, OrderStatus::RETRY_SHIP->value])) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Order status must be ready_to_ship or retry_ship.'
-                ], 422);
-            }
+            // Atur pengiriman (Arrange Shipment)
+            $shipResponse = $this->shopeeService->shipOrder($request->order_sn, [
+                'pickup' => [
+                    'address_id' => (int)$request->address_id,
+                    'pickup_time_id' => $request->pickup_time_id
+                ]
+            ]);
 
-            $pickupData = [
-                'address_id' => $request->address_id,
-                'pickup_time_id' => $request->pickup_time_id
-            ];
-
-            // 1. Ship Order (Arrange Pickup)
-            $shipResponse = $this->shopeeService->shipOrder($request->order_sn, $pickupData);
-
-            if (isset($shipResponse['error']) && !empty($shipResponse['error'])) {
-                 // Check if it's "Order has been shipped" error, treat as success (maybe state mismatch)
-                 if (isset($shipResponse['message']) && stripos($shipResponse['message'], 'shipped') !== false) {
-                      // It is shipped, proceed to update local status
-                 } else {
-                      return response()->json([
-                          'success' => false,
-                          'message' => 'Shopee API Error: ' . ($shipResponse['message'] ?? 'Unknown error'),
-                          'data' => $shipResponse
-                      ], 400);
-                 }
-            }
-
-            // Update Local Status & Fetch AWB
-            try {
-                $updateData = [
-                    'status' => OrderStatus::READY_TO_PICKUP,
-                    'readytoship_at' => now(),
-                ];
-                
-                Log::info("Attempting to update order status to READY_TO_PICKUP for order: " . $request->order_sn);
-
-                // Try to fetch AWB + logistics channel mapping
-                $detailResponse = $this->shopeeService->getOrderDetail([$request->order_sn]);
-                $detail = $detailResponse['response']['order_list'][0] ?? null;
-                
-                if ($detail) {
-                    $awb = $detail['tracking_no'] ?? $detail['shipping_carrier'] ?? null;
-                    if ($awb) {
-                        $updateData['awb_code'] = $awb;
-                    }
-                    if (isset($detail['order_status'])) {
-                        $updateData['readytoship_marketplace'] = $detail['order_status'];
-                    }
-
-                    // Map logistics_channel_id from package_list to local ShippingLogistic
-                    $logisticsChannelId = $detail['package_list'][0]['logistics_channel_id'] ?? null;
-                    if ($logisticsChannelId) {
-                        $logistic = \App\Models\MasterData\ShippingLogistic::where('marketplace_id', $order->marketplace_id)
-                            ->where('logistic_id', (string) $logisticsChannelId)
-                            ->first();
-                        if ($logistic) {
-                            $updateData['shipping_logistic_id'] = $logistic->id;
-                            Log::info("Mapped logistics_channel_id {$logisticsChannelId} to ShippingLogistic: {$logistic->logistic_name}");
-                        } else {
-                            Log::warning("No local ShippingLogistic found for logistics_channel_id: {$logisticsChannelId} (marketplace: {$order->marketplace_id})");
-                        }
-                    }
-                }
-
-                $order->update($updateData);
-
-                // Verify update
-                $order->refresh();
-                if ($order->status !== OrderStatus::READY_TO_PICKUP) {
-                     $currentStatus = $order->status instanceof \BackedEnum ? $order->status->value : $order->status;
-                     Log::warning("Order status update verification failed. Status is still: " . $currentStatus);
-                     // Force direct update
-                     DB::table('trx_orders')
-                        ->where('id', $order->id)
-                        ->update(['status' => 'ready_to_pickup', 'readytoship_at' => now()]);
-                }
-
-            } catch (\Exception $e) {
-                Log::warning("Failed to update local status/AWB after ship: " . $e->getMessage());
-                $shipResponse['local_update_warning'] = $e->getMessage();
-            }
-
-            // 2. Automatically Create Shipping Document
-            // Note: This might take a moment to be available for download
-            // We use try-catch here so if document creation fails, we still return success for ship order but with warning
-            try {
-                $docResponse = $this->shopeeService->createShippingDocument($request->order_sn);
-            } catch (\Exception $e) {
-                $docResponse = ['error' => 'Failed to initiate shipping document creation: ' . $e->getMessage()];
-                // Log warning but don't fail the whole request
-                Log::warning('Auto create shipping document failed after ship order', ['order_sn' => $request->order_sn, 'error' => $e->getMessage()]);
-            }
+            // Trigger Shopee to generate shipping document (Print)
+            $docResponse = $this->shopeeService->createShippingDocument($request->order_sn);
 
             return response()->json([
                 'success' => true,
@@ -438,7 +339,7 @@ class ShopeeController extends Controller
     {
         $request->validate([
             'order_sn' => 'required|string',
-            'shipping_document_type' => 'nullable|string' // Default NORMAL_AIR_WAYBILL
+            'shipping_document_type' => 'nullable|string',
         ]);
 
         try {
@@ -454,14 +355,8 @@ class ShopeeController extends Controller
                 $this->shopeeService->setStore($order->online_store);
             }
 
-            $statusValue = $order->status instanceof OrderStatus ? $order->status->value : (string) $order->status;
-            $allowed = [
-                OrderStatus::READY_TO_SHIP->value,
-                OrderStatus::RETRY_SHIP->value,
-                OrderStatus::READY_TO_PICKUP->value,
-                OrderStatus::SHIPPED->value,
-            ];
-            if (!in_array($statusValue, $allowed, true)) {
+            // Validasi status order sebelum download
+            if ($order->status->value !== OrderStatus::READY_TO_SHIP->value && $order->status->value !== OrderStatus::READY_TO_PICKUP->value) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Order status must be ready_to_ship or ready_to_pickup.'
@@ -493,7 +388,6 @@ class ShopeeController extends Controller
 
             // Return as downloadable PDF
             return response($fileContent)
-                ->header('Access-Control-Expose-Headers', 'Content-Disposition')
                 ->header('Content-Type', 'application/pdf')
                 ->header('Content-Disposition', 'attachment; filename="shipping_document_' . $request->order_sn . '.pdf"');
 
