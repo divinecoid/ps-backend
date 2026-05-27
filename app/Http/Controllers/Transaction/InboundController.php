@@ -418,12 +418,18 @@ class InboundController extends Controller
                     $colorId = $requestDetail->color_id;
 
                     $recommendedRack = \App\Models\MasterData\Rack::with('warehouse')
+                        ->whereHas('warehouse', function ($q) {
+                            $q->where('type', 'SMALL');
+                        })
                         ->where('model_id', $modelId)
                         ->where('color_id', $colorId)
                         ->first();
 
                     if (!$recommendedRack) {
                         $recommendedRack = \App\Models\MasterData\Rack::with('warehouse')
+                            ->whereHas('warehouse', function ($q) {
+                                $q->where('type', 'SMALL');
+                            })
                             ->where('model_id', $modelId)
                             ->whereNull('color_id')
                             ->first();
@@ -431,6 +437,40 @@ class InboundController extends Controller
 
                     if (!$recommendedRack) {
                         $recommendedRack = \App\Models\MasterData\Rack::with('warehouse')
+                            ->whereHas('warehouse', function ($q) {
+                                $q->where('type', 'SMALL');
+                            })
+                            ->whereNull('model_id')
+                            ->whereNull('color_id')
+                            ->first();
+                    }
+                } else if ($group === 'D') {
+                    $modelId = $requestDetail->model_id;
+                    $colorId = $requestDetail->color_id;
+
+                    $recommendedRack = \App\Models\MasterData\Rack::with('warehouse')
+                        ->whereHas('warehouse', function ($q) {
+                            $q->where('type', 'BIG');
+                        })
+                        ->where('model_id', $modelId)
+                        ->where('color_id', $colorId)
+                        ->first();
+
+                    if (!$recommendedRack) {
+                        $recommendedRack = \App\Models\MasterData\Rack::with('warehouse')
+                            ->whereHas('warehouse', function ($q) {
+                                $q->where('type', 'BIG');
+                            })
+                            ->where('model_id', $modelId)
+                            ->whereNull('color_id')
+                            ->first();
+                    }
+
+                    if (!$recommendedRack) {
+                        $recommendedRack = \App\Models\MasterData\Rack::with('warehouse')
+                            ->whereHas('warehouse', function ($q) {
+                                $q->where('type', 'BIG');
+                            })
                             ->whereNull('model_id')
                             ->whereNull('color_id')
                             ->first();
@@ -507,6 +547,33 @@ class InboundController extends Controller
                     'size_id' => $requestDetail->size_id,
                 ]
             );
+            if ($inventory->rack_id === null) {
+                $recRack = \App\Models\MasterData\Rack::whereHas('warehouse', function ($q) {
+                        $q->where('type', 'BIG');
+                    })
+                    ->where('model_id', $requestDetail->model_id)
+                    ->where('color_id', $requestDetail->color_id)
+                    ->first();
+                if (!$recRack) {
+                    $recRack = \App\Models\MasterData\Rack::whereHas('warehouse', function ($q) {
+                            $q->where('type', 'BIG');
+                        })
+                        ->where('model_id', $requestDetail->model_id)
+                        ->whereNull('color_id')
+                        ->first();
+                }
+                if (!$recRack) {
+                    $recRack = \App\Models\MasterData\Rack::whereHas('warehouse', function ($q) {
+                            $q->where('type', 'BIG');
+                        })
+                        ->whereNull('model_id')
+                        ->whereNull('color_id')
+                        ->first();
+                }
+                if ($recRack) {
+                    $inventory->update(['rack_id' => $recRack->id]);
+                }
+            }
             $detail = $inventory->detail()->firstOrCreate(
                 ['series' => $series],
                 ['quantity' => 0]
