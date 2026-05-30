@@ -13,10 +13,16 @@ return new class extends Migration
     {
         Schema::create('trx_fabric_purchase_request_details', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('fabric_purchase_request_id')
-                ->constrained('trx_fabric_purchase_requests')
+            $table->uuid('fabric_purchase_request_id');
+            $table->foreign('fabric_purchase_request_id', 'tfprd_fpr_id_fk')
+                ->references('id')
+                ->on('trx_fabric_purchase_requests')
                 ->onDelete('cascade');
-            $table->foreignUuid('color_id')->constrained('mdx_colors')->onDelete('restrict');
+            $table->uuid('color_id');
+            $table->foreign('color_id', 'tfprd_color_id_fk')
+                ->references('id')
+                ->on('mdx_colors')
+                ->onDelete('restrict');
             $table->string('series_code', 100);
             $table->unsignedSmallInteger('series_sequence');
             $table->unsignedInteger('roll_qty');
@@ -24,14 +30,13 @@ return new class extends Migration
 
             $table->unique([
                 'fabric_purchase_request_id',
-                'sequence'
+                'color_id',
+                'series_code',
+                'series_sequence'
             ], 'trx_fp_request_details_unique');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('trx_fabric_purchase_request_details');
