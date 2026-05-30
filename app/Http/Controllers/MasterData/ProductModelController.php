@@ -112,8 +112,8 @@ class ProductModelController extends Controller
                 ]
             ],
             function (ProductModel $model, Request $req) {
-                $model->sizes()->syncWithoutDetaching($req->size_id);
-                $model->colors()->syncWithoutDetaching($req->color_id);
+                $model->sizes()->sync($req->size_id);
+                $model->colors()->sync($req->color_id);
             }
         );
     }
