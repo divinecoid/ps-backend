@@ -13,11 +13,11 @@ return new class extends Migration
     {
         Schema::table('trx_fabric_purchase_requests', function (Blueprint $table) {
             // Drop foreign keys
-            $table->dropForeign(['factory_id']);
-            $table->dropForeign(['model_id']);
+            $table->dropForeign(['supplier_id']);
+            $table->dropForeign(['configuration_id']);
             
             // Drop old columns
-            $table->dropColumn(['factory_id', 'model_id']);
+            $table->dropColumn(['supplier_id', 'configuration_id']);
             
             // Add new columns for manual entry
             $table->string('supplier_name')->after('id');
@@ -32,10 +32,10 @@ return new class extends Migration
     {
         Schema::table('trx_fabric_purchase_requests', function (Blueprint $table) {
             $table->dropColumn(['supplier_name', 'configuration_name']);
-            $table->uuid('factory_id')->after('id');
-            $table->uuid('model_id')->after('factory_id');
-            $table->foreign('factory_id')->references('id')->on('mdx_factories')->onDelete('restrict');
-            $table->foreign('model_id')->references('id')->on('mdx_models')->onDelete('restrict');
+            $table->uuid('supplier_id')->after('id');
+            $table->uuid('configuration_id')->after('supplier_id');
+            $table->foreign('supplier_id')->references('id')->on('mdx_factories')->onDelete('restrict');
+            $table->foreign('configuration_id')->references('id')->on('mdx_configurations')->onDelete('restrict');
         });
     }
 };
