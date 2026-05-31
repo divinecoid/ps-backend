@@ -24,11 +24,13 @@ use App\Http\Controllers\MasterData\FactoryController;
 use App\Http\Controllers\MasterData\ProductController;
 use App\Http\Controllers\MasterData\RackController;
 use App\Http\Controllers\MasterData\WarehouseController;
+use App\Http\Controllers\MasterData\SequenceController;
 use App\Http\Controllers\MasterData\ConfigurationController;
 use App\Http\Controllers\Transaction\OrderController;
 use App\Http\Controllers\Api\ShopeeController;
 use App\Http\Controllers\Api\TiktokShopController;
 use App\Http\Controllers\Transaction\CheckerController;
+use App\Http\Controllers\Transaction\FabricPurchaseController;
 use Illuminate\Http\JsonResponse;
 use App\Http\Controllers\Api\MarketplaceAuthController;
 
@@ -226,6 +228,18 @@ Route::prefix('cloth')->middleware('checkrole:admin')->group(function () {
     Route::delete('{id}', [ClothController::class, 'destroy']);
 });
 
+//Sequence
+Route::prefix('sequence')->middleware('checkrole:admin')->group(function () {
+    Route::get('/', [SequenceController::class, 'index']);
+    Route::get('/master', [SequenceController::class, 'master']);
+    Route::get('{id}', [SequenceController::class, 'show']);
+    Route::post('/', [SequenceController::class, 'store']);
+    Route::post('{id}/restore', [SequenceController::class, 'restore']);
+    Route::patch('{id}', [SequenceController::class, 'update']);
+    Route::delete('/', [SequenceController::class, 'multiDestroy']);
+    Route::delete('{id}', [SequenceController::class, 'destroy']);
+});
+
 
 //Order
 Route::prefix('order')->middleware('checkrole:admin')->group(function () {
@@ -281,6 +295,14 @@ Route::prefix('request')->middleware('checkrole')->group(function () {
     Route::get('/barcode/{id}', [RequestController::class, 'barcode']);
     Route::post('/', [RequestController::class, 'store']);
     Route::delete('/{id}', [RequestController::class, 'destroy']);
+});
+
+Route::prefix('fabric-purchase')->middleware('checkrole')->group(function () {
+    Route::get('/', [FabricPurchaseController::class, 'index']);
+    Route::get('/series', [FabricPurchaseController::class, 'series']);
+    Route::get('/{id}', [FabricPurchaseController::class, 'show']);
+    Route::post('/', [FabricPurchaseController::class, 'store']);
+    Route::delete('/{id}', [FabricPurchaseController::class, 'destroy']);
 });
 
 // Inbound Receiving
