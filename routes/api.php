@@ -31,6 +31,7 @@ use App\Http\Controllers\Api\ShopeeController;
 use App\Http\Controllers\Api\TiktokShopController;
 use App\Http\Controllers\Transaction\CheckerController;
 use App\Http\Controllers\Transaction\FabricPurchaseController;
+use App\Http\Controllers\Transaction\DashboardController;
 use Illuminate\Http\JsonResponse;
 use App\Http\Controllers\Api\MarketplaceAuthController;
 
@@ -255,6 +256,11 @@ Route::prefix('order')->middleware('checkrole:admin')->group(function () {
     Route::get('/items/lazada/{id}', [OrderController::class, 'getLazadaOrderItems']);
     Route::get('/items/tiktokshop/{id}', [OrderController::class, 'getTiktokShopOrderItems']);
     Route::get('/items/shopee/{id}', [OrderController::class, 'getShopeeOrderItems']);
+});
+
+//Dashboard Operations
+Route::prefix('dashboard')->middleware('checkrole')->group(function () {
+    Route::get('/stats', [DashboardController::class, 'getStats']);
 });
 
 //Outbound Operations
