@@ -9,6 +9,7 @@ use Database\Seeders\MasterData\SizeSeeder;
 use Database\Seeders\MasterData\UserSeeder;
 use Database\Seeders\MasterData\WarehouseRackSeeder;
 use Database\Seeders\MasterData\ConfigurationSeeder;
+use Database\Seeders\MasterData\ShippingLogisticSeeder;
 use Database\Seeders\MasterData\ProductModelSeeder;
 use Database\Seeders\MasterData\FactorySeeder;
 use Database\Seeders\MasterData\ProductSeeder;
@@ -26,15 +27,16 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            CMTSeeder::class,
-            ColorSeeder::class,
+          //  CMTSeeder::class,
+           // ColorSeeder::class,
             RoleSeeder::class,
-            SizeSeeder::class,
+           // SizeSeeder::class,
             UserSeeder::class,
             ProductModelSeeder::class,
-            WarehouseRackSeeder::class,
-            ShopeeSeeder::class,
+            //WarehouseRackSeeder::class,
+            //ShopeeSeeder::class,
             ConfigurationSeeder::class,
+            ShippingLogisticSeeder::class,
             FactorySeeder::class,
             ProductSeeder::class,
         ]);

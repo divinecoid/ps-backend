@@ -127,8 +127,12 @@ trait CrudTrait
                 $items[] = $item;
                 $item->delete();
             }
-            if (count($items) > 0) {
-                return $this->successResponse($items);
+            if (count($items) > 0 && count($id) == count($items)) {
+                return $this->successResponse($items, 'Success delete all data');
+            } else if (count($items) > 0 && count($id) != count($items)) {
+                return $this->successResponse($items, 'Success delete some data');
+            } else if (count($items) == 0 && count($id) != count($items)) {
+                return $this->errorResponse(400, 'Failed to delete data');
             } else {
                 return $this->errorResponse(404, 'Not found');
             }
