@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\LazadaController;
+use App\Http\Controllers\MasterData\AcmPermissionController;
 use App\Http\Controllers\MasterData\ClothController;
 use App\Http\Controllers\MasterData\RollSizeController;
 use App\Http\Controllers\MasterData\SmallInventoryController;
@@ -56,6 +57,12 @@ Route::prefix('tiktok-shop')->middleware('checkrole:admin')->group(function () {
     Route::get('/get-order/{orderId}', [TiktokShopController::class, 'getOrder']);
 });
 
+// ACM (admin only — admin bypasses ACM so no acm middleware needed here)
+Route::prefix('acm')->middleware('checkrole:admin')->group(function () {
+    Route::get('/{roleId}', [AcmPermissionController::class, 'index']);
+    Route::post('/{roleId}', [AcmPermissionController::class, 'upsert']);
+});
+
 //MasterData
 //Role
 Route::prefix('role')->middleware('checkrole:admin')->group(function () {
@@ -68,6 +75,7 @@ Route::prefix('role')->middleware('checkrole:admin')->group(function () {
     Route::delete('/', [RoleController::class, 'multiDestroy']);
     Route::delete('{id}', [RoleController::class, 'destroy']);
 });
+
 //User
 Route::prefix('user')->middleware('checkrole:admin')->group(function () {
     Route::get('/', [UserController::class, 'index']);
@@ -79,152 +87,246 @@ Route::prefix('user')->middleware('checkrole:admin')->group(function () {
     Route::delete('/', [UserController::class, 'multiDestroy']);
     Route::delete('{id}', [UserController::class, 'destroy']);
 });
+
 //Marketplace
-Route::prefix('marketplace')->middleware('checkrole:admin')->group(function () {
+Route::prefix('marketplace')->middleware(['checkrole:admin', 'acm:master_marketplace,read'])->group(function () {
     Route::get('/', [MarketplaceController::class, 'index']);
     Route::get('/master', [MarketplaceController::class, 'master']);
     Route::get('{id}', [MarketplaceController::class, 'show']);
+});
+Route::prefix('marketplace')->middleware(['checkrole:admin', 'acm:master_marketplace,create'])->group(function () {
     Route::post('/', [MarketplaceController::class, 'store']);
     Route::post('{id}/restore', [MarketplaceController::class, 'restore']);
+});
+Route::prefix('marketplace')->middleware(['checkrole:admin', 'acm:master_marketplace,update'])->group(function () {
     Route::patch('{id}', [MarketplaceController::class, 'update']);
+});
+Route::prefix('marketplace')->middleware(['checkrole:admin', 'acm:master_marketplace,delete'])->group(function () {
     Route::delete('/', [MarketplaceController::class, 'multiDestroy']);
     Route::delete('{id}', [MarketplaceController::class, 'destroy']);
 });
+
 //Online Store
-Route::prefix('onlinestore')->middleware('checkrole:admin')->group(function () {
+Route::prefix('onlinestore')->middleware(['checkrole:admin', 'acm:master_toko,read'])->group(function () {
     Route::get('/', [OnlineStoreController::class, 'index']);
     Route::get('/master', [OnlineStoreController::class, 'master']);
     Route::get('{id}', [OnlineStoreController::class, 'show']);
+});
+Route::prefix('onlinestore')->middleware(['checkrole:admin', 'acm:master_toko,create'])->group(function () {
     Route::post('/', [OnlineStoreController::class, 'store']);
     Route::post('{id}/restore', [OnlineStoreController::class, 'restore']);
+});
+Route::prefix('onlinestore')->middleware(['checkrole:admin', 'acm:master_toko,update'])->group(function () {
     Route::patch('{id}', [OnlineStoreController::class, 'update']);
+});
+Route::prefix('onlinestore')->middleware(['checkrole:admin', 'acm:master_toko,delete'])->group(function () {
     Route::delete('/', [OnlineStoreController::class, 'multiDestroy']);
     Route::delete('{id}', [OnlineStoreController::class, 'destroy']);
 });
+
 //Color
-Route::prefix('color')->middleware('checkrole:admin')->group(function () {
+Route::prefix('color')->middleware(['checkrole:admin', 'acm:master_warna,read'])->group(function () {
     Route::get('/', [ColorController::class, 'index']);
     Route::get('/master', [ColorController::class, 'master']);
     Route::get('{id}', [ColorController::class, 'show']);
+});
+Route::prefix('color')->middleware(['checkrole:admin', 'acm:master_warna,create'])->group(function () {
     Route::post('/', [ColorController::class, 'store']);
     Route::post('{id}/restore', [ColorController::class, 'restore']);
+});
+Route::prefix('color')->middleware(['checkrole:admin', 'acm:master_warna,update'])->group(function () {
     Route::patch('{id}', [ColorController::class, 'update']);
+});
+Route::prefix('color')->middleware(['checkrole:admin', 'acm:master_warna,delete'])->group(function () {
     Route::delete('/', [ColorController::class, 'multiDestroy']);
     Route::delete('{id}', [ColorController::class, 'destroy']);
 });
+
 //Model
-Route::prefix('model')->middleware('checkrole:admin')->group(function () {
+Route::prefix('model')->middleware(['checkrole:admin', 'acm:master_model,read'])->group(function () {
     Route::get('/', [ProductModelController::class, 'index']);
     Route::get('/master', [ProductModelController::class, 'master']);
     Route::get('{id}', [ProductModelController::class, 'show']);
+});
+Route::prefix('model')->middleware(['checkrole:admin', 'acm:master_model,create'])->group(function () {
     Route::post('/', [ProductModelController::class, 'store']);
     Route::post('{id}/restore', [ProductModelController::class, 'restore']);
+});
+Route::prefix('model')->middleware(['checkrole:admin', 'acm:master_model,update'])->group(function () {
     Route::patch('{id}', [ProductModelController::class, 'update']);
+});
+Route::prefix('model')->middleware(['checkrole:admin', 'acm:master_model,delete'])->group(function () {
     Route::delete('/', [ProductModelController::class, 'multiDestroy']);
     Route::delete('{id}', [ProductModelController::class, 'destroy']);
 });
+
 //Size
-Route::prefix('size')->middleware('checkrole:admin')->group(function () {
+Route::prefix('size')->middleware(['checkrole:admin', 'acm:master_ukuran,read'])->group(function () {
     Route::get('/', [SizeController::class, 'index']);
     Route::get('/master', [SizeController::class, 'master']);
     Route::get('{id}', [SizeController::class, 'show']);
+});
+Route::prefix('size')->middleware(['checkrole:admin', 'acm:master_ukuran,create'])->group(function () {
     Route::post('/', [SizeController::class, 'store']);
     Route::post('{id}/restore', [SizeController::class, 'restore']);
+});
+Route::prefix('size')->middleware(['checkrole:admin', 'acm:master_ukuran,update'])->group(function () {
     Route::patch('{id}', [SizeController::class, 'update']);
+});
+Route::prefix('size')->middleware(['checkrole:admin', 'acm:master_ukuran,delete'])->group(function () {
     Route::delete('/', [SizeController::class, 'multiDestroy']);
     Route::delete('{id}', [SizeController::class, 'destroy']);
 });
+
 //Product
-Route::prefix('product')->middleware('checkrole:admin')->group(function () {
+Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,read'])->group(function () {
     Route::get('/', [ProductController::class, 'index']);
     Route::get('/master', [ProductController::class, 'master']);
     Route::get('{id}', [ProductController::class, 'show']);
+});
+Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,create'])->group(function () {
     Route::post('/', [ProductController::class, 'store']);
     Route::post('{id}/restore', [ProductController::class, 'restore']);
+});
+Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,update'])->group(function () {
     Route::patch('{id}', [ProductController::class, 'update']);
+});
+Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,delete'])->group(function () {
     Route::delete('/', [ProductController::class, 'multiDestroy']);
     Route::delete('{id}', [ProductController::class, 'destroy']);
 });
+
 //Factory
-Route::prefix('factory')->middleware('checkrole:admin')->group(function () {
+Route::prefix('factory')->middleware(['checkrole:admin', 'acm:master_pabrik,read'])->group(function () {
     Route::get('/', [FactoryController::class, 'index']);
     Route::get('/master', [FactoryController::class, 'master']);
     Route::get('{id}', [FactoryController::class, 'show']);
+});
+Route::prefix('factory')->middleware(['checkrole:admin', 'acm:master_pabrik,create'])->group(function () {
     Route::post('/', [FactoryController::class, 'store']);
     Route::post('{id}/restore', [FactoryController::class, 'restore']);
+});
+Route::prefix('factory')->middleware(['checkrole:admin', 'acm:master_pabrik,update'])->group(function () {
     Route::patch('{id}', [FactoryController::class, 'update']);
+});
+Route::prefix('factory')->middleware(['checkrole:admin', 'acm:master_pabrik,delete'])->group(function () {
     Route::delete('/', [FactoryController::class, 'multiDestroy']);
     Route::delete('{id}', [FactoryController::class, 'destroy']);
 });
+
 //CMT
-Route::prefix('cmt')->middleware('checkrole:admin')->group(function () {
+Route::prefix('cmt')->middleware(['checkrole:admin', 'acm:master_cmt,read'])->group(function () {
     Route::get('/', [CMTController::class, 'index']);
     Route::get('/master', [CMTController::class, 'master']);
     Route::get('{id}', [CMTController::class, 'show']);
+});
+Route::prefix('cmt')->middleware(['checkrole:admin', 'acm:master_cmt,create'])->group(function () {
     Route::post('/', [CMTController::class, 'store']);
     Route::post('{id}/restore', [CMTController::class, 'restore']);
+});
+Route::prefix('cmt')->middleware(['checkrole:admin', 'acm:master_cmt,update'])->group(function () {
     Route::patch('{id}', [CMTController::class, 'update']);
+});
+Route::prefix('cmt')->middleware(['checkrole:admin', 'acm:master_cmt,delete'])->group(function () {
     Route::delete('/', [CMTController::class, 'multiDestroy']);
     Route::delete('{id}', [CMTController::class, 'destroy']);
 });
-//Inventory
-Route::prefix('small-inventory')->middleware('checkrole:admin')->group(function () {
+
+//Inventory Small
+Route::prefix('small-inventory')->middleware(['checkrole', 'acm:gudang_kecil,read'])->group(function () {
     Route::get('/', [SmallInventoryController::class, 'index']);
     Route::get('/master', [SmallInventoryController::class, 'master']);
     Route::get('{id}', [SmallInventoryController::class, 'show']);
 });
-Route::prefix('inventory')->middleware('checkrole:admin')->group(function () {
+
+//Inventory Large (Gudang Besar)
+Route::prefix('inventory')->middleware(['checkrole', 'acm:gudang_besar,read'])->group(function () {
     Route::get('/', [InventoryController::class, 'index']);
     Route::get('/master', [InventoryController::class, 'master']);
     Route::get('{id}', [InventoryController::class, 'show']);
+});
+Route::prefix('inventory')->middleware(['checkrole', 'acm:gudang_besar,create'])->group(function () {
     Route::post('/', [InventoryController::class, 'store']);
     Route::post('{id}/restore', [InventoryController::class, 'restore']);
+});
+Route::prefix('inventory')->middleware(['checkrole', 'acm:gudang_besar,update'])->group(function () {
     Route::patch('{id}', [InventoryController::class, 'update']);
+});
+Route::prefix('inventory')->middleware(['checkrole', 'acm:gudang_besar,delete'])->group(function () {
     Route::delete('/', [InventoryController::class, 'multiDestroy']);
     Route::delete('{id}', [InventoryController::class, 'destroy']);
 });
+
 //Rack
-Route::prefix('rack')->middleware('checkrole:admin')->group(function () {
+Route::prefix('rack')->middleware(['checkrole:admin', 'acm:master_rak,read'])->group(function () {
     Route::get('/', [RackController::class, 'index']);
     Route::get('/master', [RackController::class, 'master']);
     Route::get('{id}', [RackController::class, 'show']);
+});
+Route::prefix('rack')->middleware(['checkrole:admin', 'acm:master_rak,create'])->group(function () {
     Route::post('/', [RackController::class, 'store']);
     Route::post('{id}/restore', [RackController::class, 'restore']);
+});
+Route::prefix('rack')->middleware(['checkrole:admin', 'acm:master_rak,update'])->group(function () {
     Route::patch('{id}', [RackController::class, 'update']);
+});
+Route::prefix('rack')->middleware(['checkrole:admin', 'acm:master_rak,delete'])->group(function () {
     Route::delete('/', [RackController::class, 'multiDestroy']);
     Route::delete('{id}', [RackController::class, 'destroy']);
 });
+
 //Warehouse
 Route::prefix('warehouse')->middleware('checkrole')->group(function () {
     Route::get('/master', [WarehouseController::class, 'master']);
 });
-Route::prefix('warehouse')->middleware('checkrole:admin')->group(function () {
+Route::prefix('warehouse')->middleware(['checkrole:admin', 'acm:master_gudang,read'])->group(function () {
     Route::get('/', [WarehouseController::class, 'index']);
     Route::get('{id}', [WarehouseController::class, 'show']);
+});
+Route::prefix('warehouse')->middleware(['checkrole:admin', 'acm:master_gudang,create'])->group(function () {
     Route::post('/', [WarehouseController::class, 'store']);
     Route::post('{id}/restore', [WarehouseController::class, 'restore']);
+});
+Route::prefix('warehouse')->middleware(['checkrole:admin', 'acm:master_gudang,update'])->group(function () {
     Route::patch('{id}', [WarehouseController::class, 'update']);
+});
+Route::prefix('warehouse')->middleware(['checkrole:admin', 'acm:master_gudang,delete'])->group(function () {
     Route::delete('/', [WarehouseController::class, 'multiDestroy']);
     Route::delete('{id}', [WarehouseController::class, 'destroy']);
 });
+
 //Roll size
-Route::prefix('roll-size')->middleware('checkrole:admin')->group(function () {
+Route::prefix('roll-size')->middleware(['checkrole:admin', 'acm:master_roll_size,read'])->group(function () {
     Route::get('/', [RollSizeController::class, 'index']);
     Route::get('/master', [RollSizeController::class, 'master']);
     Route::get('{id}', [RollSizeController::class, 'show']);
+});
+Route::prefix('roll-size')->middleware(['checkrole:admin', 'acm:master_roll_size,create'])->group(function () {
     Route::post('/', [RollSizeController::class, 'store']);
     Route::post('{id}/restore', [RollSizeController::class, 'restore']);
+});
+Route::prefix('roll-size')->middleware(['checkrole:admin', 'acm:master_roll_size,update'])->group(function () {
     Route::patch('{id}', [RollSizeController::class, 'update']);
+});
+Route::prefix('roll-size')->middleware(['checkrole:admin', 'acm:master_roll_size,delete'])->group(function () {
     Route::delete('/', [RollSizeController::class, 'multiDestroy']);
     Route::delete('{id}', [RollSizeController::class, 'destroy']);
 });
-Route::prefix('cloth')->middleware('checkrole:admin')->group(function () {
+
+//Cloth (Gudang Kain)
+Route::prefix('cloth')->middleware(['checkrole', 'acm:gudang_kain,read'])->group(function () {
     Route::get('/', [ClothController::class, 'index']);
     Route::get('/master', [ClothController::class, 'master']);
     Route::get('{id}', [ClothController::class, 'show']);
+});
+Route::prefix('cloth')->middleware(['checkrole:admin', 'acm:master_roll_size,create'])->group(function () {
     Route::post('/', [ClothController::class, 'store']);
     Route::post('{id}/restore', [ClothController::class, 'restore']);
+});
+Route::prefix('cloth')->middleware(['checkrole:admin', 'acm:master_roll_size,update'])->group(function () {
     Route::patch('{id}', [ClothController::class, 'update']);
+});
+Route::prefix('cloth')->middleware(['checkrole:admin', 'acm:master_roll_size,delete'])->group(function () {
     Route::delete('/', [ClothController::class, 'multiDestroy']);
     Route::delete('{id}', [ClothController::class, 'destroy']);
 });
@@ -241,9 +343,8 @@ Route::prefix('sequence')->middleware('checkrole:admin')->group(function () {
     Route::delete('{id}', [SequenceController::class, 'destroy']);
 });
 
-
-//Order
-Route::prefix('order')->middleware('checkrole:admin')->group(function () {
+//Order (Pesanan Toko Online)
+Route::prefix('order')->middleware(['checkrole', 'acm:pesanan,read'])->group(function () {
     Route::get('/', [OrderController::class, 'index']);
     Route::get('/{id}', [OrderController::class, 'show']);
     Route::get('/lazada/{id}', [OrderController::class, 'getLazadaOrder']);
@@ -252,7 +353,7 @@ Route::prefix('order')->middleware('checkrole:admin')->group(function () {
 });
 
 //Order Items
-Route::prefix('order')->middleware('checkrole:admin')->group(function () {
+Route::prefix('order')->middleware(['checkrole', 'acm:pesanan,read'])->group(function () {
     Route::get('/items/lazada/{id}', [OrderController::class, 'getLazadaOrderItems']);
     Route::get('/items/tiktokshop/{id}', [OrderController::class, 'getTiktokShopOrderItems']);
     Route::get('/items/shopee/{id}', [OrderController::class, 'getShopeeOrderItems']);
@@ -295,53 +396,74 @@ Route::prefix('lazada')->middleware('checkrole:admin')->group(function() {
 Route::get('shopee/callback', [ShopeeController::class, 'handleCallback']);
 Route::get('shopee/fetch-orders', [ShopeeController::class, 'fetchOrders']);
 
-Route::prefix('request')->middleware('checkrole')->group(function () {
+//Request CMT (Permintaan)
+Route::prefix('request')->middleware(['checkrole', 'acm:permintaan,read'])->group(function () {
     Route::get('/', [RequestController::class, 'index']);
     Route::get('/{id}', [RequestController::class, 'show']);
     Route::get('/barcode/{id}', [RequestController::class, 'barcode']);
+});
+Route::prefix('request')->middleware(['checkrole', 'acm:permintaan,create'])->group(function () {
     Route::post('/', [RequestController::class, 'store']);
+});
+Route::prefix('request')->middleware(['checkrole', 'acm:permintaan,delete'])->group(function () {
     Route::delete('/{id}', [RequestController::class, 'destroy']);
 });
 
-Route::prefix('fabric-purchase')->middleware('checkrole')->group(function () {
+//Fabric Purchase (Pembelian Kain)
+Route::prefix('fabric-purchase')->middleware(['checkrole', 'acm:pembelian_kain,read'])->group(function () {
     Route::get('/', [FabricPurchaseController::class, 'index']);
     Route::get('/series', [FabricPurchaseController::class, 'series']);
     Route::get('/{id}', [FabricPurchaseController::class, 'show']);
+});
+Route::prefix('fabric-purchase')->middleware(['checkrole', 'acm:pembelian_kain,create'])->group(function () {
     Route::post('/', [FabricPurchaseController::class, 'store']);
+});
+Route::prefix('fabric-purchase')->middleware(['checkrole', 'acm:pembelian_kain,delete'])->group(function () {
     Route::delete('/{id}', [FabricPurchaseController::class, 'destroy']);
 });
 
-// Inbound Receiving
-Route::prefix('inbound')->middleware('checkrole')->group(function () {
+// Inbound Receiving (Penerimaan CMT)
+Route::prefix('inbound')->middleware(['checkrole', 'acm:penerimaan,read'])->group(function () {
     Route::get('/', [InboundController::class, 'index']);
     Route::get('/{id}', [InboundController::class, 'show']);
+});
+Route::prefix('inbound')->middleware(['checkrole', 'acm:penerimaan,create'])->group(function () {
     Route::post('/', [InboundController::class, 'store']);
     Route::post('/validate', [InboundController::class, 'validate']);
     Route::post('/generate-next', [InboundController::class, 'generateNext']);
 });
 
-Route::prefix('model_color')->middleware('checkrole:admin')->group(function () {
+Route::prefix('model_color')->middleware(['checkrole:admin', 'acm:master_model,read'])->group(function () {
     Route::get('/{id}', [ProductModelController::class, 'modelColor']);
 });
-Route::prefix('model_size')->middleware('checkrole:admin')->group(function () {
+Route::prefix('model_size')->middleware(['checkrole:admin', 'acm:master_model,read'])->group(function () {
     Route::get('/{id}', [ProductModelController::class, 'modelSize']);
 });
 
-Route::prefix('mutation')->middleware('checkrole')->group(function () {
+//Mutation (Mutasi Gudang)
+Route::prefix('mutation')->middleware(['checkrole', 'acm:mutasi,read'])->group(function () {
     Route::get('/', [MutationController::class, 'index']);
+});
+Route::prefix('mutation')->middleware(['checkrole', 'acm:mutasi,create'])->group(function () {
     Route::post('/', [MutationController::class, 'store']);
     Route::post('/validate', [MutationController::class, 'validate']);
 });
 
 //Configuration
-Route::prefix('configuration')->middleware('checkrole:admin')->group(function () {
+Route::prefix('configuration')->middleware(['checkrole:admin', 'acm:master_konfigurasi,read'])->group(function () {
     Route::get('/', [ConfigurationController::class, 'index']);
     Route::get('/master', [ConfigurationController::class, 'master']);
     Route::get('{id}', [ConfigurationController::class, 'show']);
     Route::get('{id}/histories', [ConfigurationController::class, 'histories']);
+});
+Route::prefix('configuration')->middleware(['checkrole:admin', 'acm:master_konfigurasi,create'])->group(function () {
     Route::post('/', [ConfigurationController::class, 'store']);
     Route::post('{id}/restore', [ConfigurationController::class, 'restore']);
+});
+Route::prefix('configuration')->middleware(['checkrole:admin', 'acm:master_konfigurasi,update'])->group(function () {
     Route::patch('{id}', [ConfigurationController::class, 'update']);
+});
+Route::prefix('configuration')->middleware(['checkrole:admin', 'acm:master_konfigurasi,delete'])->group(function () {
     Route::delete('/', [ConfigurationController::class, 'multiDestroy']);
     Route::delete('{id}', [ConfigurationController::class, 'destroy']);
 });

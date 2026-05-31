@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AcmMiddleware;
 use App\Http\Middleware\RoleMiddleware;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
@@ -17,7 +18,8 @@ return Application::configure(basePath: dirname(__DIR__))
         //
 
         $middleware->alias([
-            'checkrole' => RoleMiddleware::class
+            'checkrole' => RoleMiddleware::class,
+            'acm'       => AcmMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
