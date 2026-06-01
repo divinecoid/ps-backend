@@ -24,6 +24,14 @@ Route::get('/shopee/login/{id}', [ShopeeController::class, 'redirectToShopee']);
 Route::get('/shopee/callback', [ShopeeController::class, 'handleCallback']);
 Route::get('/shopee/refresh/{id}', [ShopeeController::class, 'refreshToken']);
 
+Route::get('/shopee_sandbox/login/{id}', [ShopeeController::class, 'redirectToShopee']);
+Route::get('/shopee_sandbox/callback', [ShopeeController::class, 'handleCallback']);
+Route::get('/shopee_sandbox/refresh/{id}', [ShopeeController::class, 'refreshToken']);
+
 Route::get('/tiktok-shop/login/{id}', [TiktokAuthController::class, 'redirectToTiktok']);
 Route::get('/tiktok-shop/callback', [TiktokAuthController::class, 'handleCallback']);
 Route::get('/tiktok-shop/refresh/{id}', [TiktokAuthController::class, 'refreshToken']);
+
+Route::get('/tiktok_shop/login/{id}', [TiktokAuthController::class, 'redirectToTiktok']);
+Route::get('/tiktok_shop/callback', [TiktokAuthController::class, 'handleCallback']);
+Route::get('/tiktok_shop/refresh/{id}', [TiktokAuthController::class, 'refreshToken']);

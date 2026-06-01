@@ -38,6 +38,7 @@ class MarketplaceAuthController extends Controller
 
             switch ($marketplaceAlias) {
                 case 'shopee':
+                case 'shopee_sandbox':
                     $this->shopeeService->setStore($store);
                     $result = $this->shopeeService->refreshAccessToken();
 
@@ -55,6 +56,11 @@ class MarketplaceAuthController extends Controller
                         'message' => 'Lazada token refreshed successfully.',
                         'data' => $result
                     ]);
+
+                case 'tiktok_shop':
+                case 'tiktok-shop':
+                    $tiktokController = app(\App\Http\Controllers\Api\TiktokAuthController::class);
+                    return $tiktokController->refreshToken($store->id);
                 // Future cases can be added here
                 // case 'lazada':
                 //     ...

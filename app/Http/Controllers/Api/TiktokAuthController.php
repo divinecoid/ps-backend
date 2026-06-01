@@ -104,7 +104,7 @@ class TiktokAuthController extends Controller
 
         // Query params
         $params = [
-            "app_key"       => $store->api_key,
+            "app_key"       => $store->api_key ?: $store->client_id,
             "app_secret"    => $store->client_secret,
             "refresh_token" => $store->refresh_token,
             "grant_type"    => "refresh_token",
