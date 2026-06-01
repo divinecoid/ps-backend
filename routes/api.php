@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\LazadaController;
 use App\Http\Controllers\MasterData\AcmPermissionController;
+use App\Http\Controllers\MasterData\AuditLogController;
 use App\Http\Controllers\MasterData\ClothController;
 use App\Http\Controllers\MasterData\RollSizeController;
 use App\Http\Controllers\MasterData\SmallInventoryController;
@@ -61,6 +62,11 @@ Route::prefix('tiktok-shop')->middleware('checkrole:admin')->group(function () {
 Route::prefix('acm')->middleware('checkrole:admin')->group(function () {
     Route::get('/{roleId}', [AcmPermissionController::class, 'index']);
     Route::post('/{roleId}', [AcmPermissionController::class, 'upsert']);
+});
+
+// Audit Log
+Route::prefix('audit-log')->middleware(['checkrole', 'acm:audit_log,read'])->group(function () {
+    Route::get('/', [AuditLogController::class, 'index']);
 });
 
 //MasterData

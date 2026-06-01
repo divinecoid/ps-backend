@@ -90,6 +90,11 @@ trait CrudTrait
             if ($afterCreate) {
                 $afterCreate($data, $request);
             }
+
+            // Audit Log
+            $module = \App\Support\AuditLogger::mapModelToModule($model);
+            \App\Support\AuditLogger::log($module, 'CREATE', "Membuat data baru dengan ID: {$data->id}");
+
             return $this->successResponse($data);
         });
     }
@@ -112,6 +117,11 @@ trait CrudTrait
             if ($afterUpdate) {
                 $afterUpdate($record, $request);
             }
+
+            // Audit Log
+            $module = \App\Support\AuditLogger::mapModelToModule(get_class($record));
+            \App\Support\AuditLogger::log($module, 'UPDATE', "Mengubah data dengan ID: {$record->id}");
+
             return $this->successResponse($record);
         });
     }
@@ -120,12 +130,18 @@ trait CrudTrait
     {
         if (is_array($id)) {
             $items = [];
+            $deletedIds = [];
             foreach ($id as $i) {
                 $item = $model::find($i);
                 if (!$item)
                     continue;
                 $items[] = $item;
                 $item->delete();
+                $deletedIds[] = $i;
+            }
+            if (count($items) > 0) {
+                $module = \App\Support\AuditLogger::mapModelToModule($model);
+                \App\Support\AuditLogger::log($module, 'DELETE', "Menghapus data dengan ID: " . implode(', ', $deletedIds));
             }
             if (count($items) > 0 && count($id) == count($items)) {
                 return $this->successResponse($items, 'Success delete all data');
@@ -142,6 +158,11 @@ trait CrudTrait
                 return $this->errorResponse(404, 'Not found');
             }
             $item->delete();
+
+            // Audit Log
+            $module = \App\Support\AuditLogger::mapModelToModule($model);
+            \App\Support\AuditLogger::log($module, 'DELETE', "Menghapus data dengan ID: {$id}");
+
             return $this->successResponse($item);
         }
     }
@@ -150,12 +171,18 @@ trait CrudTrait
     {
         if (is_array($id)) {
             $items = [];
+            $deletedIds = [];
             foreach ($id as $i) {
                 $item = $model::withTrashed()->find($i);
                 if (!$item)
                     continue;
                 $items[] = $item;
                 $item->forceDelete();
+                $deletedIds[] = $i;
+            }
+            if (count($items) > 0) {
+                $module = \App\Support\AuditLogger::mapModelToModule($model);
+                \App\Support\AuditLogger::log($module, 'FORCE_DELETE', "Menghapus permanen data dengan ID: " . implode(', ', $deletedIds));
             }
             if (count($items) > 0 && count($id) == count($items)) {
                 return $this->successResponse($items, 'Success force delete all data');
@@ -172,6 +199,11 @@ trait CrudTrait
                 return $this->errorResponse(404, 'Not found');
             }
             $item->forceDelete();
+
+            // Audit Log
+            $module = \App\Support\AuditLogger::mapModelToModule($model);
+            \App\Support\AuditLogger::log($module, 'FORCE_DELETE', "Menghapus permanen data dengan ID: {$id}");
+
             return $this->successResponse($item);
         }
     }
@@ -183,6 +215,11 @@ trait CrudTrait
             return $this->errorResponse(404, 'Not found or already active');
         }
         $item->restore();
+
+        // Audit Log
+        $module = \App\Support\AuditLogger::mapModelToModule($model);
+        \App\Support\AuditLogger::log($module, 'RESTORE', "Mengembalikan data terhapus dengan ID: {$id}");
+
         return $this->successResponse($item);
     }
 

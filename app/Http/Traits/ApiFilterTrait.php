@@ -70,7 +70,16 @@ trait ApiFilterTrait
             $query->orderBy($sortBy, $order);
         } elseif ($defaultSort) {
             foreach ($defaultSort as $column => $direction) {
-                $query->orderBy($column, $direction);
+                if (is_int($column)) {
+                    $col = $defaultSort[0] ?? null;
+                    $dir = $defaultSort[1] ?? 'asc';
+                    if ($col) {
+                        $query->orderBy($col, $dir);
+                    }
+                    break;
+                } else {
+                    $query->orderBy($column, $direction);
+                }
             }
         }
         return $query;

@@ -13,6 +13,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Tymon\JWTAuth\Facades\JWTAuth;
+use App\Support\AuditLogger;
+
 
 class LoginController extends Controller
 {
@@ -47,6 +49,8 @@ class LoginController extends Controller
             $accessToken = JWTAuth::fromUser($user);
 
             $refreshToken = RefreshToken::createToken($user);
+
+            AuditLogger::log('auth', 'LOGIN', "Pengguna {$user->username} berhasil masuk", $user->id);
 
             // $payload = JWTAuth::setToken($accessToken)->getPayload();
             // Log::info('JWT Payload:', $payload->toArray());
@@ -148,6 +152,11 @@ class LoginController extends Controller
                     'success' => false,
                     'message' => "Invalid refresh token"
                 ], 401);
+            }
+
+            $user = $refreshToken->user;
+            if ($user) {
+                AuditLogger::log('auth', 'LOGOUT', "Pengguna {$user->username} keluar", $user->id);
             }
 
             $refreshToken->revoke();

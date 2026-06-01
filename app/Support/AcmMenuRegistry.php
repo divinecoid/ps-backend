@@ -42,6 +42,7 @@ class AcmMenuRegistry
             'master_toko'        => ['label' => 'Master Toko Online'],
             'master_marketplace' => ['label' => 'Master Marketplace'],
             'master_konfigurasi' => ['label' => 'Konfigurasi'],
+            'audit_log'          => ['label' => 'Audit Log'],
         ];
     }
 
