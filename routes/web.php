@@ -6,6 +6,9 @@ use App\Http\Controllers\Api\TiktokAuthController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
+    if (file_exists(public_path('index.html'))) {
+        return file_get_contents(public_path('index.html'));
+    }
     return view('welcome');
 });
 
@@ -35,3 +38,11 @@ Route::get('/tiktok-shop/refresh/{id}', [TiktokAuthController::class, 'refreshTo
 Route::get('/tiktok_shop/login/{id}', [TiktokAuthController::class, 'redirectToTiktok']);
 Route::get('/tiktok_shop/callback', [TiktokAuthController::class, 'handleCallback']);
 Route::get('/tiktok_shop/refresh/{id}', [TiktokAuthController::class, 'refreshToken']);
+
+// SPA fallback: Serve the React index.html for unmatched web requests (for browser users)
+Route::fallback(function () {
+    if (file_exists(public_path('index.html'))) {
+        return file_get_contents(public_path('index.html'));
+    }
+    return view('welcome');
+});
