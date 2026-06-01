@@ -191,6 +191,16 @@ class ConfigurationController extends Controller
         return $this->baseDelete(Configuration::class, $request->all());
     }
 
+    public function forceDestroy($id)
+    {
+        return $this->baseForceDelete(Configuration::class, $id);
+    }
+
+    public function multiForceDestroy(Request $request)
+    {
+        return $this->baseForceDelete(Configuration::class, $request->all());
+    }
+
     public function histories(Request $request, $id)
     {
         $config = Configuration::find($id);

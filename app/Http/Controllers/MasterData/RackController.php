@@ -141,4 +141,20 @@ class RackController extends Controller
             $request->all()
         );
     }
+
+    public function forceDestroy($id)
+    {
+        return $this->baseForceDelete(
+            Rack::class,
+            $id
+        );
+    }
+
+    public function multiForceDestroy(Request $request)
+    {
+        return $this->baseForceDelete(
+            Rack::class,
+            $request->all()
+        );
+    }
 }

@@ -145,4 +145,20 @@ class OnlineStoreController extends Controller
             $request->all()
         );
     }
+
+    public function forceDestroy($id)
+    {
+        return $this->baseForceDelete(
+            OnlineStore::class,
+            $id
+        );
+    }
+
+    public function multiForceDestroy(Request $request)
+    {
+        return $this->baseForceDelete(
+            OnlineStore::class,
+            $request->all()
+        );
+    }
 }

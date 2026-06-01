@@ -135,4 +135,20 @@ class UserController extends Controller
             $request->all()
         );
     }
+
+    public function forceDestroy($id)
+    {
+        return $this->baseForceDelete(
+            User::class,
+            $id
+        );
+    }
+
+    public function multiForceDestroy(Request $request)
+    {
+        return $this->baseForceDelete(
+            User::class,
+            $request->all()
+        );
+    }
 }

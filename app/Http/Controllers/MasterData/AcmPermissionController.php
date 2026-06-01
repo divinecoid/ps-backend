@@ -41,6 +41,7 @@ class AcmPermissionController extends Controller
                 'can_read'   => $perm ? (bool) $perm->can_read   : false,
                 'can_update' => $perm ? (bool) $perm->can_update  : false,
                 'can_delete' => $perm ? (bool) $perm->can_delete  : false,
+                'can_force_delete' => $perm ? (bool) $perm->can_force_delete : false,
             ];
         }
 
@@ -79,6 +80,7 @@ class AcmPermissionController extends Controller
             'permissions.*.can_read'  => 'required|boolean',
             'permissions.*.can_update'=> 'required|boolean',
             'permissions.*.can_delete'=> 'required|boolean',
+            'permissions.*.can_force_delete'=> 'required|boolean',
         ]);
 
         $validKeys = AcmMenuRegistry::keys();
@@ -97,6 +99,7 @@ class AcmPermissionController extends Controller
                         'can_read'   => (bool) $item['can_read'],
                         'can_update' => (bool) $item['can_update'],
                         'can_delete' => (bool) $item['can_delete'],
+                        'can_force_delete' => (bool) $item['can_force_delete'],
                     ]
                 );
             }

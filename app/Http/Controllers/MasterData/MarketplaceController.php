@@ -118,4 +118,20 @@ class MarketplaceController extends Controller
             $request->all()
         );
     }
+
+    public function forceDestroy($id)
+    {
+        return $this->baseForceDelete(
+            Marketplace::class,
+            $id
+        );
+    }
+
+    public function multiForceDestroy(Request $request)
+    {
+        return $this->baseForceDelete(
+            Marketplace::class,
+            $request->all()
+        );
+    }
 }

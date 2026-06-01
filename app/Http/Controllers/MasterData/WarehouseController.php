@@ -110,4 +110,20 @@ class WarehouseController extends Controller
             $request->all()
         );
     }
+
+    public function forceDestroy($id)
+    {
+        return $this->baseForceDelete(
+            Warehouse::class,
+            $id
+        );
+    }
+
+    public function multiForceDestroy(Request $request)
+    {
+        return $this->baseForceDelete(
+            Warehouse::class,
+            $request->all()
+        );
+    }
 }

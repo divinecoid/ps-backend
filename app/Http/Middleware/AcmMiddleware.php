@@ -42,10 +42,11 @@ class AcmMiddleware
 
             // Map action string to DB column
             $columnMap = [
-                'create' => 'can_create',
-                'read'   => 'can_read',
-                'update' => 'can_update',
-                'delete' => 'can_delete',
+                'create'       => 'can_create',
+                'read'         => 'can_read',
+                'update'       => 'can_update',
+                'delete'       => 'can_delete',
+                'force_delete' => 'can_force_delete',
             ];
 
             $column = $columnMap[$action] ?? null;

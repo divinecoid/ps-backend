@@ -20,6 +20,7 @@ class AcmPermission extends Model
         'can_read',
         'can_update',
         'can_delete',
+        'can_force_delete',
     ];
 
     protected $casts = [
@@ -27,6 +28,7 @@ class AcmPermission extends Model
         'can_read'   => 'boolean',
         'can_update' => 'boolean',
         'can_delete' => 'boolean',
+        'can_force_delete' => 'boolean',
     ];
 
     public function role()

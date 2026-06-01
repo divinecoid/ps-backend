@@ -105,4 +105,20 @@ class FactoryController extends Controller
             $request->all()
         );
     }
+
+    public function forceDestroy($id)
+    {
+        return $this->baseForceDelete(
+            Factory::class,
+            $id
+        );
+    }
+
+    public function multiForceDestroy(Request $request)
+    {
+        return $this->baseForceDelete(
+            Factory::class,
+            $request->all()
+        );
+    }
 }

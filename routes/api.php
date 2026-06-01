@@ -73,7 +73,9 @@ Route::prefix('role')->middleware('checkrole:admin')->group(function () {
     Route::post('{id}/restore', [RoleController::class, 'restore']);
     Route::patch('{id}', [RoleController::class, 'update']);
     Route::delete('/', [RoleController::class, 'multiDestroy']);
+    Route::delete('/force', [RoleController::class, 'multiForceDestroy']);
     Route::delete('{id}', [RoleController::class, 'destroy']);
+    Route::delete('{id}/force', [RoleController::class, 'forceDestroy']);
 });
 
 //User
@@ -85,7 +87,9 @@ Route::prefix('user')->middleware('checkrole:admin')->group(function () {
     Route::post('{id}/restore', [UserController::class, 'restore']);
     Route::patch('{id}', [UserController::class, 'update']);
     Route::delete('/', [UserController::class, 'multiDestroy']);
+    Route::delete('/force', [UserController::class, 'multiForceDestroy']);
     Route::delete('{id}', [UserController::class, 'destroy']);
+    Route::delete('{id}/force', [UserController::class, 'forceDestroy']);
 });
 
 //Marketplace
@@ -105,6 +109,10 @@ Route::prefix('marketplace')->middleware(['checkrole:admin', 'acm:master_marketp
     Route::delete('/', [MarketplaceController::class, 'multiDestroy']);
     Route::delete('{id}', [MarketplaceController::class, 'destroy']);
 });
+Route::prefix('marketplace')->middleware(['checkrole:admin', 'acm:master_marketplace,force_delete'])->group(function () {
+    Route::delete('/force', [MarketplaceController::class, 'multiForceDestroy']);
+    Route::delete('{id}/force', [MarketplaceController::class, 'forceDestroy']);
+});
 
 //Online Store
 Route::prefix('onlinestore')->middleware(['checkrole:admin', 'acm:master_toko,read'])->group(function () {
@@ -122,6 +130,10 @@ Route::prefix('onlinestore')->middleware(['checkrole:admin', 'acm:master_toko,up
 Route::prefix('onlinestore')->middleware(['checkrole:admin', 'acm:master_toko,delete'])->group(function () {
     Route::delete('/', [OnlineStoreController::class, 'multiDestroy']);
     Route::delete('{id}', [OnlineStoreController::class, 'destroy']);
+});
+Route::prefix('onlinestore')->middleware(['checkrole:admin', 'acm:master_toko,force_delete'])->group(function () {
+    Route::delete('/force', [OnlineStoreController::class, 'multiForceDestroy']);
+    Route::delete('{id}/force', [OnlineStoreController::class, 'forceDestroy']);
 });
 
 //Color
@@ -141,6 +153,10 @@ Route::prefix('color')->middleware(['checkrole:admin', 'acm:master_warna,delete'
     Route::delete('/', [ColorController::class, 'multiDestroy']);
     Route::delete('{id}', [ColorController::class, 'destroy']);
 });
+Route::prefix('color')->middleware(['checkrole:admin', 'acm:master_warna,force_delete'])->group(function () {
+    Route::delete('/force', [ColorController::class, 'multiForceDestroy']);
+    Route::delete('{id}/force', [ColorController::class, 'forceDestroy']);
+});
 
 //Model
 Route::prefix('model')->middleware(['checkrole:admin', 'acm:master_model,read'])->group(function () {
@@ -158,6 +174,10 @@ Route::prefix('model')->middleware(['checkrole:admin', 'acm:master_model,update'
 Route::prefix('model')->middleware(['checkrole:admin', 'acm:master_model,delete'])->group(function () {
     Route::delete('/', [ProductModelController::class, 'multiDestroy']);
     Route::delete('{id}', [ProductModelController::class, 'destroy']);
+});
+Route::prefix('model')->middleware(['checkrole:admin', 'acm:master_model,force_delete'])->group(function () {
+    Route::delete('/force', [ProductModelController::class, 'multiForceDestroy']);
+    Route::delete('{id}/force', [ProductModelController::class, 'forceDestroy']);
 });
 
 //Size
@@ -177,6 +197,10 @@ Route::prefix('size')->middleware(['checkrole:admin', 'acm:master_ukuran,delete'
     Route::delete('/', [SizeController::class, 'multiDestroy']);
     Route::delete('{id}', [SizeController::class, 'destroy']);
 });
+Route::prefix('size')->middleware(['checkrole:admin', 'acm:master_ukuran,force_delete'])->group(function () {
+    Route::delete('/force', [SizeController::class, 'multiForceDestroy']);
+    Route::delete('{id}/force', [SizeController::class, 'forceDestroy']);
+});
 
 //Product
 Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,read'])->group(function () {
@@ -194,6 +218,10 @@ Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,upd
 Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,delete'])->group(function () {
     Route::delete('/', [ProductController::class, 'multiDestroy']);
     Route::delete('{id}', [ProductController::class, 'destroy']);
+});
+Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,force_delete'])->group(function () {
+    Route::delete('/force', [ProductController::class, 'multiForceDestroy']);
+    Route::delete('{id}/force', [ProductController::class, 'forceDestroy']);
 });
 
 //Factory
@@ -213,6 +241,10 @@ Route::prefix('factory')->middleware(['checkrole:admin', 'acm:master_pabrik,dele
     Route::delete('/', [FactoryController::class, 'multiDestroy']);
     Route::delete('{id}', [FactoryController::class, 'destroy']);
 });
+Route::prefix('factory')->middleware(['checkrole:admin', 'acm:master_pabrik,force_delete'])->group(function () {
+    Route::delete('/force', [FactoryController::class, 'multiForceDestroy']);
+    Route::delete('{id}/force', [FactoryController::class, 'forceDestroy']);
+});
 
 //CMT
 Route::prefix('cmt')->middleware(['checkrole:admin', 'acm:master_cmt,read'])->group(function () {
@@ -230,6 +262,10 @@ Route::prefix('cmt')->middleware(['checkrole:admin', 'acm:master_cmt,update'])->
 Route::prefix('cmt')->middleware(['checkrole:admin', 'acm:master_cmt,delete'])->group(function () {
     Route::delete('/', [CMTController::class, 'multiDestroy']);
     Route::delete('{id}', [CMTController::class, 'destroy']);
+});
+Route::prefix('cmt')->middleware(['checkrole:admin', 'acm:master_cmt,force_delete'])->group(function () {
+    Route::delete('/force', [CMTController::class, 'multiForceDestroy']);
+    Route::delete('{id}/force', [CMTController::class, 'forceDestroy']);
 });
 
 //Inventory Small
@@ -256,6 +292,10 @@ Route::prefix('inventory')->middleware(['checkrole', 'acm:gudang_besar,delete'])
     Route::delete('/', [InventoryController::class, 'multiDestroy']);
     Route::delete('{id}', [InventoryController::class, 'destroy']);
 });
+Route::prefix('inventory')->middleware(['checkrole', 'acm:gudang_besar,force_delete'])->group(function () {
+    Route::delete('/force', [InventoryController::class, 'multiForceDestroy']);
+    Route::delete('{id}/force', [InventoryController::class, 'forceDestroy']);
+});
 
 //Rack
 Route::prefix('rack')->middleware(['checkrole:admin', 'acm:master_rak,read'])->group(function () {
@@ -273,6 +313,10 @@ Route::prefix('rack')->middleware(['checkrole:admin', 'acm:master_rak,update'])-
 Route::prefix('rack')->middleware(['checkrole:admin', 'acm:master_rak,delete'])->group(function () {
     Route::delete('/', [RackController::class, 'multiDestroy']);
     Route::delete('{id}', [RackController::class, 'destroy']);
+});
+Route::prefix('rack')->middleware(['checkrole:admin', 'acm:master_rak,force_delete'])->group(function () {
+    Route::delete('/force', [RackController::class, 'multiForceDestroy']);
+    Route::delete('{id}/force', [RackController::class, 'forceDestroy']);
 });
 
 //Warehouse
@@ -294,6 +338,10 @@ Route::prefix('warehouse')->middleware(['checkrole:admin', 'acm:master_gudang,de
     Route::delete('/', [WarehouseController::class, 'multiDestroy']);
     Route::delete('{id}', [WarehouseController::class, 'destroy']);
 });
+Route::prefix('warehouse')->middleware(['checkrole:admin', 'acm:master_gudang,force_delete'])->group(function () {
+    Route::delete('/force', [WarehouseController::class, 'multiForceDestroy']);
+    Route::delete('{id}/force', [WarehouseController::class, 'forceDestroy']);
+});
 
 //Roll size
 Route::prefix('roll-size')->middleware(['checkrole:admin', 'acm:master_roll_size,read'])->group(function () {
@@ -311,6 +359,10 @@ Route::prefix('roll-size')->middleware(['checkrole:admin', 'acm:master_roll_size
 Route::prefix('roll-size')->middleware(['checkrole:admin', 'acm:master_roll_size,delete'])->group(function () {
     Route::delete('/', [RollSizeController::class, 'multiDestroy']);
     Route::delete('{id}', [RollSizeController::class, 'destroy']);
+});
+Route::prefix('roll-size')->middleware(['checkrole:admin', 'acm:master_roll_size,force_delete'])->group(function () {
+    Route::delete('/force', [RollSizeController::class, 'multiForceDestroy']);
+    Route::delete('{id}/force', [RollSizeController::class, 'forceDestroy']);
 });
 
 //Cloth (Gudang Kain)
@@ -330,6 +382,10 @@ Route::prefix('cloth')->middleware(['checkrole:admin', 'acm:master_roll_size,del
     Route::delete('/', [ClothController::class, 'multiDestroy']);
     Route::delete('{id}', [ClothController::class, 'destroy']);
 });
+Route::prefix('cloth')->middleware(['checkrole:admin', 'acm:master_roll_size,force_delete'])->group(function () {
+    Route::delete('/force', [ClothController::class, 'multiForceDestroy']);
+    Route::delete('{id}/force', [ClothController::class, 'forceDestroy']);
+});
 
 //Sequence
 Route::prefix('sequence')->middleware('checkrole:admin')->group(function () {
@@ -340,7 +396,9 @@ Route::prefix('sequence')->middleware('checkrole:admin')->group(function () {
     Route::post('{id}/restore', [SequenceController::class, 'restore']);
     Route::patch('{id}', [SequenceController::class, 'update']);
     Route::delete('/', [SequenceController::class, 'multiDestroy']);
+    Route::delete('/force', [SequenceController::class, 'multiForceDestroy']);
     Route::delete('{id}', [SequenceController::class, 'destroy']);
+    Route::delete('{id}/force', [SequenceController::class, 'forceDestroy']);
 });
 
 //Order (Pesanan Toko Online)
@@ -466,6 +524,10 @@ Route::prefix('configuration')->middleware(['checkrole:admin', 'acm:master_konfi
 Route::prefix('configuration')->middleware(['checkrole:admin', 'acm:master_konfigurasi,delete'])->group(function () {
     Route::delete('/', [ConfigurationController::class, 'multiDestroy']);
     Route::delete('{id}', [ConfigurationController::class, 'destroy']);
+});
+Route::prefix('configuration')->middleware(['checkrole:admin', 'acm:master_konfigurasi,force_delete'])->group(function () {
+    Route::delete('/force', [ConfigurationController::class, 'multiForceDestroy']);
+    Route::delete('{id}/force', [ConfigurationController::class, 'forceDestroy']);
 });
 
 Route::prefix('checker')->middleware('checkrole:admin')->group(function () {

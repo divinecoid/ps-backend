@@ -167,4 +167,20 @@ class InventoryController extends Controller
             $request->all()
         );
     }
+
+    public function forceDestroy($id)
+    {
+        return $this->baseForceDelete(
+            Inventory::class,
+            $id
+        );
+    }
+
+    public function multiForceDestroy(Request $request)
+    {
+        return $this->baseForceDelete(
+            Inventory::class,
+            $request->all()
+        );
+    }
 }

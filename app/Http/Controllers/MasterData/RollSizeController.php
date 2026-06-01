@@ -102,4 +102,20 @@ class RollSizeController extends Controller
             $request->all()
         );
     }
+
+    public function forceDestroy($id)
+    {
+        return $this->baseForceDelete(
+            RollSize::class,
+            $id
+        );
+    }
+
+    public function multiForceDestroy(Request $request)
+    {
+        return $this->baseForceDelete(
+            RollSize::class,
+            $request->all()
+        );
+    }
 }

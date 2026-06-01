@@ -139,6 +139,22 @@ class ProductModelController extends Controller
         );
     }
 
+    public function forceDestroy($id)
+    {
+        return $this->baseForceDelete(
+            ProductModel::class,
+            $id
+        );
+    }
+
+    public function multiForceDestroy(Request $request)
+    {
+        return $this->baseForceDelete(
+            ProductModel::class,
+            $request->all()
+        );
+    }
+
     public function modelColor(Request $request, $id)
     {
         $model = ProductModel::find($id);

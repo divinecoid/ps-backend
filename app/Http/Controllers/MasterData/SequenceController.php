@@ -107,4 +107,20 @@ class SequenceController extends Controller
             $request->all()
         );
     }
+
+    public function forceDestroy($id)
+    {
+        return $this->baseForceDelete(
+            Sequence::class,
+            $id
+        );
+    }
+
+    public function multiForceDestroy(Request $request)
+    {
+        return $this->baseForceDelete(
+            Sequence::class,
+            $request->all()
+        );
+    }
 }

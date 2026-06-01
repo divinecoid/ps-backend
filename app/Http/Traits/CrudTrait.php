@@ -146,6 +146,36 @@ trait CrudTrait
         }
     }
 
+    public function baseForceDelete($model, $id)
+    {
+        if (is_array($id)) {
+            $items = [];
+            foreach ($id as $i) {
+                $item = $model::withTrashed()->find($i);
+                if (!$item)
+                    continue;
+                $items[] = $item;
+                $item->forceDelete();
+            }
+            if (count($items) > 0 && count($id) == count($items)) {
+                return $this->successResponse($items, 'Success force delete all data');
+            } else if (count($items) > 0 && count($id) != count($items)) {
+                return $this->successResponse($items, 'Success force delete some data');
+            } else if (count($items) == 0 && count($id) != count($items)) {
+                return $this->errorResponse(400, 'Failed to force delete data');
+            } else {
+                return $this->errorResponse(404, 'Not found');
+            }
+        } else {
+            $item = $model::withTrashed()->find($id);
+            if (!$item) {
+                return $this->errorResponse(404, 'Not found');
+            }
+            $item->forceDelete();
+            return $this->successResponse($item);
+        }
+    }
+
     public function baseRestore($model, $id)
     {
         $item = $model::onlyTrashed()->find($id);
