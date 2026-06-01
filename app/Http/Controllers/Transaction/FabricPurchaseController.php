@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
 use App\Models\MasterData\Color;
 use App\Models\MasterData\Factory;
+use App\Models\MasterData\RollSize;
 use App\Models\MasterData\Sequence;
 use App\Models\Transactions\FabricPurchaseRequest;
 use App\Models\Transactions\FabricPurchaseRequestDetail;
@@ -26,6 +27,8 @@ class FabricPurchaseController extends Controller
             'factory' => $data->factory,
             'gram' => $data->gram,
             'ukuran' => $data->ukuran,
+            'roll_size_id' => $data->roll_size_id,
+            'roll_size' => $data->roll_size,
             'status' => $data->status,
             'created_at' => $data->created_at,
             'details' => $data->details?->map(fn($detail) => [
@@ -98,7 +101,9 @@ class FabricPurchaseController extends Controller
             [
                 'factory_id' => 'required|uuid|exists:mdx_factories,id',
                 'gram' => 'required|string|max:255',
-                'ukuran' => 'required|integer|min:1',
+                // accept either roll_size_id or ukuran; we'll derive ukuran from roll_size if provided
+                'roll_size_id' => 'nullable|uuid|exists:mdx_roll_sizes,id',
+                'ukuran' => 'nullable|integer|min:1',
                 'details' => 'required|array|min:1',
                 'details.*.color_id' => 'required|uuid|exists:mdx_colors,id',
                 'details.*.quantity' => 'required|integer|min:1',
@@ -108,10 +113,21 @@ class FabricPurchaseController extends Controller
 
                 try {
                     return DB::transaction(function () use ($data, $factory) {
+                        // determine ukuran value: prefer roll_size_id if provided
+                        $ukuranValue = null;
+                        if (!empty($data['roll_size_id'])) {
+                            $roll = RollSize::find($data['roll_size_id']);
+                            if ($roll) $ukuranValue = (int) $roll->size;
+                        }
+                        if ($ukuranValue === null && isset($data['ukuran'])) {
+                            $ukuranValue = (int) $data['ukuran'];
+                        }
+
                         $requestModel = FabricPurchaseRequest::create([
                             'factory_id' => $data['factory_id'],
                             'gram' => $data['gram'],
-                            'ukuran' => $data['ukuran'],
+                            'ukuran' => $ukuranValue,
+                            'roll_size_id' => $data['roll_size_id'] ?? null,
                             'status' => 'OPEN',
                         ]);
 

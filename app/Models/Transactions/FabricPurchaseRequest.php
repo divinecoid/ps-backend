@@ -3,6 +3,7 @@
 namespace App\Models\Transactions;
 
 use App\Models\MasterData\Factory;
+use App\Models\MasterData\RollSize;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -18,12 +19,18 @@ class FabricPurchaseRequest extends Model
         'factory_id',
         'gram',
         'ukuran',
+        'roll_size_id',
         'status',
     ];
 
     public function factory()
     {
         return $this->belongsTo(Factory::class, 'factory_id');
+    }
+
+    public function roll_size()
+    {
+        return $this->belongsTo(RollSize::class, 'roll_size_id');
     }
 
     public function details()
