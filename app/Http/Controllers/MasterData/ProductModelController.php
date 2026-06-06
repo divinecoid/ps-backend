@@ -186,4 +186,23 @@ class ProductModelController extends Controller
         );
     }
 
+    public function getFabricColor($id)
+    {
+        $cuttings = \App\Models\Transactions\FabricCutting::whereHas('fabric_cutting_request_detail', function ($q) use ($id) {
+            $q->where('model_id', $id);
+        })
+        ->where('quantity', '>', 0)
+        ->with(['clothes.color'])
+        ->get();
+
+        $colors = $cuttings->map(function ($cutting) {
+            if ($cutting->clothes && $cutting->clothes->color) {
+                return $cutting->clothes->color->name . '-' . $cutting->clothes->sequence;
+            }
+            return null;
+        })->filter()->unique()->values();
+
+        return $this->successResponse($colors);
+    }
+
 }

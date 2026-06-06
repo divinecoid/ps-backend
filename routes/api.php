@@ -505,6 +505,8 @@ Route::prefix('model_size')->middleware(['checkrole:admin', 'acm:master_model,re
     Route::get('/{id}', [ProductModelController::class, 'modelSize']);
 });
 
+Route::get('/get-fabric-color/{id}', [ProductModelController::class, 'getFabricColor'])->middleware(['checkrole:admin', 'acm:master_model,read']);
+
 //Mutation (Mutasi Gudang)
 Route::prefix('mutation')->middleware(['checkrole', 'acm:mutasi,read'])->group(function () {
     Route::get('/', [MutationController::class, 'index']);
