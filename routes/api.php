@@ -6,6 +6,7 @@ use App\Http\Controllers\MasterData\AuditLogController;
 use App\Http\Controllers\MasterData\ClothController;
 use App\Http\Controllers\MasterData\RollSizeController;
 use App\Http\Controllers\MasterData\SmallInventoryController;
+use App\Http\Controllers\Transaction\FabricCuttingController;
 use App\Http\Controllers\Transaction\MutationController;
 use App\Http\Controllers\Transaction\RequestController;
 use App\Http\Controllers\Transaction\InboundController;
@@ -543,4 +544,17 @@ Route::prefix('checker')->middleware('checkrole:admin')->group(function () {
     Route::get('/order-items/{orderId}', [CheckerController::class, 'getOrderItems']);
     Route::post('/validate-product-barcode', [CheckerController::class, 'validateProductBarcode']);
     Route::patch('/approve-order/{id}', [CheckerController::class, 'approveOrder']);
+});
+
+//Request Cutting (Permintaan)
+Route::prefix('fabric-cutting')->middleware(['checkrole', 'acm:permintaan,read'])->group(function () {
+    Route::get('/', [FabricCuttingController::class, 'index']);
+    Route::get('/{id}', [FabricCuttingController::class, 'show']);
+});
+Route::prefix('fabric-cutting')->middleware(['checkrole', 'acm:permintaan,create'])->group(function () {
+    Route::post('/', [FabricCuttingController::class, 'store']);
+    Route::patch('/{id}', [FabricCuttingController::class, 'setReceived']);
+});
+Route::prefix('fabric-cutting')->middleware(['checkrole', 'acm:permintaan,delete'])->group(function () {
+    Route::delete('/{id}', [FabricCuttingController::class, 'destroy']);
 });
