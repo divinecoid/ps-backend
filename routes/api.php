@@ -375,6 +375,7 @@ Route::prefix('roll-size')->middleware(['checkrole:admin', 'acm:master_roll_size
 //Cloth (Gudang Kain)
 Route::prefix('cloth')->middleware(['checkrole', 'acm:gudang_kain,read'])->group(function () {
     Route::get('/', [ClothController::class, 'index']);
+    Route::get('/uncut', [ClothController::class, 'uncut']);
     Route::get('/master', [ClothController::class, 'master']);
     Route::get('{id}', [ClothController::class, 'show']);
 });

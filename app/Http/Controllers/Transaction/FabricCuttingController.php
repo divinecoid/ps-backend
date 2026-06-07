@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Transaction;
 
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
+use App\Models\MasterData\Cloth;
 use App\Models\MasterData\ProductModel;
 use App\Models\Transactions\FabricCuttingDetail;
 use DB;
@@ -21,6 +22,7 @@ class FabricCuttingController extends Controller
             'fabric_id' => $data->fabric_id,
             'serial_number' => $data->serial_number,
             'fabric' => $data->clothes,
+            'quantity' => $data->quantity,
             'created_at' => $data->created_at,
             'status' => $data->status,
             'request_detail' => $data->fabric_cutting_request_detail->map(fn($detail) => [
@@ -139,6 +141,17 @@ class FabricCuttingController extends Controller
                         'serial_number' => $data['serial_number']
                         // 'serial_number' => $serial
                     ]);
+                    $cloth = Cloth::findOrFail($data['fabric_id']);
+
+                    $affected = Cloth::whereKey($cloth->id)
+                        ->where('quantity', '>=', $data['quantity'])
+                        ->decrement('quantity', $data['quantity']);
+
+                    if ($affected === 0) {
+                        throw new \RuntimeException(
+                            "Quantity kain tinggal {$cloth->quantity}"
+                        );
+                    }
                     $details = [];
                     foreach ($items as $item) {
                         $details[] = [

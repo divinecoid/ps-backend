@@ -35,7 +35,20 @@ class ClothController extends Controller
             Cloth::class,
             [],
             ['id', 'factory', 'gram', 'color', 'quantity', 'sequence'],
-            $this->structure()
+            $this->structure(),
+        );
+    }
+    public function readyStock(Request $request)
+    {
+        return $this->baseIndex(
+            $request,
+            Cloth::class,
+            [],
+            ['id', 'factory', 'gram', 'color', 'quantity', 'sequence'],
+            $this->structure(),
+            queryCallback: function ($query) {
+                $query->where('quantity', '>', 0);
+            }
         );
     }
 
