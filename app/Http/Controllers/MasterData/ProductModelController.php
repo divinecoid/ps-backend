@@ -205,4 +205,56 @@ class ProductModelController extends Controller
         return $this->successResponse($colors);
     }
 
+    public function getFabricQty(Request $request)
+    {
+        $request->validate([
+            'model_id' => 'required|uuid',
+            'color_name' => 'required|string'
+        ]);
+
+        $modelId = $request->model_id;
+        $colorName = $request->color_name;
+
+        $cuttings = \App\Models\Transactions\FabricCutting::whereHas('fabric_cutting_request_detail', function ($q) use ($modelId) {
+            $q->where('model_id', $modelId);
+        })
+        ->where('quantity', '>', 0)
+        ->with(['clothes.color', 'fabric_cutting_request_detail.size'])
+        ->get();
+
+        $matchedCutting = null;
+        foreach ($cuttings as $cutting) {
+            if ($cutting->clothes && $cutting->clothes->color) {
+                $name = $cutting->clothes->color->name . '-' . $cutting->clothes->sequence;
+                if ($name === $colorName) {
+                    $matchedCutting = $cutting;
+                    break;
+                }
+            }
+        }
+
+        if (!$matchedCutting) {
+            return $this->errorResponse(404, 'Data not found or already used');
+        }
+
+        $details = $matchedCutting->fabric_cutting_request_detail->where('model_id', $modelId);
+        $variantDetail = $details->map(function ($item) {
+            return [
+                'size_id' => $item->size_id,
+                'dozen_qty' => floor($item->req_qty / 12),
+                'piece_qty' => $item->req_qty % 12,
+                'size_name' => $item->size->name ?? '',
+                'req_qty' => $item->req_qty
+            ];
+        })->values();
+
+        // Mark as used so it won't appear again
+        $matchedCutting->update(['quantity' => 0]);
+
+        return $this->successResponse([
+            'fabric_cutting_id' => $matchedCutting->id,
+            'variant_detail' => $variantDetail
+        ]);
+    }
+
 }
