@@ -32,8 +32,8 @@ class RequestController extends Controller
                 'rec_bs_qty' => $detail->rec_bs_qty,
                 'model_id' => $detail->model_id,
                 'models' => $detail->model,
-                'color_id' => $detail->color_id,
-                'colors' => $detail->color,
+                'cloth_id' => $detail->cloth_id,
+                'cloth' => $detail->cloth,
                 'barcode' => $detail->barcode
             ]),
         ];
@@ -54,8 +54,8 @@ class RequestController extends Controller
                 'serial_number',
                 'request_detail.model.sku',
                 'request_detail.model.name',
-                'request_detail.color.code',
-                'request_detail.color.name',
+                'request_detail.cloth.color.code',
+                'request_detail.cloth.color.name',
                 'request_detail.size.code',
                 'request_detail.size.name',
                 'request_detail.barcode'
@@ -74,12 +74,12 @@ class RequestController extends Controller
                 'serial_number' => $request->serial_number,
                 'status' => $request->status,
                 'request_detail' => $request->request_detail
-                    ->groupBy(fn($item) => $item->model_id . '|' . $item->color_id)
+                    ->groupBy(fn($item) => $item->model_id . '|' . $item->cloth_id)
                     ->map(function ($group) {
                         $first = $group->first();
                         return [
                             'model_id' => $first->model_id,
-                            'color_id' => $first->color_id,
+                            'cloth_id' => $first->cloth_id,
                             'variant_detail' => $group->map(function ($item) {
                                 return [
                                     'size_id' => $item->size_id,
@@ -145,7 +145,7 @@ class RequestController extends Controller
                     'req_dozen_qty' => floor($detail->req_qty / 12),
                     'req_piece_qty' => $detail->req_qty % 12,
                     'serial_number' => $data->serial_number,
-                    'colors' => $detail->color->code,
+                    'colors' => $detail->cloth->color->code ?? null,
                     'sizes' => $detail->size->code,
                     'barcode' => $detail->barcode,
                 ]),
@@ -162,7 +162,7 @@ class RequestController extends Controller
                 'serial_number' => 'required|string|max:255',
                 'request_detail' => 'required|array|min:1',
                 'request_detail.*.model_id' => 'required|uuid',
-                'request_detail.*.color_id' => 'required|uuid',
+                'request_detail.*.cloth_id' => 'required|uuid',
                 'request_detail.*.variant_detail' => 'required|array|min:1',
                 'request_detail.*.variant_detail.*.size_id' => 'required|uuid',
                 'request_detail.*.variant_detail.*.dozen_qty' => 'required|integer|min:0',
@@ -174,7 +174,7 @@ class RequestController extends Controller
                     foreach ($detail['variant_detail'] as $variant) {
                         $items[] = [
                             'model_id' => $detail['model_id'],
-                            'color_id' => $detail['color_id'],
+                            'cloth_id' => $detail['cloth_id'],
                             'size_id' => $variant['size_id'],
                             'req_qty' => ($variant['dozen_qty'] * 12) + $variant['piece_qty'],
                         ];
@@ -185,21 +185,26 @@ class RequestController extends Controller
                     ->whereIn('id', collect($items)->pluck('model_id')->unique())
                     ->get()
                     ->keyBy('id');
+                $clothes = \App\Models\MasterData\Cloth::with('color')->whereIn('id', collect($items)->pluck('cloth_id')->unique())->get()->keyBy('id');
                 foreach ($items as &$item) {
                     $model = $models[$item['model_id']] ?? null;
                     if (!$model) {
                         return $this->errorResponse(422, "Model {$item['model_id']} not found");
                     }
-                    $color = $model->colors->firstWhere('id', $item['color_id']);
+                    $cloth = $clothes[$item['cloth_id']] ?? null;
+                    if (!$cloth) {
+                        return $this->errorResponse(422, "Cloth not found");
+                    }
+                    $color = $model->colors->firstWhere('id', $cloth->color_id);
                     if (!$color) {
-                        return $this->errorResponse(422, "Invalid color for model {$model->name}");
+                        return $this->errorResponse(422, "Invalid color (from cloth) for model {$model->name}");
                     }
                     $size = $model->sizes->firstWhere('id', $item['size_id']);
                     if (!$size) {
                         return $this->errorResponse(422, "Invalid size for model {$model->name}");
                     }
                     $item['model'] = $model;
-                    $item['color'] = $color;
+                    $item['cloth'] = $cloth;
                     $item['size'] = $size;
                 }
                 unset($item);
@@ -216,7 +221,7 @@ class RequestController extends Controller
                             'id' => Str::uuid(),
                             'request_id' => $requestModel->id,
                             'model_id' => $item['model_id'],
-                            'color_id' => $item['color_id'],
+                            'cloth_id' => $item['cloth_id'],
                             'size_id' => $item['size_id'],
                             'req_qty' => $item['req_qty'],
                             'rec_qty' => 0,
@@ -226,7 +231,7 @@ class RequestController extends Controller
                                 // $serial,
                                 $data['serial_number'],
                                 $item['model']->sku,
-                                $item['color']->code,
+                                $item['cloth']->color->code,
                                 $item['size']->code,
                             ]),
                         ];

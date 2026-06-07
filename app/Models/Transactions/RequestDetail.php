@@ -2,7 +2,7 @@
 
 namespace App\Models\Transactions;
 
-use App\Models\MasterData\Color;
+use App\Models\MasterData\Cloth;
 use App\Models\MasterData\ProductModel;
 use App\Models\MasterData\Size;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -19,7 +19,7 @@ class RequestDetail extends Model
     protected $fillable = [
         'request_id',
         'model_id',
-        'color_id',
+        'cloth_id',
         'size_id',
         'req_qty',
         'rec_qty',
@@ -36,9 +36,9 @@ class RequestDetail extends Model
     {
         return $this->belongsTo(ProductModel::class, 'model_id');
     }
-    public function color()
+    public function cloth()
     {
-        return $this->belongsTo(Color::class, 'color_id');
+        return $this->belongsTo(Cloth::class, 'cloth_id');
     }
     public function size()
     {
