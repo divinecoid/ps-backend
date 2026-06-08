@@ -5,6 +5,7 @@ namespace App\Http\Controllers\MasterData;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
 use App\Models\MasterData\ProductModel;
+use App\Models\Transactions\FabricCutting;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -186,25 +187,24 @@ class ProductModelController extends Controller
         );
     }
 
-    public function getFabricColor($id)
-    {
-        $cuttings = \App\Models\Transactions\FabricCutting::whereHas('fabric_cutting_request_detail', function ($q) use ($id) {
+public function getFabricColor(Request $request, $id)
+{
+    $colors = FabricCutting::query()
+        ->where('quantity', '>', 0)
+        ->whereHas('fabric_cutting_request_detail', function ($q) use ($id) {
             $q->where('model_id', $id);
         })
-        ->where('quantity', '>', 0)
-        ->with(['clothes.color'])
-        ->get();
+        ->with('clothes.color')
+        ->get()
+        ->filter(fn($cutting) => $cutting->clothes && $cutting->clothes->color)
+        ->map(fn($cutting) => [
+            'id' => $cutting->id, // fabric_cutting_id
+            'name' => $cutting->clothes->color->name . ' - ' . $cutting->clothes->sequence,
+        ])
+        ->values();
 
-        $colors = $cuttings->map(function ($cutting) {
-            if ($cutting->clothes && $cutting->clothes->color) {
-                return $cutting->clothes->color->name . '-' . $cutting->clothes->sequence;
-            }
-            return null;
-        })->filter()->unique()->values();
-
-        return $this->successResponse($colors);
-    }
-
+    return $this->successResponse($colors);
+}
     public function getFabricQty(Request $request)
     {
         $request->validate([
@@ -215,12 +215,12 @@ class ProductModelController extends Controller
         $modelId = $request->model_id;
         $colorName = $request->color_name;
 
-        $cuttings = \App\Models\Transactions\FabricCutting::whereHas('fabric_cutting_request_detail', function ($q) use ($modelId) {
+        $cuttings = FabricCutting::whereHas('fabric_cutting_request_detail', function ($q) use ($modelId) {
             $q->where('model_id', $modelId);
         })
-        ->where('quantity', '>', 0)
-        ->with(['clothes.color', 'fabric_cutting_request_detail.size'])
-        ->get();
+            ->where('quantity', '>', 0)
+            ->with(['clothes.color', 'fabric_cutting_request_detail.size'])
+            ->get();
 
         $matchedCutting = null;
         foreach ($cuttings as $cutting) {

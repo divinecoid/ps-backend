@@ -32,8 +32,8 @@ class RequestController extends Controller
                 'rec_bs_qty' => $detail->rec_bs_qty,
                 'model_id' => $detail->model_id,
                 'models' => $detail->model,
-                'cloth_id' => $detail->cloth_id,
-                'cloth' => $detail->cloth,
+                'cutting_id' => $detail->cloth_id,
+                'cutting' => $detail->cutting,
                 'barcode' => $detail->barcode
             ]),
         ];
@@ -46,7 +46,8 @@ class RequestController extends Controller
             \App\Models\Transactions\Request::class,
             [
                 'cmt',
-                'request_detail'
+                'request_detail',
+                'request_detail.cutting',
             ],
             [
                 'cmt.code',
@@ -91,44 +92,44 @@ class RequestController extends Controller
                     })
                     ->values(),
                 'receive_log' => $request->request_detail->flatMap(function ($detail) {
-                        return $detail->receivedlog_detail
-                            ->map(fn($rd) => $rd->receivedlog);
-                    })->filter()->unique('id')->values()->map(function ($log) {
-                        return [
-                            'id' => $log->id,
-                            'request_id' => $log->request_id,
-                            'warehouse_id' => $log->warehouse_id,
-                            'warehouse' => (object) [
-                                'name' => $log->warehouse?->name
-                            ],
-                            'user_id' => $log->user_id,
-                            'user' => (object) [
-                                'name' => $log->user?->name
-                            ],
-                            'received_date' => $log->received_date,
-                            'notes' => $log->notes,
-                            'created_at' => $log->created_at,
-                            'updated_at' => $log->updated_at,
-                            'details' => $log->details->map(function ($d) {
-                                return [
-                                    'model_id' => $d->model_id,
-                                    'model' => (object) [
-                                        'name' => $d->model?->name
-                                    ],
-                                    'color_id' => $d->color_id,
-                                    'color' => (object) [
-                                        'name' => $d->color?->name
-                                    ],
-                                    'size_id' => $d->size_id,
-                                    'size' => (object) [
-                                        'name' => $d->size?->name
-                                    ],
-                                    'qty' => $d->qty,
-                                    'barcode' => $d->barcode
-                                ];
-                            })->values()
-                        ];
-                    })
+                    return $detail->receivedlog_detail
+                        ->map(fn($rd) => $rd->receivedlog);
+                })->filter()->unique('id')->values()->map(function ($log) {
+                    return [
+                        'id' => $log->id,
+                        'request_id' => $log->request_id,
+                        'warehouse_id' => $log->warehouse_id,
+                        'warehouse' => (object) [
+                            'name' => $log->warehouse?->name
+                        ],
+                        'user_id' => $log->user_id,
+                        'user' => (object) [
+                            'name' => $log->user?->name
+                        ],
+                        'received_date' => $log->received_date,
+                        'notes' => $log->notes,
+                        'created_at' => $log->created_at,
+                        'updated_at' => $log->updated_at,
+                        'details' => $log->details->map(function ($d) {
+                            return [
+                                'model_id' => $d->model_id,
+                                'model' => (object) [
+                                    'name' => $d->model?->name
+                                ],
+                                'color_id' => $d->color_id,
+                                'color' => (object) [
+                                    'name' => $d->color?->name
+                                ],
+                                'size_id' => $d->size_id,
+                                'size' => (object) [
+                                    'name' => $d->size?->name
+                                ],
+                                'qty' => $d->qty,
+                                'barcode' => $d->barcode
+                            ];
+                        })->values()
+                    ];
+                })
 
             ]
         );
@@ -145,7 +146,7 @@ class RequestController extends Controller
                     'req_dozen_qty' => floor($detail->req_qty / 12),
                     'req_piece_qty' => $detail->req_qty % 12,
                     'serial_number' => $data->serial_number,
-                    'colors' => $detail->cloth->color->code ?? null,
+                    'cutting' => $detail->cutting->clothes->color->code ?? null,
                     'sizes' => $detail->size->code,
                     'barcode' => $detail->barcode,
                 ]),
@@ -185,19 +186,29 @@ class RequestController extends Controller
                     ->whereIn('id', collect($items)->pluck('model_id')->unique())
                     ->get()
                     ->keyBy('id');
-                $clothes = \App\Models\MasterData\Cloth::with('color')->whereIn('id', collect($items)->pluck('cloth_id')->unique())->get()->keyBy('id');
+                //$clothes = \App\Models\MasterData\Cloth::with('color')->whereIn('cloth_id', collect($items)->pluck('cloth_id')->unique())->get()->keyBy('id');
+                $fabricCuttings = \App\Models\Transactions\FabricCutting::with('clothes.color')
+                    ->whereIn('id', collect($items)->pluck('cloth_id')->unique())
+                    ->get()
+                    ->keyBy('id');
                 foreach ($items as &$item) {
                     $model = $models[$item['model_id']] ?? null;
                     if (!$model) {
                         return $this->errorResponse(422, "Model {$item['model_id']} not found");
                     }
-                    $cloth = $clothes[$item['cloth_id']] ?? null;
+                    $fabricCutting = $fabricCuttings[$item['cloth_id']] ?? null;
+
+                    if (!$fabricCutting) {
+                        return $this->errorResponse(422, "Fabric cutting not found");
+                    }
+                    $cloth = $fabricCutting->clothes;
+
                     if (!$cloth) {
                         return $this->errorResponse(422, "Cloth not found");
                     }
                     $color = $model->colors->firstWhere('id', $cloth->color_id);
                     if (!$color) {
-                        return $this->errorResponse(422, "Invalid color (from cloth) for model {$model->name}");
+                        return $this->errorResponse( 422, "Invalid color (from cloth) for model {$model->name}");
                     }
                     $size = $model->sizes->firstWhere('id', $item['size_id']);
                     if (!$size) {
