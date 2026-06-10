@@ -38,7 +38,7 @@ class ClothController extends Controller
             $this->structure(),
         );
     }
-    public function readyStock(Request $request)
+    public function uncut(Request $request)
     {
         return $this->baseIndex(
             $request,

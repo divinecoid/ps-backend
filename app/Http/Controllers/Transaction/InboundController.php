@@ -259,23 +259,23 @@ class InboundController extends Controller
                                     ['prefix' => $prefix] = $this->parseBarcode($barcodesDozen[0]);
                                     if ($rd = $this->findRequestDetail($prefix)) {
                                         $recRack = \App\Models\MasterData\Rack::whereHas('warehouse', function ($q) {
-                                                $q->where('type', 'BIG');
-                                            })
+                                            $q->where('type', 'BIG');
+                                        })
                                             ->where('model_id', $rd->model_id)
                                             ->where('color_id', $rd->color_id)
                                             ->first();
                                         if (!$recRack) {
                                             $recRack = \App\Models\MasterData\Rack::whereHas('warehouse', function ($q) {
-                                                    $q->where('type', 'BIG');
-                                                })
+                                                $q->where('type', 'BIG');
+                                            })
                                                 ->where('model_id', $rd->model_id)
                                                 ->whereNull('color_id')
                                                 ->first();
                                         }
                                         if (!$recRack) {
                                             $recRack = \App\Models\MasterData\Rack::whereHas('warehouse', function ($q) {
-                                                    $q->where('type', 'BIG');
-                                                })
+                                                $q->where('type', 'BIG');
+                                            })
                                                 ->whereNull('model_id')
                                                 ->whereNull('color_id')
                                                 ->first();
@@ -344,7 +344,7 @@ class InboundController extends Controller
                                     Product::create([
                                         'rack_id' => $items['rack_id'],
                                         'model_id' => $rd->model_id,
-                                        'color_id' => $rd->color_id,
+                                        'color_id' => $rd->cutting->clothes->color_id,
                                         'size_id' => $rd->size_id,
                                         'series' => $series,
                                         'barcode' => $barcode
@@ -448,13 +448,13 @@ class InboundController extends Controller
 
                 $cmt = $requestDetail->request->cmt;
                 $model = $requestDetail->model;
-                $color = $requestDetail->color;
+                $color = $requestDetail->cutting->clothes->color;
                 $size = $requestDetail->size;
 
                 $recommendedRack = null;
                 if ($group === 'P') {
                     $modelId = $requestDetail->model_id;
-                    $colorId = $requestDetail->color_id;
+                    $colorId = $requestDetail->cutting->clothes->color_id;
 
                     $recommendedRack = \App\Models\MasterData\Rack::with('warehouse')
                         ->whereHas('warehouse', function ($q) {
@@ -485,7 +485,7 @@ class InboundController extends Controller
                     }
                 } else if ($group === 'D') {
                     $modelId = $requestDetail->model_id;
-                    $colorId = $requestDetail->color_id;
+                    $colorId = $requestDetail->cutting->clothes->color_id;
 
                     $recommendedRack = \App\Models\MasterData\Rack::with('warehouse')
                         ->whereHas('warehouse', function ($q) {
@@ -561,7 +561,7 @@ class InboundController extends Controller
     }
     private function findRequestDetail(string $prefix)
     {
-        return RequestDetail::with(['request.cmt', 'model', 'color', 'size'])->where('barcode', $prefix)->first();
+        return RequestDetail::with(['request.cmt', 'model', 'cutting.clothes.color', 'size'])->where('barcode', $prefix)->first();
     }
     private function createReceivedDetail($receivedLog, $requestDetail, string $barcode, int $qty, bool $is_rejected = false)
     {
@@ -571,7 +571,7 @@ class InboundController extends Controller
             'receivedlog_id' => $receivedLog->id,
             'request_detail_id' => $requestDetail->id,
             'model_id' => $requestDetail->model_id,
-            'color_id' => $requestDetail->color_id,
+            'color_id' => $requestDetail->cutting->clothes->color_id,
             'size_id' => $requestDetail->size_id,
             'qty' => $qty,
             'barcode' => $barcode,
@@ -579,32 +579,30 @@ class InboundController extends Controller
         ]);
         $requestDetail->increment('rec_qty', $qty);
         if (!$is_rejected && $group == 'D') {
-            $inventory = Inventory::firstOrCreate(
-                [
-                    'model_id' => $requestDetail->model_id,
-                    'color_id' => $requestDetail->color_id,
-                    'size_id' => $requestDetail->size_id,
-                ]
-            );
+            $inventory = Inventory::firstOrCreate([
+                'model_id' => $requestDetail->model_id,
+                'color_id' => $requestDetail->cutting->clothes->color_id,
+                'size_id' => $requestDetail->size_id,
+            ]);
             if ($inventory->rack_id === null) {
                 $recRack = \App\Models\MasterData\Rack::whereHas('warehouse', function ($q) {
-                        $q->where('type', 'BIG');
-                    })
+                    $q->where('type', 'BIG');
+                })
                     ->where('model_id', $requestDetail->model_id)
-                    ->where('color_id', $requestDetail->color_id)
+                    ->where('color_id', $requestDetail->cutting->clothes->color_id)
                     ->first();
                 if (!$recRack) {
                     $recRack = \App\Models\MasterData\Rack::whereHas('warehouse', function ($q) {
-                            $q->where('type', 'BIG');
-                        })
+                        $q->where('type', 'BIG');
+                    })
                         ->where('model_id', $requestDetail->model_id)
                         ->whereNull('color_id')
                         ->first();
                 }
                 if (!$recRack) {
                     $recRack = \App\Models\MasterData\Rack::whereHas('warehouse', function ($q) {
-                            $q->where('type', 'BIG');
-                        })
+                        $q->where('type', 'BIG');
+                    })
                         ->whereNull('model_id')
                         ->whereNull('color_id')
                         ->first();

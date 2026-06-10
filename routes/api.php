@@ -455,6 +455,7 @@ Route::prefix('shopee')->middleware('checkrole:admin')->group(function () {
 Route::prefix('lazada')->middleware('checkrole:admin')->group(function() {
     Route::get('/get-order/{id}', [LazadaController::class, 'getOrderList']);
     Route::get('/get-order/{id}/{orderId}', [LazadaController::class, 'getOrder']);
+    Route::get('/get-order/{id}/{orderId}/item', [LazadaController::class, 'getOrderItem']);
     Route::get('/get-order/{id}/{orderId}/pickup', [LazadaController::class, 'pickupOrder']);
     Route::get('/get-order/{id}/{orderId}/download', [LazadaController::class, 'getReceipt']);
 });
