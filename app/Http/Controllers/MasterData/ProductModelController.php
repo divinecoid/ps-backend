@@ -198,8 +198,9 @@ public function getFabricColor(Request $request, $id)
         ->get()
         ->filter(fn($cutting) => $cutting->clothes && $cutting->clothes->color)
         ->map(fn($cutting) => [
-            'id' => $cutting->id, // fabric_cutting_id
+            'id' => $cutting->id,
             'name' => $cutting->clothes->color->name . ' - ' . $cutting->clothes->sequence,
+            'detail' => $cutting->fabric_cutting_request_detail
         ])
         ->values();
 
