@@ -485,6 +485,9 @@ Route::prefix('fabric-purchase')->middleware(['checkrole', 'acm:pembelian_kain,r
 Route::prefix('fabric-purchase')->middleware(['checkrole', 'acm:pembelian_kain,create'])->group(function () {
     Route::post('/', [FabricPurchaseController::class, 'store']);
 });
+Route::prefix('fabric-purchase')->middleware(['checkrole', 'acm:pembelian_kain,update'])->group(function () {
+    Route::patch('/{id}/complete', [FabricPurchaseController::class, 'complete']);
+});
 Route::prefix('fabric-purchase')->middleware(['checkrole', 'acm:pembelian_kain,delete'])->group(function () {
     Route::delete('/{id}', [FabricPurchaseController::class, 'destroy']);
 });

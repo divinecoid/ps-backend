@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Transaction;
 
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
+use App\Models\MasterData\Cloth;
 use App\Models\MasterData\Color;
 use App\Models\MasterData\Factory;
 use App\Models\MasterData\RollSize;
@@ -222,6 +223,55 @@ class FabricPurchaseController extends Controller
         }
 
         return $value;
+    }
+
+    public function complete($id)
+    {
+        try {
+            return DB::transaction(function () use ($id) {
+                $purchase = FabricPurchaseRequest::with(['factory', 'roll_size', 'details.color'])->find($id);
+                if (!$purchase) {
+                    return $this->errorResponse(404, 'Pembelian kain tidak ditemukan.');
+                }
+
+                if ($purchase->status === 'CLOSED') {
+                    return $this->errorResponse(422, 'Pembelian kain sudah selesai.');
+                }
+
+                if (!$purchase->roll_size_id) {
+                    return $this->errorResponse(422, 'Ukuran roll tidak tersedia untuk pembelian ini.');
+                }
+
+                foreach ($purchase->details as $detail) {
+                    $existingCloth = Cloth::withTrashed()->where('sequence', $detail->sequence)->first();
+
+                    if ($existingCloth) {
+                        if ($existingCloth->trashed()) {
+                            $existingCloth->restore();
+                        }
+                        $existingCloth->quantity = $existingCloth->quantity + $detail->quantity;
+                        $existingCloth->save();
+                    } else {
+                        Cloth::create([
+                            'factory_id' => $purchase->factory_id,
+                            'gram' => $purchase->gram,
+                            'roll_size_id' => $purchase->roll_size_id,
+                            'color_id' => $detail->color_id,
+                            'quantity' => $detail->quantity,
+                            'sequence' => $detail->sequence,
+                        ]);
+                    }
+                }
+
+                $purchase->status = 'CLOSED';
+                $purchase->save();
+
+                $fresh = FabricPurchaseRequest::with(['factory', 'details.color'])->find($purchase->id);
+                return $this->successResponse(($this->structure())($fresh));
+            });
+        } catch (\Throwable $exception) {
+            return $this->errorResponse(422, $exception->getMessage());
+        }
     }
 
     public function destroy($id)
