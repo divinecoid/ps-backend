@@ -187,7 +187,10 @@ class RequestController extends Controller
                     ->get()
                     ->keyBy('id');
                 //$clothes = \App\Models\MasterData\Cloth::with('color')->whereIn('cloth_id', collect($items)->pluck('cloth_id')->unique())->get()->keyBy('id');
-                $fabricCuttings = \App\Models\Transactions\FabricCutting::with('clothes.color')
+                $fabricCuttings = \App\Models\Transactions\FabricCutting::with([
+                    'clothes.color',
+                    'fabric_cutting_request_detail',
+                ])
                     ->whereIn('id', collect($items)->pluck('cloth_id')->unique())
                     ->get()
                     ->keyBy('id');
@@ -208,7 +211,7 @@ class RequestController extends Controller
                     }
                     $color = $model->colors->firstWhere('id', $cloth->color_id);
                     if (!$color) {
-                        return $this->errorResponse( 422, "Invalid color (from cloth) for model {$model->name}");
+                        return $this->errorResponse(422, "Invalid color (from cloth) for model {$model->name}");
                     }
                     $size = $model->sizes->firstWhere('id', $item['size_id']);
                     if (!$size) {
@@ -219,7 +222,7 @@ class RequestController extends Controller
                     $item['size'] = $size;
                 }
                 unset($item);
-                return DB::transaction(function () use ($data, $items, $cmt) {
+                return DB::transaction(function () use ($data, $items, $cmt, $fabricCuttings) {
                     // $serial = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT); //TODO: ganti dengan input dari proses potong baju
                     $requestModel = \App\Models\Transactions\Request::create([
                         'cmt_id' => $data['cmt_id'],
@@ -246,6 +249,26 @@ class RequestController extends Controller
                                 $item['size']->code,
                             ]),
                         ];
+                    }
+                    foreach ($items as $item) {
+                        $fabricCutting = $fabricCuttings[$item['cloth_id']];
+                        $cuttingDetail = $fabricCutting
+                            ->fabric_cutting_request_detail
+                            ->firstWhere('size_id', $item['size_id']);
+                        if (!$cuttingDetail) {
+                            return $this->errorResponse(
+                                422,
+                                "Ukuran tidak ditemukan pada fabric cutting."
+                            );
+                        }
+                        if ($cuttingDetail->avl_qty < $item['req_qty']) {
+                            return $this->errorResponse(
+                                422,
+                                "Stok ukuran {$cuttingDetail->size_id} tidak mencukupi."
+                            );
+                        }
+                        $cuttingDetail->avl_qty -= $item['req_qty'];
+                        $cuttingDetail->save();
                     }
                     RequestDetail::insert($details);
                     return $this->successResponse($requestModel);

@@ -190,10 +190,10 @@ class ProductModelController extends Controller
 public function getFabricColor($id)
 {
     $colors = FabricCutting::query()
-        ->where('quantity', '>', 0)
+        ->where('status', '=', 'CLOSED')
         ->whereHas('fabric_cutting_request_detail', function ($q) use ($id) {
             $q->where('model_id', $id)
-              ->where('rec_qty', '>', 0);
+              ->where('avl_qty', '>', 0);
         })
         ->with('clothes.color')
         ->get()

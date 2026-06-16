@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
 use App\Models\MasterData\Cloth;
 use App\Models\MasterData\ProductModel;
+use App\Models\Transactions\FabricCutting;
 use App\Models\Transactions\FabricCuttingDetail;
 use DB;
 use Illuminate\Http\Request;
@@ -28,8 +29,8 @@ class FabricCuttingController extends Controller
             'request_detail' => $data->fabric_cutting_request_detail->map(fn($detail) => [
                 'req_dozen_qty' => floor($detail->req_qty / 12),
                 'req_piece_qty' => $detail->req_qty % 12,
-                'rec_dozen_qty' => floor($detail->rec_qty / 12),
-                'rec_piece_qty' => $detail->rec_qty % 12,
+                'rec_dozen_qty' => floor($detail->avl_qty / 12),
+                'rec_piece_qty' => $detail->avl_qty % 12,
                 'model_id' => $detail->model_id,
                 'models' => $detail->model
             ]),
@@ -160,7 +161,7 @@ class FabricCuttingController extends Controller
                             'model_id' => $item['model_id'],
                             'size_id' => $item['size_id'],
                             'req_qty' => $item['req_qty'],
-                            'rec_qty' => 0,
+                            'avl_qty' => 0,
                         ];
                     }
                     FabricCuttingDetail::insert($details);
@@ -188,10 +189,17 @@ class FabricCuttingController extends Controller
 
     public function setReceived($id)
     {
-        FabricCuttingDetail::where('fabric_cutting_id', $id)
-            ->update([
-                'rec_qty' => DB::raw('req_qty')
-            ]);
+        DB::transaction(function () use ($id) {
+            FabricCuttingDetail::where('fabric_cutting_id', $id)
+                ->update([
+                    'avl_qty' => DB::raw('req_qty'),
+                ]);
+
+            FabricCutting::where('id', $id)
+                ->update([
+                    'status' => 'CLOSED',
+                ]);
+        });
     }
 
 }
