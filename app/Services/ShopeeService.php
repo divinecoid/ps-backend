@@ -63,6 +63,11 @@ class ShopeeService
             urlencode($redirectUrl . "&state=" . $partnerId),
         );
 
+        Log::info('Generated Shopee Auth URL', [
+            'store_id' => $store->id,
+            'store_name' => $store->store_name,
+            'url' => $url
+        ]);
         return $url;
     }
 
@@ -585,7 +590,18 @@ class ShopeeService
             'partner_id' => $partnerId,
         ];
 
+        Log::info('Initiating Shopee exchangeAuthCodeForToken', [
+            'store_id' => $store->id,
+            'shop_id' => $shopId,
+            'partner_id' => $partnerId,
+        ]);
+
         $response = Http::post($host . $path . '?' . http_build_query($params), $data);
+
+        Log::info('Shopee exchangeAuthCodeForToken HTTP response status', [
+            'status' => $response->status(),
+            'body' => $response->body()
+        ]);
 
         if ($response->failed()) {
             Log::error('Shopee exchangeAuthCodeForToken failed', ['body' => $response->body()]);
@@ -593,6 +609,10 @@ class ShopeeService
         }
 
         $json = $response->json();
+        Log::info('Shopee exchangeAuthCodeForToken parsed JSON', [
+            'json' => $json
+        ]);
+
         if (isset($json['error']) && !empty($json['error'])) {
             throw new \Exception($json['message'] ?? 'Exchange auth code failed');
         }
@@ -600,11 +620,22 @@ class ShopeeService
         $accessExpireIn = isset($json['expire_in']) ? (int) $json['expire_in'] : null;
         $refreshExpireIn = isset($json['refresh_token_expire_in']) ? (int) $json['refresh_token_expire_in'] : null;
 
-        $store->update([
+        $updated = $store->update([
             'access_token' => $json['access_token'] ?? $store->access_token,
             'refresh_token' => $json['refresh_token'] ?? $store->refresh_token,
             'access_token_expires_at' => $accessExpireIn ? Carbon::now()->addSeconds($accessExpireIn) : $store->access_token_expires_at,
             'refresh_token_expires_at' => $refreshExpireIn ? Carbon::now()->addSeconds($refreshExpireIn) : $store->refresh_token_expires_at,
+        ]);
+
+        $store->refresh();
+
+        Log::info('Successfully exchanged Shopee auth code for tokens', [
+            'store_id' => $store->id,
+            'shop_id' => $shopId,
+            'db_update_result' => $updated,
+            'saved_access_token_prefix' => substr($store->access_token, 0, 15) . '...',
+            'access_token_expires_at' => $store->access_token_expires_at,
+            'refresh_token_expires_at' => $store->refresh_token_expires_at,
         ]);
 
         return $json;
