@@ -60,7 +60,7 @@ class ShopeeService
             $partnerId,
             $timestamp,
             $sign,
-            urlencode($redirectUrl . "&state=" . $partnerId),
+            urlencode($redirectUrl . "?state=" . $partnerId),
         );
 
         return $url;
