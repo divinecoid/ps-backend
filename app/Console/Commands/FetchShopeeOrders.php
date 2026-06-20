@@ -13,287 +13,287 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
-class FetchShopeeOrders extends Command
-{
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
-    protected $signature = 'shopee:fetch-orders {--days=1 : Number of days to look back}';
+// class FetchShopeeOrders extends Command
+// {
+//     /**
+//      * The name and signature of the console command.
+//      *
+//      * @var string
+//      */
+//     protected $signature = 'shopee:fetch-orders {--days=1 : Number of days to look back}';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $description = 'Fetch orders from Shopee and process them';
+//     /**
+//      * The console command description.
+//      *
+//      * @var string
+//      */
+//     protected $description = 'Fetch orders from Shopee and process them';
 
-    /**
-     * Execute the console command.
-     */
-    public function handle(ShopeeService $shopeeService)
-    {
-        $this->info('Starting Shopee Order Fetch...');
+//     /**
+//      * Execute the console command.
+//      */
+//     public function handle(ShopeeService $shopeeService)
+//     {
+//         $this->info('Starting Shopee Order Fetch...');
 
-        $days = $this->option('days');
-        $timeTo = time();
-        $timeFrom = $timeTo - ($days * 24 * 60 * 60);
+//         $days = $this->option('days');
+//         $timeTo = time();
+//         $timeFrom = $timeTo - ($days * 24 * 60 * 60);
 
-        // Fetch all active Shopee stores
-        $stores = OnlineStore::whereHas('marketplace', function ($q) {
-            $q->where('name', 'like', '%Shopee%')
-                ->orWhere('alias', 'like', '%shopee%');
-        })->where('is_active', true)->get();
+//         // Fetch all active Shopee stores
+//         $stores = OnlineStore::whereHas('marketplace', function ($q) {
+//             $q->where('name', 'like', '%Shopee%')
+//                 ->orWhere('alias', 'like', '%shopee%');
+//         })->where('is_active', true)->get();
 
-        if ($stores->isEmpty()) {
-            $this->warn("No active Shopee stores found.");
-            return 0;
-        }
+//         if ($stores->isEmpty()) {
+//             $this->warn("No active Shopee stores found.");
+//             return 0;
+//         }
 
-        $this->info("Found " . $stores->count() . " active Shopee stores.");
+//         $this->info("Found " . $stores->count() . " active Shopee stores.");
 
-        foreach ($stores as $store) {
-            $this->info("Processing Store: " . $store->store_name . " (" . $store->store_code . ")");
+//         foreach ($stores as $store) {
+//             $this->info("Processing Store: " . $store->store_name . " (" . $store->store_code . ")");
 
-            try {
-                // Set the store context for the service
-                $shopeeService->setStore($store);
+//             try {
+//                 // Set the store context for the service
+//                 $shopeeService->setStore($store);
 
-                $this->info("Fetching orders from " . date('Y-m-d H:i:s', $timeFrom) . " to " . date('Y-m-d H:i:s', $timeTo));
+//                 $this->info("Fetching orders from " . date('Y-m-d H:i:s', $timeFrom) . " to " . date('Y-m-d H:i:s', $timeTo));
 
-                // 1. Get List of Orders
-                $response = $shopeeService->getOrderList($timeFrom, $timeTo);
+//                 // 1. Get List of Orders
+//                 $response = $shopeeService->getOrderList($timeFrom, $timeTo);
 
-                // Log response to file
-                $this->saveApiResponse('order_list', $store->store_name, $response);
+//                 // Log response to file
+//                 $this->saveApiResponse('order_list', $store->store_name, $response);
 
-                if (isset($response['error']) && !empty($response['error'])) {
-                    $this->error('Shopee API Error: ' . ($response['message'] ?? 'Unknown error'));
-                    continue; // Skip to next store
-                }
+//                 if (isset($response['error']) && !empty($response['error'])) {
+//                     $this->error('Shopee API Error: ' . ($response['message'] ?? 'Unknown error'));
+//                     continue; // Skip to next store
+//                 }
 
-                $orders = $response['response']['order_list'] ?? [];
-                $count = count($orders);
+//                 $orders = $response['response']['order_list'] ?? [];
+//                 $count = count($orders);
 
-                $this->info("Found {$count} orders for store {$store->store_name}.");
+//                 $this->info("Found {$count} orders for store {$store->store_name}.");
 
-                if ($count > 0) {
-                    // Extract all Order SNs
-                    $orderSns = array_column($orders, 'order_sn');
+//                 if ($count > 0) {
+//                     // Extract all Order SNs
+//                     $orderSns = array_column($orders, 'order_sn');
 
-                    // Chunk them if necessary (Shopee might have a limit per request, e.g. 50)
-                    $snChunks = array_chunk($orderSns, 50);
+//                     // Chunk them if necessary (Shopee might have a limit per request, e.g. 50)
+//                     $snChunks = array_chunk($orderSns, 50);
 
-                    foreach ($snChunks as $chunk) {
-                        $this->info("Fetching details for " . count($chunk) . " orders...");
+//                     foreach ($snChunks as $chunk) {
+//                         $this->info("Fetching details for " . count($chunk) . " orders...");
 
-                        // 2. Get Details for these orders
-                        $detailResponse = $shopeeService->getOrderDetail($chunk);
+//                         // 2. Get Details for these orders
+//                         $detailResponse = $shopeeService->getOrderDetail($chunk);
 
-                        // Log response to file
-                        $this->saveApiResponse('order_detail', $store->store_name, $detailResponse);
+//                         // Log response to file
+//                         $this->saveApiResponse('order_detail', $store->store_name, $detailResponse);
 
-                        if (isset($detailResponse['error']) && !empty($detailResponse['error'])) {
-                            $this->error('Shopee Detail API Error: ' . ($detailResponse['message'] ?? 'Unknown error'));
-                            continue;
-                        }
+//                         if (isset($detailResponse['error']) && !empty($detailResponse['error'])) {
+//                             $this->error('Shopee Detail API Error: ' . ($detailResponse['message'] ?? 'Unknown error'));
+//                             continue;
+//                         }
 
-                        $detailedOrders = $detailResponse['response']['order_list'] ?? [];
+//                         $detailedOrders = $detailResponse['response']['order_list'] ?? [];
 
-                        foreach ($detailedOrders as $detail) {
-                            $this->line("--------------------------------------------------");
-                            $this->line("🆔 Order SN   : " . $detail['order_sn']);
-                            $this->line("👤 Buyer      : " . ($detail['buyer_username'] ?? '-'));
-                            $this->line("💰 Total      : " . ($detail['total_amount'] ?? '-'));
-                            $this->line("✉️  Note       : " . ($detail['message_to_seller'] ?? '-'));
+//                         foreach ($detailedOrders as $detail) {
+//                             $this->line("--------------------------------------------------");
+//                             $this->line("🆔 Order SN   : " . $detail['order_sn']);
+//                             $this->line("👤 Buyer      : " . ($detail['buyer_username'] ?? '-'));
+//                             $this->line("💰 Total      : " . ($detail['total_amount'] ?? '-'));
+//                             $this->line("✉️  Note       : " . ($detail['message_to_seller'] ?? '-'));
 
-                            if (isset($detail['item_list'])) {
-                                $this->line("📦 Items:");
-                                foreach ($detail['item_list'] as $index => $item) {
-                                    $this->line("   " . ($index + 1) . ". " . $item['item_name'] . " [x" . $item['model_quantity_purchased'] . "]");
-                                }
-                            }
+//                             if (isset($detail['item_list'])) {
+//                                 $this->line("📦 Items:");
+//                                 foreach ($detail['item_list'] as $index => $item) {
+//                                     $this->line("   " . ($index + 1) . ". " . $item['item_name'] . " [x" . $item['model_quantity_purchased'] . "]");
+//                                 }
+//                             }
 
-                            // Save to Database
-                            $this->saveOrder($detail, $store);
-                        }
-                    }
-                }
+//                             // Save to Database
+//                             $this->saveOrder($detail, $store);
+//                         }
+//                     }
+//                 }
 
-            } catch (\Exception $e) {
-                $this->error('Exception for store ' . $store->store_name . ': ' . $e->getMessage());
-                Log::error('FetchShopeeOrders command failed for store ' . $store->store_name, ['error' => $e->getMessage()]);
-            }
-        }
+//             } catch (\Exception $e) {
+//                 $this->error('Exception for store ' . $store->store_name . ': ' . $e->getMessage());
+//                 Log::error('FetchShopeeOrders command failed for store ' . $store->store_name, ['error' => $e->getMessage()]);
+//             }
+//         }
 
-        $this->info('All stores processed.');
-        return 0;
-    }
+//         $this->info('All stores processed.');
+//         return 0;
+//     }
 
-    private function saveApiResponse($type, $storeName, $data)
-    {
-        try {
-            $path = storage_path("logs/shopee/orders/" . date('Y-m-d'));
-            if (!file_exists($path)) {
-                mkdir($path, 0777, true);
-            }
+//     private function saveApiResponse($type, $storeName, $data)
+//     {
+//         try {
+//             $path = storage_path("logs/shopee/orders/" . date('Y-m-d'));
+//             if (!file_exists($path)) {
+//                 mkdir($path, 0777, true);
+//             }
 
-            $filename = sprintf(
-                "%s_%s_%s_%s.json",
-                date('H-i-s'),
-                str_replace([' ', '/', '\\'], '_', $storeName),
-                $type,
-                uniqid()
-            );
+//             $filename = sprintf(
+//                 "%s_%s_%s_%s.json",
+//                 date('H-i-s'),
+//                 str_replace([' ', '/', '\\'], '_', $storeName),
+//                 $type,
+//                 uniqid()
+//             );
 
-            file_put_contents($path . '/' . $filename, json_encode($data, JSON_PRETTY_PRINT));
-            $this->info("   Saved JSON response to: " . $path . '/' . $filename);
-        } catch (\Exception $e) {
-            $this->warn("   Failed to save JSON response: " . $e->getMessage());
-        }
-    }
+//             file_put_contents($path . '/' . $filename, json_encode($data, JSON_PRETTY_PRINT));
+//             $this->info("   Saved JSON response to: " . $path . '/' . $filename);
+//         } catch (\Exception $e) {
+//             $this->warn("   Failed to save JSON response: " . $e->getMessage());
+//         }
+//     }
 
-    private function saveOrder($detail, $store)
-    {
-        try {
-            DB::beginTransaction();
+//     private function saveOrder($detail, $store)
+//     {
+//         try {
+//             DB::beginTransaction();
 
-            // Map Status
-            $statusMap = [
-                'UNPAID' => null, // Skip per user request
-                'READY_TO_SHIP' => OrderStatus::READY_TO_SHIP,
-                'RETRY_SHIP' => OrderStatus::RETRY_SHIP,
-                'PROCESSED' => OrderStatus::WAIT_COURIER,
-                'SHIPPED' => OrderStatus::SHIPPED,
-                'TO_CONFIRM_RECEIVE' => OrderStatus::SHIPPED,
-                'COMPLETED' => OrderStatus::COMPLETED,
-                'CANCELLED' => OrderStatus::CANCELLED,
-                'TO_RETURN' => OrderStatus::RETURNED,
-            ];
+//             // Map Status
+//             $statusMap = [
+//                 'UNPAID' => null, // Skip per user request
+//                 'READY_TO_SHIP' => OrderStatus::READY_TO_SHIP,
+//                 'RETRY_SHIP' => OrderStatus::RETRY_SHIP,
+//                 'PROCESSED' => OrderStatus::WAIT_COURIER,
+//                 'SHIPPED' => OrderStatus::SHIPPED,
+//                 'TO_CONFIRM_RECEIVE' => OrderStatus::SHIPPED,
+//                 'COMPLETED' => OrderStatus::COMPLETED,
+//                 'CANCELLED' => OrderStatus::CANCELLED,
+//                 'TO_RETURN' => OrderStatus::RETURNED,
+//             ];
 
-            $status = $statusMap[$detail['order_status']] ?? null;
+//             $status = $statusMap[$detail['order_status']] ?? null;
 
-            if ($status === null) {
-                $this->info("   Skipping order " . $detail['order_sn'] . " with status: " . $detail['order_status']);
-                DB::rollBack();
-                return;
-            }
+//             if ($status === null) {
+//                 $this->info("   Skipping order " . $detail['order_sn'] . " with status: " . $detail['order_status']);
+//                 DB::rollBack();
+//                 return;
+//             }
 
-            $recipient = $detail['recipient_address'] ?? [];
+//             $recipient = $detail['recipient_address'] ?? [];
 
-            $this->info("   Saving Order: " . $detail['order_sn']);
+//             $this->info("   Saving Order: " . $detail['order_sn']);
 
-            // Get Shopee marketplace ID
-            $shopeeMarketplace = Marketplace::where('code', 'shopee')->first();
+//             // Get Shopee marketplace ID
+//             $shopeeMarketplace = Marketplace::where('code', 'shopee')->first();
 
-            // Prepare order data
-            $orderData = [
-                'online_store_id' => $store->id,
-                'status' => $status,
-                'total_price' => $detail['goods_to_declare'] ?? 0,
-                'total_shipping' => $detail['estimated_shipping_fee'] ?? 0,
-                'total_amount' => $detail['total_amount'] ?? 0,
-                'customer_name' => $recipient['name'] ?? $detail['buyer_username'],
-                'customer_phone' => $recipient['phone'] ?? null,
-                'customer_address' => $this->formatAddress($recipient),
-                'item_count' => count($detail['item_list'] ?? []),
-                'unique_item_count' => count($detail['item_list'] ?? []),
-                'read_at' => now(),
-                'marketplace_id' => $shopeeMarketplace?->id,
-            ];
+//             // Prepare order data
+//             $orderData = [
+//                 'online_store_id' => $store->id,
+//                 'status' => $status,
+//                 'total_price' => $detail['goods_to_declare'] ?? 0,
+//                 'total_shipping' => $detail['estimated_shipping_fee'] ?? 0,
+//                 'total_amount' => $detail['total_amount'] ?? 0,
+//                 'customer_name' => $recipient['name'] ?? $detail['buyer_username'],
+//                 'customer_phone' => $recipient['phone'] ?? null,
+//                 'customer_address' => $this->formatAddress($recipient),
+//                 'item_count' => count($detail['item_list'] ?? []),
+//                 'unique_item_count' => count($detail['item_list'] ?? []),
+//                 'read_at' => now(),
+//                 'marketplace_id' => $shopeeMarketplace?->id,
+//             ];
 
-            // Find existing order by order_sn
-            $order = Order::where('order_sn', $detail['order_sn'])->first();
+//             // Find existing order by order_sn
+//             $order = Order::where('order_sn', $detail['order_sn'])->first();
 
-            if ($order) {
-                // Jika order sudah ada, HANYA UPDATE STATUS.
-                // Jangan timpa data lain seperti customer_address, awb_code, dll yang mungkin sudah diubah manual/sistem lain.
-                $order->update([
-                    'status' => $status,
-                    'read_at' => now(), // Update waktu terakhir ditarik
-                ]);
+//             if ($order) {
+//                 // Jika order sudah ada, HANYA UPDATE STATUS.
+//                 // Jangan timpa data lain seperti customer_address, awb_code, dll yang mungkin sudah diubah manual/sistem lain.
+//                 $order->update([
+//                     'status' => $status,
+//                     'read_at' => now(), // Update waktu terakhir ditarik
+//                 ]);
 
-                // Update AWB HANYA jika di database masih kosong DAN Shopee punya data barunya
-                if (empty($order->awb_code) && !empty($detail['tracking_number'])) {
-                    $order->update(['awb_code' => $detail['tracking_number']]);
-                }
+//                 // Update AWB HANYA jika di database masih kosong DAN Shopee punya data barunya
+//                 if (empty($order->awb_code) && !empty($detail['tracking_number'])) {
+//                     $order->update(['awb_code' => $detail['tracking_number']]);
+//                 }
 
-                $this->info("   Updating Order Status only: " . $detail['order_sn'] . " -> " . $detail['order_status']);
-            } else {
-                // Jika order belum ada (baru), buat data lengkap
-                $orderData['order_sn'] = $detail['order_sn'];
+//                 $this->info("   Updating Order Status only: " . $detail['order_sn'] . " -> " . $detail['order_status']);
+//             } else {
+//                 // Jika order belum ada (baru), buat data lengkap
+//                 $orderData['order_sn'] = $detail['order_sn'];
                 
-                // Tambahkan AWB jika ada dari Shopee
-                if (!empty($detail['tracking_number'])) {
-                    $orderData['awb_code'] = $detail['tracking_number'];
-                }
+//                 // Tambahkan AWB jika ada dari Shopee
+//                 if (!empty($detail['tracking_number'])) {
+//                     $orderData['awb_code'] = $detail['tracking_number'];
+//                 }
 
-                $order = Order::create($orderData);
-                $this->info("   Creating New Order: " . $detail['order_sn']);
-            }
+//                 $order = Order::create($orderData);
+//                 $this->info("   Creating New Order: " . $detail['order_sn']);
+//             }
 
-            if (isset($detail['item_list'])) {
-                foreach ($detail['item_list'] as $itemData) {
+//             if (isset($detail['item_list'])) {
+//                 foreach ($detail['item_list'] as $itemData) {
 
-                    // Logic to extract color and size from model_name
-                    // Assumed format "Color,Size" or similar. Shopee usually sends "VariationName, VariationName2"
-                    // If model_name is "Merah,L" -> color=Merah, size=L
-                    // We will split by comma.
-                    $color = null;
-                    $size = null;
-                    if (!empty($itemData['model_name'])) {
-                        $parts = explode(',', $itemData['model_name']);
-                        $color = trim($parts[0] ?? '');
-                        $size = trim($parts[1] ?? '');
-                    }
+//                     // Logic to extract color and size from model_name
+//                     // Assumed format "Color,Size" or similar. Shopee usually sends "VariationName, VariationName2"
+//                     // If model_name is "Merah,L" -> color=Merah, size=L
+//                     // We will split by comma.
+//                     $color = null;
+//                     $size = null;
+//                     if (!empty($itemData['model_name'])) {
+//                         $parts = explode(',', $itemData['model_name']);
+//                         $color = trim($parts[0] ?? '');
+//                         $size = trim($parts[1] ?? '');
+//                     }
 
-                    OrderItem::updateOrCreate(
-                        [
-                            'order_id' => $order->id,
-                            'order_item_id' => (string) $itemData['order_item_id'],
-                        ],
-                        [
-                            'item_name' => $itemData['item_name'],
-                            'sku' => $itemData['item_sku'] ?? null,
-                            'color' => $color,
-                            'size' => $size,
-                            'quantity_purchased' => $itemData['model_quantity_purchased'],
-                            'price' => $itemData['model_original_price'],
-                            'discounted_price' => $itemData['model_discounted_price'],
-                        ]
-                    );
-                }
-            }
+//                     OrderItem::updateOrCreate(
+//                         [
+//                             'order_id' => $order->id,
+//                             'order_item_id' => (string) $itemData['order_item_id'],
+//                         ],
+//                         [
+//                             'item_name' => $itemData['item_name'],
+//                             'sku' => $itemData['item_sku'] ?? null,
+//                             'color' => $color,
+//                             'size' => $size,
+//                             'quantity_purchased' => $itemData['model_quantity_purchased'],
+//                             'price' => $itemData['model_original_price'],
+//                             'discounted_price' => $itemData['model_discounted_price'],
+//                         ]
+//                     );
+//                 }
+//             }
 
-            DB::commit();
-            $this->info("   ✅ Order saved successfully.");
+//             DB::commit();
+//             $this->info("   ✅ Order saved successfully.");
 
-        } catch (\Exception $e) {
-            DB::rollBack();
-            $this->error("   ❌ Failed to save order " . $detail['order_sn'] . ": " . $e->getMessage());
-            Log::error("Failed to save order " . $detail['order_sn'], [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'data' => $detail
-            ]);
-        }
-    }
+//         } catch (\Exception $e) {
+//             DB::rollBack();
+//             $this->error("   ❌ Failed to save order " . $detail['order_sn'] . ": " . $e->getMessage());
+//             Log::error("Failed to save order " . $detail['order_sn'], [
+//                 'error' => $e->getMessage(),
+//                 'trace' => $e->getTraceAsString(),
+//                 'data' => $detail
+//             ]);
+//         }
+//     }
 
-    private function formatAddress($recipient)
-    {
-        if (empty($recipient))
-            return null;
+//     private function formatAddress($recipient)
+//     {
+//         if (empty($recipient))
+//             return null;
 
-        $parts = [
-            $recipient['full_address'] ?? '',
-            $recipient['district'] ?? '',
-            $recipient['city'] ?? '',
-            $recipient['state'] ?? '',
-            $recipient['zipcode'] ?? '',
-            $recipient['region'] ?? ''
-        ];
+//         $parts = [
+//             $recipient['full_address'] ?? '',
+//             $recipient['district'] ?? '',
+//             $recipient['city'] ?? '',
+//             $recipient['state'] ?? '',
+//             $recipient['zipcode'] ?? '',
+//             $recipient['region'] ?? ''
+//         ];
 
-        return implode(', ', array_filter($parts));
-    }
-}
+//         return implode(', ', array_filter($parts));
+//     }
+// }
