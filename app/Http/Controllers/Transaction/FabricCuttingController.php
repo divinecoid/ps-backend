@@ -90,6 +90,50 @@ class FabricCuttingController extends Controller
 
 
 
+    public function searchCutting(Request $request)
+    {
+        $request->validate([
+            'model_id' => 'required|uuid',
+            'color_id' => 'required|uuid',
+            'size_id' => 'required|uuid',
+        ]);
+
+        $modelId = $request->model_id;
+        $colorId = $request->color_id;
+        $sizeId = $request->size_id;
+
+        $cuttings = \App\Models\Transactions\FabricCutting::query()
+            ->whereHas('fabric_cutting_request_detail', function ($q) use ($modelId, $sizeId) {
+                $q->where('model_id', $modelId)
+                  ->where('size_id', $sizeId)
+                  ->where('avl_qty', '>', 0);
+            })
+            ->whereHas('clothes', function ($q) use ($colorId) {
+                $q->where('color_id', $colorId);
+            })
+            ->with(['fabric_cutting_request_detail' => function ($q) use ($modelId, $sizeId) {
+                $q->where('model_id', $modelId)
+                  ->where('size_id', $sizeId)
+                  ->where('avl_qty', '>', 0);
+            }])
+            ->get();
+
+        $result = $cuttings->map(function ($cut) {
+            $totalAvlQty = $cut->fabric_cutting_request_detail->sum('avl_qty');
+            $totalReqQty = $cut->fabric_cutting_request_detail->sum('req_qty');
+            
+            return [
+                'fabric_cutting_id' => $cut->id,
+                'serial_number' => $cut->serial_number,
+                'status' => $cut->status,
+                'avl_qty' => $totalAvlQty,
+                'req_qty' => $totalReqQty,
+            ];
+        });
+
+        return $this->successResponse($result);
+    }
+
     public function store(Request $request)
     {
         return $this->baseValidate(

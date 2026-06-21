@@ -555,8 +555,9 @@ Route::prefix('checker')->middleware('checkrole:admin')->group(function () {
     Route::patch('/approve-order/{id}', [CheckerController::class, 'approveOrder']);
 });
 
-//Request Cutting (Permintaan)
-Route::prefix('fabric-cutting')->middleware(['checkrole', 'acm:permintaan,read'])->group(function () {
+//Fabric Cutting (Pemotongan Kain)
+Route::prefix('fabric-cutting')->middleware(['checkrole', 'acm:pemotongan_kain,read'])->group(function () {
+    Route::get('/search-cutting', [FabricCuttingController::class, 'searchCutting']);
     Route::get('/', [FabricCuttingController::class, 'index']);
     Route::get('/{id}', [FabricCuttingController::class, 'show']);
 });
