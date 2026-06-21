@@ -187,19 +187,21 @@ class ProductModelController extends Controller
         );
     }
 
-public function getFabricColor(Request $request, $id)
+public function getFabricColor($id)
 {
     $colors = FabricCutting::query()
-        ->where('quantity', '>', 0)
+        ->where('status', '=', 'CLOSED')
         ->whereHas('fabric_cutting_request_detail', function ($q) use ($id) {
-            $q->where('model_id', $id);
+            $q->where('model_id', $id)
+              ->where('avl_qty', '>', 0);
         })
         ->with('clothes.color')
         ->get()
         ->filter(fn($cutting) => $cutting->clothes && $cutting->clothes->color)
         ->map(fn($cutting) => [
-            'id' => $cutting->id, // fabric_cutting_id
+            'id' => $cutting->id,
             'name' => $cutting->clothes->color->name . ' - ' . $cutting->clothes->sequence,
+            'detail' => $cutting->fabric_cutting_request_detail
         ])
         ->values();
 

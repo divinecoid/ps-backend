@@ -53,7 +53,7 @@ class FabricCutting extends Model
     public function isCompleted()
     {
         return !$this->fabric_cutting_request_detail()
-            ->whereRaw('rec_qty < req_qty')
+            ->whereRaw('avl_qty < req_qty')
             ->exists();
     }
 }

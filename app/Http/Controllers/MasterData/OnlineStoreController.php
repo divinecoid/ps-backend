@@ -23,6 +23,7 @@ class OnlineStoreController extends Controller
             'store_code' => $data->store_code,
             'store_name' => $data->store_name,
             'api_key' => $data->api_key,
+            'shop_id' => $data->shop_id,
             'client_id' => $data->client_id,
             'client_secret' => $data->client_secret,
             'store_url' => $data->store_url,

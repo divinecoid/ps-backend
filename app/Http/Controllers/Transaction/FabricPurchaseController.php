@@ -104,7 +104,7 @@ class FabricPurchaseController extends Controller
                 'gram' => 'required|string|max:255',
                 // accept either roll_size_id or ukuran; we'll derive ukuran from roll_size if provided
                 'roll_size_id' => 'nullable|uuid|exists:mdx_roll_sizes,id',
-                'ukuran' => 'nullable|integer|min:1',
+                // 'ukuran' => 'nullable|integer|min:1',
                 'details' => 'required|array|min:1',
                 'details.*.color_id' => 'required|uuid|exists:mdx_colors,id',
                 'details.*.quantity' => 'required|integer|min:1',
