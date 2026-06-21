@@ -178,7 +178,7 @@ class FabricPurchaseController extends Controller
                             );
 
                             $rows[] = [
-                                'id' => Str::uuid(),
+                                'id' => (string) Str::uuid(),
                                 'fabric_purchase_request_id' => $requestModel->id,
                                 'color_id' => $detail['color_id'],
                                 'quantity' => (int) $detail['quantity'],

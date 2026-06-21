@@ -232,7 +232,7 @@ class RequestController extends Controller
                     $details = [];
                     foreach ($items as $item) {
                         $details[] = [
-                            'id' => Str::uuid(),
+                            'id' => (string) Str::uuid(),
                             'request_id' => $requestModel->id,
                             'model_id' => $item['model_id'],
                             'cloth_id' => $item['cloth_id'],
@@ -256,15 +256,13 @@ class RequestController extends Controller
                             ->fabric_cutting_request_detail
                             ->firstWhere('size_id', $item['size_id']);
                         if (!$cuttingDetail) {
-                            return $this->errorResponse(
-                                422,
-                                "Ukuran tidak ditemukan pada fabric cutting."
+                            throw new \Illuminate\Http\Exceptions\HttpResponseException(
+                                $this->errorResponse(422, "Ukuran tidak ditemukan pada fabric cutting.")
                             );
                         }
                         if ($cuttingDetail->avl_qty < $item['req_qty']) {
-                            return $this->errorResponse(
-                                422,
-                                "Stok ukuran {$cuttingDetail->size_id} tidak mencukupi."
+                            throw new \Illuminate\Http\Exceptions\HttpResponseException(
+                                $this->errorResponse(422, "Stok ukuran {$cuttingDetail->size_id} tidak mencukupi.")
                             );
                         }
                         $cuttingDetail->avl_qty -= $item['req_qty'];

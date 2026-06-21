@@ -149,14 +149,14 @@ class FabricCuttingController extends Controller
                         ->decrement('quantity', $data['quantity']);
 
                     if ($affected === 0) {
-                        throw new \RuntimeException(
-                            "Quantity kain tinggal {$cloth->quantity}"
+                        throw new \Illuminate\Http\Exceptions\HttpResponseException(
+                            $this->errorResponse(400, "Quantity kain tinggal {$cloth->quantity}")
                         );
                     }
                     $details = [];
                     foreach ($items as $item) {
                         $details[] = [
-                            'id' => Str::uuid(),
+                            'id' => (string) Str::uuid(),
                             'fabric_cutting_id' => $requestModel->id,
                             'model_id' => $item['model_id'],
                             'size_id' => $item['size_id'],
