@@ -55,8 +55,8 @@ class RequestController extends Controller
                 'serial_number',
                 'request_detail.model.sku',
                 'request_detail.model.name',
-                'request_detail.cloth.color.code',
-                'request_detail.cloth.color.name',
+                'request_detail.cutting.cloth.color.code',
+                'request_detail.cutting.cloth.color.name',
                 'request_detail.size.code',
                 'request_detail.size.name',
                 'request_detail.barcode'
