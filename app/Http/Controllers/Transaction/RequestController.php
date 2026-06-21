@@ -154,6 +154,55 @@ class RequestController extends Controller
         );
     }
 
+    public function searchCmt(Request $request)
+    {
+        $request->validate([
+            'model_id' => 'required|uuid',
+            'color_id' => 'required|uuid',
+            'size_id' => 'required|uuid',
+        ]);
+
+        $modelId = $request->model_id;
+        $colorId = $request->color_id;
+        $sizeId = $request->size_id;
+
+        $requests = \App\Models\Transactions\Request::with(['cmt'])
+            ->whereHas('request_detail', function ($q) use ($modelId, $sizeId, $colorId) {
+                $q->where('model_id', $modelId)
+                  ->where('size_id', $sizeId)
+                  ->whereRaw('(req_qty - rec_qty - rec_bs_qty) > 0')
+                  ->whereHas('cutting.clothes', function ($q2) use ($colorId) {
+                      $q2->where('color_id', $colorId);
+                  });
+            })
+            ->with(['request_detail' => function ($q) use ($modelId, $sizeId, $colorId) {
+                $q->where('model_id', $modelId)
+                  ->where('size_id', $sizeId)
+                  ->whereRaw('(req_qty - rec_qty - rec_bs_qty) > 0')
+                  ->whereHas('cutting.clothes', function ($q2) use ($colorId) {
+                      $q2->where('color_id', $colorId);
+                  });
+            }])
+            ->get();
+
+        $result = $requests->map(function ($req) {
+            $totalSisaQty = $req->request_detail->sum(function ($detail) {
+                return $detail->req_qty - $detail->rec_qty - $detail->rec_bs_qty;
+            });
+            $totalReqQty = $req->request_detail->sum('req_qty');
+            
+            return [
+                'request_id' => $req->id,
+                'serial_number' => $req->serial_number,
+                'cmt_name' => $req->cmt->name ?? null,
+                'sisa_qty' => $totalSisaQty,
+                'req_qty' => $totalReqQty,
+            ];
+        });
+
+        return $this->successResponse($result);
+    }
+
     public function store(Request $request)
     {
         return $this->baseValidate(

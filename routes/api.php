@@ -465,6 +465,7 @@ Route::get('shopee/fetch-orders', [ShopeeController::class, 'fetchOrders']);
 
 //Request CMT (Permintaan)
 Route::prefix('request')->middleware(['checkrole', 'acm:permintaan,read'])->group(function () {
+    Route::get('/search-cmt', [RequestController::class, 'searchCmt']);
     Route::get('/', [RequestController::class, 'index']);
     Route::get('/{id}', [RequestController::class, 'show']);
     Route::get('/barcode/{id}', [RequestController::class, 'barcode']);
