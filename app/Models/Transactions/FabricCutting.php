@@ -4,6 +4,7 @@ namespace App\Models\Transactions;
 
 // use App\Models\MasterData\Inventory;
 // use App\Models\MasterData\CMT;
+use App\Models\FabricCuttingFabric;
 use App\Models\MasterData\Cloth;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,10 +18,8 @@ class FabricCutting extends Model
     protected $table = 'trx_fabric_cuttings';
 
     protected $fillable = [
-        'fabric_id',
         'status',
         'serial_number',
-        'quantity'
     ];
 
     // Define relationship with Received Log model
@@ -45,9 +44,9 @@ class FabricCutting extends Model
         return $this->hasMany(FabricCuttingDetail::class, 'fabric_cutting_id');
     }
 
-    public function clothes()
+    public function fabric_detail()
     {
-        return $this->belongsTo(Cloth::class, 'fabric_id');
+        return $this->hasMany(FabricCuttingFabric::class, 'fabric_cutting_id');
     }
 
     public function isCompleted()
