@@ -21,36 +21,17 @@ class FabricCuttingController extends Controller
     {
         return fn($data) => [
             'id' => $data->id,
+                'serial_number' => $data->serial_number,
+                'status' => $data->status,
+                'created_at' => $data->created_at,
 
-            'serial_number' => $data->serial_number,
+                'fabric_count' => $data->fabric_detail->count(),
 
-            'status' => $data->status,
-
-            'created_at' => $data->created_at,
-
-            'fabric_detail' => $data->fabric_detail
-                ->map(fn($fabric) => [
+                'fabric_detail' => $data->fabric_detail->map(fn($fabric) => [
                     'fabric_id' => $fabric->fabric_id,
                     'quantity' => $fabric->quantity,
-                    'fabric' => $fabric->cloth,
-                ])
-                ->values(),
-
-            'request_detail' => $data->fabric_cutting_request_detail
-                ->groupBy('model_id')
-                ->map(fn($group) => [
-                    'model_id' => $group->first()->model_id,
-                    'model' => $group->first()->model,
-                    'variant_detail' => $group
-                        ->map(fn($detail) => [
-                            'size_id' => $detail->size_id,
-                            'size' => $detail->size,
-                            'req_qty' => $detail->req_qty,
-                            'avl_qty' => $detail->avl_qty,
-                        ])
-                        ->values(),
-                ])
-                ->values(),
+                    'sequence' => $fabric->cloth?->sequence,
+                ])->values(),
         ];
     }
 
@@ -72,20 +53,7 @@ class FabricCuttingController extends Controller
                 'fabric_cutting_request_detail.size.code',
                 'fabric_cutting_request_detail.size.name',
             ],
-            fn($data) => [
-                'id' => $data->id,
-                'serial_number' => $data->serial_number,
-                'status' => $data->status,
-                'created_at' => $data->created_at,
-
-                'fabric_count' => $data->fabric_detail->count(),
-
-                'fabric_detail' => $data->fabric_detail->map(fn($fabric) => [
-                    'fabric_id' => $fabric->fabric_id,
-                    'quantity' => $fabric->quantity,
-                    'sequence' => $fabric->cloth?->sequence,
-                ])->values(),
-            ]
+            $this->structure()
         );
     }
 
@@ -99,27 +67,22 @@ class FabricCuttingController extends Controller
         ])->findOrFail($id);
         return $this->successResponse([
             'serial_number' => $request->serial_number,
-
             'fabric_detail' => $request->fabric_detail
                 ->map(function ($item) {
-
                     return [
                         'fabric_id' => $item->fabric_id,
                         'quantity' => $item->quantity,
+                        'sequence' => $item->cloth->sequence
                     ];
                 })
                 ->values(),
-
             'request_detail' => $request->fabric_cutting_request_detail
                 ->groupBy('model_id')
                 ->map(function ($group) {
-
                     return [
                         'model_id' => $group->first()->model_id,
-
                         'variant_detail' => $group
                             ->map(function ($item) {
-
                                 return [
                                     'size_id' => $item->size_id,
                                     'qty' => $item->req_qty,
