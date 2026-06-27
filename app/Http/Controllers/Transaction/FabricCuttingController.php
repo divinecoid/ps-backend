@@ -41,7 +41,7 @@ class FabricCuttingController extends Controller
             $request,
             FabricCutting::class,
             [
-                'fabric_cutting_fabric_detail.cloth',
+                'fabric_detail.cloth',
                 'fabric_cutting_request_detail.model.fabric',
                 'fabric_cutting_request_detail.size',
             ],
@@ -190,7 +190,7 @@ class FabricCuttingController extends Controller
                 $q->where('model_id', $modelId)
                     ->where('size_id', $sizeId);
             })
-            ->whereHas('fabric_cutting_clothes.fabric', function ($q) use ($colorId) {
+            ->whereHas('fabric_detail.cloth', function ($q) use ($colorId) {
                 $q->where('color_id', $colorId);
             })
             ->with([
@@ -424,12 +424,12 @@ class FabricCuttingController extends Controller
 
     public function getFabrics($id)
     {
-        $cutting = \App\Models\Transactions\FabricCutting::with(['fabric_cutting_clothes.fabric.color', 'fabric_cutting_request_detail'])->findOrFail($id);
+        $cutting = FabricCutting::with(['fabric_detail.cloth.color', 'fabric_cutting_request_detail'])->findOrFail($id);
         
-        $clothes = $cutting->fabric_cutting_clothes->map(function ($cloth_item) use ($cutting) {
+        $clothes = $cutting->fabric_detail->map(function ($cloth_item) use ($cutting) {
             return [
                 'id' => $cloth_item->fabric_id,
-                'name' => ($cloth_item->fabric->color->name ?? '') . ' - ' . ($cloth_item->fabric->sequence ?? ''),
+                'name' => ($cloth_item->cloth->color->name ?? '') . ' - ' . ($cloth_item->cloth->sequence ?? ''),
                 'detail' => $cutting->fabric_cutting_request_detail->map(function ($detail) {
                     return [
                         'size_id' => $detail->size_id,

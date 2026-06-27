@@ -27,7 +27,7 @@ class FabricCutting extends Model
         return $this->hasMany(FabricCuttingDetail::class, 'fabric_cutting_id');
     }
 
-    public function fabric_cutting_fabric_detail()
+    public function fabric_detail()
     {
         return $this->hasMany(FabricCuttingFabric::class, 'fabric_cutting_id');
     }
