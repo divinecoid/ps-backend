@@ -17,43 +17,28 @@ class FabricCutting extends Model
     protected $table = 'trx_fabric_cuttings';
 
     protected $fillable = [
-        'fabric_id',
         'status',
-        'serial_number',
-        'quantity'
+        'serial_number'
     ];
 
-    // Define relationship with Received Log model
-    // public function recevied_log()
-    // {
-    //     return $this->hasMany(ReceivedLog::class, 'request_id');
-    // }
-
-    // // Define relationship with Inventory model
-    // public function inventory()
-    // {
-    //     return $this->belongsTo(Inventory::class, 'inventory_id');
-    // }
-
-
-    // public function receive_log()
-    // {
-    //     return $this->hasMany(Receivedlog::class, 'cmt_id', 'cmt_id');
-    // }
     public function fabric_cutting_request_detail()
     {
         return $this->hasMany(FabricCuttingDetail::class, 'fabric_cutting_id');
     }
 
-    public function clothes()
+    public function fabric_cutting_clothes()
     {
-        return $this->belongsTo(Cloth::class, 'fabric_id');
+        return $this->hasMany(FabricCuttingCloth::class, 'fabric_cutting_id');
+    }
+
+    public function fabric_cutting_receives()
+    {
+        return $this->hasMany(FabricCuttingReceive::class, 'fabric_cutting_id');
     }
 
     public function isCompleted()
     {
-        return !$this->fabric_cutting_request_detail()
-            ->whereRaw('avl_qty < req_qty')
-            ->exists();
+        // To be updated when receive logic is complete
+        return false;
     }
 }

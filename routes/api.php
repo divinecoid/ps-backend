@@ -560,6 +560,7 @@ Route::prefix('fabric-cutting')->middleware(['checkrole', 'acm:pemotongan_kain,r
     Route::get('/search-cutting', [FabricCuttingController::class, 'searchCutting']);
     Route::get('/', [FabricCuttingController::class, 'index']);
     Route::get('/{id}', [FabricCuttingController::class, 'show']);
+    Route::get('/{id}/fabrics', [FabricCuttingController::class, 'getFabrics']);
 });
 Route::prefix('fabric-cutting')->middleware(['checkrole', 'acm:permintaan,create'])->group(function () {
     Route::post('/', [FabricCuttingController::class, 'store']);
