@@ -4,6 +4,7 @@ namespace App\Models\Transactions;
 
 // use App\Models\MasterData\Inventory;
 // use App\Models\MasterData\CMT;
+use App\Models\FabricCuttingFabric;
 use App\Models\MasterData\Cloth;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -26,14 +27,9 @@ class FabricCutting extends Model
         return $this->hasMany(FabricCuttingDetail::class, 'fabric_cutting_id');
     }
 
-    public function fabric_cutting_clothes()
+    public function fabric_cutting_fabric_detail()
     {
-        return $this->hasMany(FabricCuttingCloth::class, 'fabric_cutting_id');
-    }
-
-    public function fabric_cutting_receives()
-    {
-        return $this->hasMany(FabricCuttingReceive::class, 'fabric_cutting_id');
+        return $this->hasMany(FabricCuttingFabric::class, 'fabric_cutting_id');
     }
 
     public function isCompleted()

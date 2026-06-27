@@ -564,7 +564,7 @@ Route::prefix('fabric-cutting')->middleware(['checkrole', 'acm:pemotongan_kain,r
 });
 Route::prefix('fabric-cutting')->middleware(['checkrole', 'acm:permintaan,create'])->group(function () {
     Route::post('/', [FabricCuttingController::class, 'store']);
-    Route::patch('/{id}', [FabricCuttingController::class, 'setReceived']);
+    Route::patch('/{id}', [FabricCuttingController::class, 'update']);
 });
 Route::prefix('fabric-cutting')->middleware(['checkrole', 'acm:permintaan,delete'])->group(function () {
     Route::delete('/{id}', [FabricCuttingController::class, 'destroy']);
