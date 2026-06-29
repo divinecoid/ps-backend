@@ -32,6 +32,18 @@ class FabricCutting extends Model
         return $this->hasMany(FabricCuttingFabric::class, 'fabric_cutting_id');
     }
 
+    public function clothes()
+    {
+        return $this->hasOneThrough(
+            Cloth::class,
+            FabricCuttingFabric::class,
+            'fabric_cutting_id',
+            'id',
+            'id',
+            'fabric_id'
+        );
+    }
+
     public function isCompleted()
     {
         // To be updated when receive logic is complete
