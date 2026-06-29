@@ -42,7 +42,7 @@ class FabricCuttingController extends Controller
             FabricCutting::class,
             [
                 'fabric_detail.cloth',
-                'fabric_cutting_request_detail.model.fabric',
+                'fabric_cutting_request_detail.model',
                 'fabric_cutting_request_detail.size',
             ],
             [
