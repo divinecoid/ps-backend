@@ -57,6 +57,43 @@ class FabricCuttingController extends Controller
         );
     }
 
+    /**
+     * Returns CLOSED fabric cuttings for the CMT Request serial number dropdown.
+     * Includes receive_detail grouped by model_id so the frontend can autofill request_detail.
+     */
+    public function closedIndex(Request $request)
+    {
+        return $this->baseIndex(
+            $request,
+            FabricCutting::class,
+            ['fabric_cutting_receives'],
+            ['serial_number'],
+            fn($data) => [
+                'id' => $data->id,
+                'serial_number' => $data->serial_number,
+                'receive_detail' => $data->fabric_cutting_receives
+                    ->groupBy('model_id')
+                    ->map(function ($group) use ($data) {
+                        return [
+                            'model_id' => $group->first()->model_id,
+                            'cloth_id' => $data->id, // cutting_id used as cloth_id in request_detail
+                            'cloth_detail' => $group->map(fn($r) => [
+                                'size_id' => $r->size_id,
+                                'avl_qty' => $r->qty,
+                            ])->values(),
+                            'variant_detail' => $group->map(fn($r) => [
+                                'size_id' => $r->size_id,
+                                'dozen_qty' => intdiv($r->qty, 12),
+                                'piece_qty' => $r->qty % 12,
+                            ])->values(),
+                        ];
+                    })
+                    ->values(),
+            ],
+            fn($q) => $q->where('status', 'CLOSED')
+        );
+    }
+
     public function show($id)
     {
         $request = FabricCutting::with([
