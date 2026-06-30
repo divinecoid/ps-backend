@@ -33,7 +33,7 @@ class ClothController extends Controller
         return $this->baseIndex(
             $request,
             Cloth::class,
-            [],
+            ['factory', 'color', 'roll_size'],
             ['id', 'factory', 'gram', 'color', 'quantity', 'sequence'],
             $this->structure(),
         );
@@ -43,7 +43,7 @@ class ClothController extends Controller
         return $this->baseIndex(
             $request,
             Cloth::class,
-            [],
+            ['factory', 'color', 'roll_size'],
             ['id', 'factory', 'gram', 'color', 'quantity', 'sequence'],
             $this->structure(),
             queryCallback: function ($query) {
@@ -57,7 +57,7 @@ class ClothController extends Controller
         return $this->baseMaster(
             $request,
             Cloth::class,
-            [],
+            ['factory', 'color', 'roll_size'],
             ['id', 'factory', 'gram', 'color', 'quantity', 'sequence'],
             $this->structure(),
             queryCallback: function ($query) {
@@ -71,7 +71,7 @@ class ClothController extends Controller
         return $this->baseShow(
             Cloth::class,
             $id,
-            [],
+            ['factory', 'color', 'roll_size'],
             $this->structure()
         );
     }

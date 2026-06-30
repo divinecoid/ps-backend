@@ -24,8 +24,13 @@ class ProductModelSeeder extends Seeder
             ],
         ];
 
-        foreach ($models as $model) {
-            ProductModel::create($model);
+        $colors = \App\Models\MasterData\Color::all();
+        $sizes = \App\Models\MasterData\Size::all();
+
+        foreach ($models as $modelData) {
+            $model = ProductModel::create($modelData);
+            $model->colors()->attach($colors->pluck('id'));
+            $model->sizes()->attach($sizes->pluck('id'));
         }
     }
 }
