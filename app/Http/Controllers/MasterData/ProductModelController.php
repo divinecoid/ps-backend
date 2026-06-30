@@ -189,23 +189,53 @@ class ProductModelController extends Controller
 
 public function getFabricColor($id)
 {
-    $colors = FabricCutting::query()
+    // 1. Cari semua FabricCutting CLOSED yang punya receive untuk model ini
+    $cuttings = FabricCutting::query()
         ->where('status', '=', 'CLOSED')
-        ->whereHas('fabric_cutting_request_detail', function ($q) use ($id) {
-            $q->where('model_id', $id)
-              ->where('avl_qty', '>', 0);
+        ->whereHas('fabric_cutting_receives', function ($q) use ($id) {
+            $q->where('model_id', $id);
         })
-        ->with('clothes.color')
-        ->get()
-        ->filter(fn($cutting) => $cutting->clothes && $cutting->clothes->color)
-        ->map(fn($cutting) => [
-            'id' => $cutting->id,
-            'name' => $cutting->clothes->color->name . ' - ' . $cutting->clothes->sequence,
-            'detail' => $cutting->fabric_cutting_request_detail
+        ->with([
+            'fabric_cutting_receives' => function ($q) use ($id) {
+                $q->where('model_id', $id);
+            },
+            'clothes.color',
         ])
-        ->values();
+        ->get();
 
-    return $this->successResponse($colors);
+    // 2. Hitung stok yang sudah terpakai (sum req_qty dari request_detail per cutting_id + model_id + size_id)
+    $usedQty = \App\Models\Transactions\RequestDetail::query()
+        ->whereIn('cloth_id', $cuttings->pluck('id'))
+        ->where('model_id', $id)
+        ->selectRaw('cloth_id as cutting_id, size_id, SUM(req_qty) as used_qty')
+        ->groupBy('cloth_id', 'size_id')
+        ->get()
+        ->groupBy('cutting_id')
+        ->map(fn($g) => $g->keyBy('size_id'));
+
+    // 3. Build response
+    $result = $cuttings->map(function ($cutting) use ($usedQty) {
+        $receives = $cutting->fabric_cutting_receives;
+        $used = $usedQty[$cutting->id] ?? collect();
+
+        $detail = $receives->map(function ($r) use ($used) {
+            $usedForSize = $used[$r->size_id]->used_qty ?? 0;
+            return [
+                'size_id' => $r->size_id,
+                'avl_qty' => max(0, $r->qty - $usedForSize),
+            ];
+        })->filter(fn($d) => $d['avl_qty'] > 0)->values();
+
+        if ($detail->isEmpty()) return null;
+
+        return [
+            'id' => $cutting->id, // fabric_cutting_id
+            'name' => ($cutting->clothes->color->name ?? '') . ' - ' . ($cutting->clothes->sequence ?? ''),
+            'detail' => $detail,
+        ];
+    })->filter()->values();
+
+    return $this->successResponse($result);
 }
     public function getFabricQty(Request $request)
     {

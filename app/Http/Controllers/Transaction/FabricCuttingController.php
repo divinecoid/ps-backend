@@ -63,6 +63,7 @@ class FabricCuttingController extends Controller
             'fabric_detail.cloth',
             'fabric_cutting_request_detail.model',
             'fabric_cutting_request_detail.size',
+            'fabric_cutting_receives'
         ])->findOrFail($id);
         return $this->successResponse([
             'serial_number' => $request->serial_number,
@@ -92,27 +93,20 @@ class FabricCuttingController extends Controller
                 })
                 ->values(),
 
-            'receive_detail' => $request->fabric_cutting_request_detail
-                ->groupBy('model_id')
+            'receive_detail' => $request->fabric_cutting_receives
+                ->groupBy(fn($r) => $r->cloth_id . '-' . $r->model_id)
                 ->map(function ($group) {
-
+                    $first = $group->first();
                     return [
-                        'model_id' => $group->first()->model_id,
-                        'cloth_id' => '',
-                        'cloth_detail' => [],
-
-                        'variant_detail' => $group
-                            ->map(function ($item) {
-
-                                return [
-                                    'size_id' => $item->size_id,
-                                    'dozen_qty' => floor(
-                                        $item->avl_qty / 12
-                                    ),
-                                    'piece_qty' => $item->avl_qty % 12,
-                                ];
-                            })
-                            ->values(),
+                        'model_id' => $first->model_id,
+                        'cloth_id' => $first->cloth_id,
+                        'variant_detail' => $group->map(function ($r) {
+                            return [
+                                'size_id' => $r->size_id,
+                                'dozen_qty' => intdiv($r->qty, 12),
+                                'piece_qty' => $r->qty % 12,
+                            ];
+                        })->values(),
                     ];
                 })
                 ->values(),
@@ -389,8 +383,22 @@ class FabricCuttingController extends Controller
             ],
             function ($data) use ($id) {
                 return DB::transaction(function () use ($data, $id) {
+                    $fabricCutting = FabricCutting::with('fabric_detail')->findOrFail($id);
+                    if ($fabricCutting->status === 'CLOSED') {
+                        throw new \Illuminate\Http\Exceptions\HttpResponseException(
+                            $this->errorResponse(422, 'Hasil potong sudah dikunci dan tidak bisa diubah.')
+                        );
+                    }
+                    
+                    $validFabricIds = $fabricCutting->fabric_detail->pluck('fabric_id')->toArray();
+
                     $receives = [];
                     foreach ($data['receive_detail'] as $detail) {
+                        if (!in_array($detail['cloth_id'], $validFabricIds)) {
+                            throw new \Illuminate\Http\Exceptions\HttpResponseException(
+                                $this->errorResponse(422, "Kain tidak terdaftar di pemotongan ini.")
+                            );
+                        }
                         foreach ($detail['variant_detail'] as $variant) {
                             $total_piece = ($variant['dozen_qty'] * 12) + $variant['piece_qty'];
                             if ($total_piece > 0) {
@@ -406,15 +414,13 @@ class FabricCuttingController extends Controller
                         }
                     }
                     
-                    \App\Models\Transactions\FabricCuttingReceive::where('fabric_cutting_id', $id)->delete();
                     if (!empty($receives)) {
                         \App\Models\Transactions\FabricCuttingReceive::insert($receives);
                     }
 
-                    FabricCutting::where('id', $id)
-                        ->update([
-                            'status' => 'CLOSED',
-                        ]);
+                    $fabricCutting->update([
+                        'status' => 'CLOSED',
+                    ]);
 
                     return $this->successResponse(FabricCutting::find($id));
                 });

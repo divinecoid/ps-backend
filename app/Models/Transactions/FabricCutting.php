@@ -44,6 +44,11 @@ class FabricCutting extends Model
         );
     }
 
+    public function fabric_cutting_receives()
+    {
+        return $this->hasMany(FabricCuttingReceive::class, 'fabric_cutting_id');
+    }
+
     public function isCompleted()
     {
         // To be updated when receive logic is complete
