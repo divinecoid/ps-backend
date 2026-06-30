@@ -21,6 +21,7 @@ use App\Http\Controllers\MasterData\OnlineStoreController;
 use App\Http\Controllers\MasterData\ProductModelController;
 use App\Http\Controllers\MasterData\RoleController;
 use App\Http\Controllers\MasterData\UserController;
+use App\Http\Controllers\MasterData\NotificationController;
 use App\Http\Controllers\MasterData\SizeController;
 use App\Http\Controllers\MasterData\CMTController;
 use App\Http\Controllers\MasterData\FactoryController;
@@ -97,6 +98,12 @@ Route::prefix('user')->middleware('checkrole:admin')->group(function () {
     Route::delete('/force', [UserController::class, 'multiForceDestroy']);
     Route::delete('{id}', [UserController::class, 'destroy']);
     Route::delete('{id}/force', [UserController::class, 'forceDestroy']);
+});
+
+Route::prefix('notification')->middleware('checkrole:admin')->group(function () {
+    Route::get('/', [NotificationController::class, 'index']);
+    Route::get('/low-stock', [NotificationController::class, 'lowStock']);
+    Route::patch('/{id}/read', [NotificationController::class, 'markAsRead']);
 });
 
 //Marketplace
