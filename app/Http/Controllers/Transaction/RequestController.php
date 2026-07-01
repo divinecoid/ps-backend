@@ -222,12 +222,15 @@ class RequestController extends Controller
                 $items = [];
                 foreach ($data['request_detail'] as $detail) {
                     foreach ($detail['variant_detail'] as $variant) {
-                        $items[] = [
-                            'model_id' => $detail['model_id'],
-                            'cloth_id' => $detail['cloth_id'],
-                            'size_id' => $variant['size_id'],
-                            'req_qty' => ($variant['dozen_qty'] * 12) + $variant['piece_qty'],
-                        ];
+                        $reqQty = ($variant['dozen_qty'] * 12) + $variant['piece_qty'];
+                        if ($reqQty > 0) {
+                            $items[] = [
+                                'model_id' => $detail['model_id'],
+                                'cloth_id' => $detail['cloth_id'],
+                                'size_id' => $variant['size_id'],
+                                'req_qty' => $reqQty,
+                            ];
+                        }
                     }
                 }
                 $cmt = CMT::find($data['cmt_id']);
@@ -307,11 +310,6 @@ class RequestController extends Controller
                         if (!$cuttingDetail) {
                             throw new \Illuminate\Http\Exceptions\HttpResponseException(
                                 $this->errorResponse(422, "Ukuran tidak ditemukan pada fabric cutting.")
-                            );
-                        }
-                        if ($cuttingDetail->avl_qty < $item['req_qty']) {
-                            throw new \Illuminate\Http\Exceptions\HttpResponseException(
-                                $this->errorResponse(422, "Stok ukuran {$cuttingDetail->size_id} tidak mencukupi.")
                             );
                         }
                         $cuttingDetail->avl_qty -= $item['req_qty'];
