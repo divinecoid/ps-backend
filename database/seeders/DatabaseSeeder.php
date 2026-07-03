@@ -38,7 +38,6 @@ class DatabaseSeeder extends Seeder
             ProductModelSeeder::class,
             WarehouseRackSeeder::class,
             ShopeeSeeder::class,
-            WarehouseRackSeeder::class,
             ConfigurationSeeder::class,
             ShippingLogisticSeeder::class,
             FactorySeeder::class,
@@ -60,7 +59,6 @@ class DatabaseSeeder extends Seeder
                 'factory_id' => $factory->id,
                 'gram' => '200',
                 'roll_size_id' => $rollSize->id,
-                'color_id' => $color->id,
                 'quantity' => 100,
                 'sequence' => 'K1'
             ]);
