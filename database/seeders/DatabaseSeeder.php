@@ -22,32 +22,35 @@ class DatabaseSeeder extends Seeder
     use WithoutModelEvents;
 
     /**
-      * Seed the application's database.
-      */
+     * Seed the application's database.
+     */
     public function run(): void
     {
         $this->call([
+            CMTSeeder::class,
+            ColorSeeder::class,
             RoleSeeder::class,
+            SizeSeeder::class,
             UserSeeder::class,
             CMTSeeder::class,
             ColorSeeder::class,
             SizeSeeder::class,
             ProductModelSeeder::class,
             WarehouseRackSeeder::class,
+            ShopeeSeeder::class,
             ConfigurationSeeder::class,
             ShippingLogisticSeeder::class,
             FactorySeeder::class,
             ProductSeeder::class,
         ]);
 
-        // Seed Request and Request Detail specifically for user's barcode request: series 1234 - GRAY - XS
+        // Seed Request and Request Detail specifically for user's barcode request: series 1234
         $cmt = \App\Models\MasterData\CMT::where('code', 'CMT01')->first();
         $model = \App\Models\MasterData\ProductModel::where('sku', 'MDL01')->first();
-        $color = \App\Models\MasterData\Color::where('code', 'GRAY')->first();
         $size = \App\Models\MasterData\Size::where('code', 'XS')->first();
         $factory = \App\Models\MasterData\Factory::first();
 
-        if ($cmt && $model && $color && $size && $factory) {
+        if ($cmt && $model && $size && $factory) {
             $rollSize = \App\Models\MasterData\RollSize::create([
                 'size' => '25'
             ]);
@@ -91,10 +94,10 @@ class DatabaseSeeder extends Seeder
                 'model_id' => $model->id,
                 'cloth_id' => $fabricCutting->id,
                 'size_id' => $size->id,
-                'req_qty' => 120, // 10 dozen
+                'req_qty' => 120,
                 'rec_qty' => 0,
                 'rec_bs_qty' => 0,
-                'barcode' => 'CMT01|1234|MDL01|GRAY|XS'
+                'barcode' => 'CMT01|1234|MDL01|XS'
             ]);
         }
     }
