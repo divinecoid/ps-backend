@@ -566,6 +566,7 @@ Route::prefix('checker')->middleware('checkrole:admin')->group(function () {
 Route::prefix('fabric-cutting')->middleware(['checkrole', 'acm:pemotongan_kain,read'])->group(function () {
     Route::get('/search-cutting', [FabricCuttingController::class, 'searchCutting']);
     Route::get('/closed', [FabricCuttingController::class, 'closedIndex']);
+    Route::get('/get-next-series', [FabricCuttingController::class, 'getNextSeries']);
     Route::get('/', [FabricCuttingController::class, 'index']);
     Route::get('/{id}', [FabricCuttingController::class, 'show']);
     Route::get('/{id}/fabrics', [FabricCuttingController::class, 'getFabrics']);
