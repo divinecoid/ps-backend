@@ -224,7 +224,7 @@ public function getFabricColor($id)
                 'size_id' => $r->size_id,
                 'avl_qty' => max(0, $r->qty - $usedForSize),
             ];
-        })->filter(fn($d) => $d['avl_qty'] > 0)->values();
+        })->values();
 
         if ($detail->isEmpty()) return null;
 
