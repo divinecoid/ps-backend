@@ -21,17 +21,17 @@ class FabricCuttingController extends Controller
     {
         return fn($data) => [
             'id' => $data->id,
-                'serial_number' => $data->serial_number,
-                'status' => $data->status,
-                'created_at' => $data->created_at,
+            'serial_number' => $data->serial_number,
+            'status' => $data->status,
+            'created_at' => $data->created_at,
 
-                'fabric_count' => $data->fabric_detail->count(),
+            'fabric_count' => $data->fabric_detail->count(),
 
-                'fabric_detail' => $data->fabric_detail->map(fn($fabric) => [
-                    'fabric_id' => $fabric->fabric_id,
-                    'quantity' => $fabric->quantity,
-                    'sequence' => $fabric->cloth?->sequence,
-                ])->values(),
+            'fabric_detail' => $data->fabric_detail->map(fn($fabric) => [
+                'fabric_id' => $fabric->fabric_id,
+                'quantity' => $fabric->quantity,
+                'sequence' => $fabric->cloth?->sequence,
+            ])->values(),
         ];
     }
 
@@ -90,7 +90,9 @@ class FabricCuttingController extends Controller
                     })
                     ->values(),
             ],
-            fn($q) => $q->where('status', 'CLOSED')
+            fn($q) => $q->where('status', 'CLOSED')->whereHas('fabric_cutting_receives', function ($q) {
+                $q->where('qty', '>', 0);
+            })
         );
     }
 
@@ -427,7 +429,7 @@ class FabricCuttingController extends Controller
                             $this->errorResponse(422, 'Hasil potong sudah dikunci dan tidak bisa diubah.')
                         );
                     }
-                    
+
                     $validFabricIds = $fabricCutting->fabric_detail->pluck('fabric_id')->toArray();
 
                     $receives = [];
@@ -451,7 +453,7 @@ class FabricCuttingController extends Controller
                             }
                         }
                     }
-                    
+
                     if (!empty($receives)) {
                         \App\Models\Transactions\FabricCuttingReceive::insert($receives);
                     }
@@ -469,7 +471,7 @@ class FabricCuttingController extends Controller
     public function getFabrics($id)
     {
         $cutting = FabricCutting::with(['fabric_detail.cloth.color', 'fabric_cutting_request_detail'])->findOrFail($id);
-        
+
         $clothes = $cutting->fabric_detail->map(function ($cloth_item) use ($cutting) {
             return [
                 'id' => $cloth_item->fabric_id,
@@ -477,7 +479,7 @@ class FabricCuttingController extends Controller
                 'detail' => $cutting->fabric_cutting_request_detail->map(function ($detail) {
                     return [
                         'size_id' => $detail->size_id,
-                        'avl_qty' => $detail->req_qty, 
+                        'avl_qty' => $detail->req_qty,
                     ];
                 })
             ];
