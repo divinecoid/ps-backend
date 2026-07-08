@@ -9,6 +9,7 @@ use App\Models\MasterData\Cloth;
 use App\Models\MasterData\ProductModel;
 use App\Models\Transactions\FabricCutting;
 use App\Models\Transactions\FabricCuttingDetail;
+use App\Models\MasterData\Series;
 use DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -253,7 +254,7 @@ class FabricCuttingController extends Controller
         return $this->baseValidate(
             $request,
             [
-                'serial_number' => 'required|string|max:255',
+                'serial_number' => 'nullable|string|max:255',
                 'fabric_detail' => 'required|array|min:1',
                 'fabric_detail.*.fabric_id' => 'required|uuid|exists:mdx_clothes,id',
                 'fabric_detail.*.quantity' => 'required|integer|min:1',
@@ -313,8 +314,15 @@ class FabricCuttingController extends Controller
 
                 return DB::transaction(function () use ($data, $items) {
 
+                    // We always fetch the next incremented sequence value.
+                    // If that value is somehow already present in the database (e.g. legacy data or manual inserts),
+                    // we keep incrementing the sequence until we find a completely unique code.
+                    do {
+                        $serialNumber = Series::nextValue('fabric_cutting', 5);
+                    } while (FabricCutting::where('serial_number', $serialNumber)->exists());
+
                     $requestModel = FabricCutting::create([
-                        'serial_number' => $data['serial_number'],
+                        'serial_number' => $serialNumber,
                         'status' => 'OPEN',
                     ]);
 
@@ -483,5 +491,13 @@ class FabricCuttingController extends Controller
         });
 
         return $this->successResponse($clothes);
+    }
+
+    public function getNextSeries()
+    {
+        $preview = Series::previewNextValue('fabric_cutting', 5);
+        return $this->successResponse([
+            'next_series' => $preview
+        ]);
     }
 }

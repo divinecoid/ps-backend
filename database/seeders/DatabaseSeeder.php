@@ -22,15 +22,15 @@ class DatabaseSeeder extends Seeder
     use WithoutModelEvents;
 
     /**
-      * Seed the application's database.
-      */
+     * Seed the application's database.
+     */
     public function run(): void
     {
         $this->call([
-           CMTSeeder::class,
-           ColorSeeder::class,
+            CMTSeeder::class,
+            ColorSeeder::class,
             RoleSeeder::class,
-           SizeSeeder::class,
+            SizeSeeder::class,
             UserSeeder::class,
             CMTSeeder::class,
             ColorSeeder::class,
