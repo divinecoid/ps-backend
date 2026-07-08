@@ -260,7 +260,7 @@ class MutationController extends Controller
 
                 $cmt = $requestDetail->request->cmt;
                 $model = $requestDetail->model;
-                $color = $requestDetail->color;
+                $color =  $requestDetail->cutting->clothes->color;
                 $size = $requestDetail->size;
                 return $this->successResponse([
                     'cmt' => (object) [
