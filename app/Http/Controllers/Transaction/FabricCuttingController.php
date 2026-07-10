@@ -9,7 +9,6 @@ use App\Models\MasterData\Cloth;
 use App\Models\MasterData\ProductModel;
 use App\Models\Transactions\FabricCutting;
 use App\Models\Transactions\FabricCuttingDetail;
-use App\Models\MasterData\Series;
 use DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -22,17 +21,17 @@ class FabricCuttingController extends Controller
     {
         return fn($data) => [
             'id' => $data->id,
-                'serial_number' => $data->serial_number,
-                'status' => $data->status,
-                'created_at' => $data->created_at,
+            'serial_number' => $data->serial_number,
+            'status' => $data->status,
+            'created_at' => $data->created_at,
 
-                'fabric_count' => $data->fabric_detail->count(),
+            'fabric_count' => $data->fabric_detail->count(),
 
-                'fabric_detail' => $data->fabric_detail->map(fn($fabric) => [
-                    'fabric_id' => $fabric->fabric_id,
-                    'quantity' => $fabric->quantity,
-                    'sequence' => $fabric->cloth?->sequence,
-                ])->values(),
+            'fabric_detail' => $data->fabric_detail->map(fn($fabric) => [
+                'fabric_id' => $fabric->fabric_id,
+                'quantity' => $fabric->quantity,
+                'sequence' => $fabric->cloth?->sequence,
+            ])->values(),
         ];
     }
 
@@ -91,7 +90,9 @@ class FabricCuttingController extends Controller
                     })
                     ->values(),
             ],
-            fn($q) => $q->where('status', 'CLOSED')
+            fn($q) => $q->where('status', 'CLOSED')->whereHas('fabric_cutting_receives', function ($q) {
+                $q->where('qty', '>', 0);
+            })
         );
     }
 
@@ -220,7 +221,8 @@ class FabricCuttingController extends Controller
         $cuttings = FabricCutting::query()
             ->whereHas('fabric_cutting_request_detail', function ($q) use ($modelId, $sizeId) {
                 $q->where('model_id', $modelId)
-                    ->where('size_id', $sizeId);
+                    ->where('size_id', $sizeId)
+                    ->having('req_qty', '>', 0);
             })
             ->whereHas('fabric_detail.cloth', function ($q) use ($colorId) {
                 $q->where('color_id', $colorId);
@@ -254,7 +256,7 @@ class FabricCuttingController extends Controller
         return $this->baseValidate(
             $request,
             [
-                'serial_number' => 'nullable|string|max:255',
+                'serial_number' => 'required|string|max:255',
                 'fabric_detail' => 'required|array|min:1',
                 'fabric_detail.*.fabric_id' => 'required|uuid|exists:mdx_clothes,id',
                 'fabric_detail.*.quantity' => 'required|integer|min:1',
@@ -314,15 +316,8 @@ class FabricCuttingController extends Controller
 
                 return DB::transaction(function () use ($data, $items) {
 
-                    // We always fetch the next incremented sequence value.
-                    // If that value is somehow already present in the database (e.g. legacy data or manual inserts),
-                    // we keep incrementing the sequence until we find a completely unique code.
-                    do {
-                        $serialNumber = Series::nextValue('fabric_cutting', 5);
-                    } while (FabricCutting::where('serial_number', $serialNumber)->exists());
-
                     $requestModel = FabricCutting::create([
-                        'serial_number' => $serialNumber,
+                        'serial_number' => $data['serial_number'],
                         'status' => 'OPEN',
                     ]);
 
@@ -434,7 +429,7 @@ class FabricCuttingController extends Controller
                             $this->errorResponse(422, 'Hasil potong sudah dikunci dan tidak bisa diubah.')
                         );
                     }
-                    
+
                     $validFabricIds = $fabricCutting->fabric_detail->pluck('fabric_id')->toArray();
 
                     $receives = [];
@@ -458,7 +453,7 @@ class FabricCuttingController extends Controller
                             }
                         }
                     }
-                    
+
                     if (!empty($receives)) {
                         \App\Models\Transactions\FabricCuttingReceive::insert($receives);
                     }
@@ -476,7 +471,7 @@ class FabricCuttingController extends Controller
     public function getFabrics($id)
     {
         $cutting = FabricCutting::with(['fabric_detail.cloth.color', 'fabric_cutting_request_detail'])->findOrFail($id);
-        
+
         $clothes = $cutting->fabric_detail->map(function ($cloth_item) use ($cutting) {
             return [
                 'id' => $cloth_item->fabric_id,
@@ -484,20 +479,12 @@ class FabricCuttingController extends Controller
                 'detail' => $cutting->fabric_cutting_request_detail->map(function ($detail) {
                     return [
                         'size_id' => $detail->size_id,
-                        'avl_qty' => $detail->req_qty, 
+                        'avl_qty' => $detail->req_qty,
                     ];
                 })
             ];
         });
 
         return $this->successResponse($clothes);
-    }
-
-    public function getNextSeries()
-    {
-        $preview = Series::previewNextValue('fabric_cutting', 5);
-        return $this->successResponse([
-            'next_series' => $preview
-        ]);
     }
 }
