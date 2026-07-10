@@ -214,20 +214,10 @@ class FetchShopeeOrders extends Command
                     'read_at' => now(), // Update waktu terakhir ditarik
                 ]);
 
-                // Update AWB HANYA jika di database masih kosong DAN Shopee punya data barunya
-                if (empty($order->awb_code) && !empty($detail['tracking_number'])) {
-                    $order->update(['awb_code' => $detail['tracking_number']]);
-                }
-
                 $this->info("   Updating Order Status only: " . $detail['order_sn'] . " -> " . $detail['order_status']);
             } else {
                 // Jika order belum ada (baru), buat data lengkap
                 $orderData['order_sn'] = $detail['order_sn'];
-                
-                // Tambahkan AWB jika ada dari Shopee
-                if (!empty($detail['tracking_number'])) {
-                    $orderData['awb_code'] = $detail['tracking_number'];
-                }
 
                 $order = Order::create($orderData);
                 $this->info("   Creating New Order: " . $detail['order_sn']);

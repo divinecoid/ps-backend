@@ -320,7 +320,7 @@ class ShopeeController extends Controller
                 $detail = $detailResponse['response']['order_list'][0] ?? null;
                 
                 if ($detail) {
-                    $awb = $detail['tracking_no'] ?? $detail['shipping_carrier'] ?? null;
+                    $awb = $detail['order_sn'] ?? null;
                     if ($awb) {
                         $updateData['awb_code'] = $awb;
                     }
