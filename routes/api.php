@@ -38,6 +38,7 @@ use App\Http\Controllers\Transaction\FabricPurchaseController;
 use App\Http\Controllers\Transaction\DashboardController;
 use Illuminate\Http\JsonResponse;
 use App\Http\Controllers\Api\MarketplaceAuthController;
+use App\Http\Controllers\Transaction\ManualOutboundController;
 
 //Auth
 Route::prefix('auth')->group(function () {
@@ -446,6 +447,16 @@ Route::prefix('outbound')->middleware('checkrole')->group(function () {
     Route::post('/assign-order', [OrderController::class, 'assignToMe']);
     Route::post('/unassign-order', [OrderController::class, 'unassignOrder']);
     Route::get('/assigned-orders', [OrderController::class, 'assignedOrders']);
+});
+
+//Outbound Manual (Pengeluaran Stok Manual)
+Route::prefix('outbound-manual')->middleware(['checkrole', 'acm:outbound_manual,read'])->group(function () {
+    Route::get('/', [ManualOutboundController::class, 'index']);
+    Route::get('/{id}', [ManualOutboundController::class, 'show']);
+});
+Route::prefix('outbound-manual')->middleware(['checkrole', 'acm:outbound_manual,create'])->group(function () {
+    Route::post('/validate-barcode', [ManualOutboundController::class, 'validateBarcode']);
+    Route::post('/submit', [ManualOutboundController::class, 'submit']);
 });
 
 //Shopee Auth & Logistics
