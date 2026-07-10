@@ -7,6 +7,7 @@ use App\Http\Traits\CrudTrait;
 use App\Models\FabricCuttingFabric;
 use App\Models\MasterData\Cloth;
 use App\Models\MasterData\ProductModel;
+use App\Models\MasterData\Series;
 use App\Models\Transactions\FabricCutting;
 use App\Models\Transactions\FabricCuttingDetail;
 use DB;
@@ -66,12 +67,16 @@ class FabricCuttingController extends Controller
         return $this->baseIndex(
             $request,
             FabricCutting::class,
-            ['fabric_cutting_receives'],
+            [
+                'fabric_cutting_request_detail' => fn($q) => $q
+                    ->where('req_qty', '>', 0)
+                    ->where('avl_qty', '>', 0),
+            ],
             ['serial_number'],
             fn($data) => [
                 'id' => $data->id,
                 'serial_number' => $data->serial_number,
-                'receive_detail' => $data->fabric_cutting_receives
+                'receive_detail' => $data->fabric_cutting_request_detail
                     ->groupBy('model_id')
                     ->map(function ($group) use ($data) {
                         return [
@@ -79,19 +84,20 @@ class FabricCuttingController extends Controller
                             'cloth_id' => $data->id, // cutting_id used as cloth_id in request_detail
                             'cloth_detail' => $group->map(fn($r) => [
                                 'size_id' => $r->size_id,
-                                'avl_qty' => $r->qty,
+                                'avl_qty' => $r->avl_qty,
                             ])->values(),
                             'variant_detail' => $group->map(fn($r) => [
                                 'size_id' => $r->size_id,
-                                'dozen_qty' => intdiv($r->qty, 12),
-                                'piece_qty' => $r->qty % 12,
+                                'dozen_qty' => intdiv($r->avl_qty, 12),
+                                'piece_qty' => $r->avl_qty % 12,
                             ])->values(),
                         ];
                     })
                     ->values(),
             ],
-            fn($q) => $q->where('status', 'CLOSED')->whereHas('fabric_cutting_receives', function ($q) {
-                $q->where('qty', '>', 0);
+            fn($q) => $q->where('status', 'CLOSED')->whereHas('fabric_cutting_request_detail', function ($q) {
+                $q->where('req_qty', '>', 0)
+                    ->where('avl_qty', '>', 0);
             })
         );
     }
@@ -433,6 +439,7 @@ class FabricCuttingController extends Controller
                     $validFabricIds = $fabricCutting->fabric_detail->pluck('fabric_id')->toArray();
 
                     $receives = [];
+                    $receivedQtyByVariant = [];
                     foreach ($data['receive_detail'] as $detail) {
                         if (!in_array($detail['cloth_id'], $validFabricIds)) {
                             throw new \Illuminate\Http\Exceptions\HttpResponseException(
@@ -442,6 +449,9 @@ class FabricCuttingController extends Controller
                         foreach ($detail['variant_detail'] as $variant) {
                             $total_piece = ($variant['dozen_qty'] * 12) + $variant['piece_qty'];
                             if ($total_piece > 0) {
+                                $variantKey = $detail['model_id'] . '|' . $variant['size_id'];
+                                $receivedQtyByVariant[$variantKey] = ($receivedQtyByVariant[$variantKey] ?? 0) + $total_piece;
+
                                 $receives[] = [
                                     'id' => (string) Str::uuid(),
                                     'fabric_cutting_id' => $id,
@@ -456,6 +466,18 @@ class FabricCuttingController extends Controller
 
                     if (!empty($receives)) {
                         \App\Models\Transactions\FabricCuttingReceive::insert($receives);
+                    }
+
+                    foreach ($receivedQtyByVariant as $variantKey => $qty) {
+                        [$modelId, $sizeId] = explode('|', $variantKey);
+
+                        FabricCuttingDetail::where([
+                            'fabric_cutting_id' => $id,
+                            'model_id' => $modelId,
+                            'size_id' => $sizeId,
+                        ])->update([
+                                    'avl_qty' => $qty,
+                                ]);
                     }
 
                     $fabricCutting->update([
@@ -486,5 +508,13 @@ class FabricCuttingController extends Controller
         });
 
         return $this->successResponse($clothes);
+    }
+
+    public function getNextSeries()
+    {
+        $preview = Series::previewNextValue('fabric_cutting', 5);
+        return $this->successResponse([
+            'next_series' => $preview
+        ]);
     }
 }
