@@ -61,7 +61,11 @@ class RequestController extends Controller
                 'request_detail.size.name',
                 'request_detail.barcode'
             ],
-            $this->structure()
+            $this->structure(),
+            null,
+            [
+                'created_at', 'desc'
+            ]
         );
     }
 

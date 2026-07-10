@@ -54,7 +54,12 @@ class FabricCuttingController extends Controller
                 'fabric_cutting_request_detail.size.code',
                 'fabric_cutting_request_detail.size.name',
             ],
-            $this->structure()
+            $this->structure(),
+            null,
+            [
+                'created_at',
+                'desc'
+            ]
         );
     }
 
