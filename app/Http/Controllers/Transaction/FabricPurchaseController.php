@@ -50,7 +50,12 @@ class FabricPurchaseController extends Controller
             FabricPurchaseRequest::class,
             ['factory', 'details.color'],
             ['factory.name', 'gram', 'ukuran', 'status'],
-            $this->structure()
+            $this->structure(),
+            null,
+            [
+                'created_at',
+                'desc'
+            ]
         );
     }
 
@@ -118,7 +123,8 @@ class FabricPurchaseController extends Controller
                         $ukuranValue = null;
                         if (!empty($data['roll_size_id'])) {
                             $roll = RollSize::find($data['roll_size_id']);
-                            if ($roll) $ukuranValue = (int) $roll->size;
+                            if ($roll)
+                                $ukuranValue = (int) $roll->size;
                         }
                         if ($ukuranValue === null && isset($data['ukuran'])) {
                             $ukuranValue = (int) $data['ukuran'];

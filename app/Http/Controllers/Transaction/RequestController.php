@@ -61,7 +61,11 @@ class RequestController extends Controller
                 'request_detail.size.name',
                 'request_detail.barcode'
             ],
-            $this->structure()
+            $this->structure(),
+            null,
+            [
+                'created_at', 'desc'
+            ]
         );
     }
 
@@ -303,17 +307,28 @@ class RequestController extends Controller
                         ];
                     }
                     foreach ($items as $item) {
-                        $fabricCutting = $fabricCuttings[$item['cloth_id']];
-                        $cuttingDetail = $fabricCutting
-                            ->fabric_cutting_request_detail
-                            ->firstWhere('size_id', $item['size_id']);
+                        $cuttingDetail = \App\Models\Transactions\FabricCuttingDetail::where([
+                            'fabric_cutting_id' => $item['cloth_id'],
+                            'model_id' => $item['model_id'],
+                            'size_id' => $item['size_id'],
+                        ])->lockForUpdate()->first();
+
                         if (!$cuttingDetail) {
                             throw new \Illuminate\Http\Exceptions\HttpResponseException(
                                 $this->errorResponse(422, "Ukuran tidak ditemukan pada fabric cutting.")
                             );
                         }
-                        $cuttingDetail->avl_qty -= $item['req_qty'];
-                        $cuttingDetail->save();
+
+                        if ($cuttingDetail->avl_qty < $item['req_qty']) {
+                            throw new \Illuminate\Http\Exceptions\HttpResponseException(
+                                $this->errorResponse(
+                                    422,
+                                    "Qty hasil potong tidak cukup untuk model {$item['model']->name}, size {$item['size']->name}. Sisa {$cuttingDetail->avl_qty}, diminta {$item['req_qty']}."
+                                )
+                            );
+                        }
+
+                        $cuttingDetail->decrement('avl_qty', $item['req_qty']);
                     }
                     RequestDetail::insert($details);
                     return $this->successResponse($requestModel);
