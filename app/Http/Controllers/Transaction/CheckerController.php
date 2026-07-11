@@ -69,12 +69,12 @@ class CheckerController extends Controller
     public function getOrderBySerial(string $serial): JsonResponse
     {
         $order = Order::query()
-            ->where('order_sn', trim($serial))
+            ->whereRaw('LOWER(order_sn) = ?', [strtolower(trim($serial))])
             ->whereHas('marketplace', function ($query) {
                 $query->where('is_need_checker', 1);
             })
             ->where('is_approved', 0)
-            // ->with(['online_store', 'marketplace', 'checkedBy'])
+            ->with(['online_store', 'marketplace', 'checkedBy'])
             ->first();
 
         if (!$order) {
