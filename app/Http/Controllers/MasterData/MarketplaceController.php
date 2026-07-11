@@ -21,7 +21,7 @@ class MarketplaceController extends Controller
             'alias' => $data->alias,
             'base_api_url' => $data->base_api_url,
             'description' => $data->description,
-            'is_need_checker' => $data->is_needed_checker
+            'is_need_checker' => $data->is_need_checker
         ];
     }
 

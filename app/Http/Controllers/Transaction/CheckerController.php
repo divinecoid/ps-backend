@@ -47,8 +47,8 @@ class CheckerController extends Controller
         if (!empty($search)) {
             $query->where(function ($q) use ($search) {
                 $q->whereRaw('LOWER(order_sn) LIKE ?', ['%' . strtolower($search) . '%'])
-                  ->orWhereRaw('LOWER(awb_code) LIKE ?', ['%' . strtolower($search) . '%'])
-                  ->orWhereRaw('LOWER(customer_name) LIKE ?', ['%' . strtolower($search) . '%']);
+                    ->orWhereRaw('LOWER(awb_code) LIKE ?', ['%' . strtolower($search) . '%'])
+                    ->orWhereRaw('LOWER(customer_name) LIKE ?', ['%' . strtolower($search) . '%']);
             });
         }
 
@@ -69,12 +69,12 @@ class CheckerController extends Controller
     public function getOrderBySerial(string $serial): JsonResponse
     {
         $order = Order::query()
-            ->whereRaw('LOWER(order_sn) = ?', [strtolower(trim($serial))])
+            ->where('order_sn', trim($serial))
             ->whereHas('marketplace', function ($query) {
                 $query->where('is_need_checker', 1);
             })
             ->where('is_approved', 0)
-            ->with(['online_store', 'marketplace', 'checkedBy'])
+            // ->with(['online_store', 'marketplace', 'checkedBy'])
             ->first();
 
         if (!$order) {
