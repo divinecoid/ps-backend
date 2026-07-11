@@ -101,10 +101,79 @@ class TiktokShopService
         return $response;
     }
 
+    public function getPackageHandoverTimeSlots(string $packageId): array
+    {
+        $shop = $this->getPrimaryShop();
+        $path = '/fulfillment/202309/packages/' . $packageId . '/handover_time_slots';
+        $params = [
+            'access_token' => $this->getAccessToken(),
+            'app_key'      => $this->getAppKey(),
+            'shop_cipher'  => $shop['cipher'],
+            'shop_id'      => $shop['id'] ?? '',
+            'timestamp'    => time(),
+            'version'      => '202309',
+        ];
+
+        return $this->request('GET', $path, $params);
+    }
+
+    public function shipPackage(string $packageId, array $payload): array
+    {
+        $shop = $this->getPrimaryShop();
+        $path = '/fulfillment/202309/packages/' . $packageId . '/ship';
+        $params = [
+            'access_token' => $this->getAccessToken(),
+            'app_key'      => $this->getAppKey(),
+            'shop_cipher'  => $shop['cipher'],
+            'shop_id'      => $shop['id'] ?? '',
+            'timestamp'    => time(),
+            'version'      => '202309',
+        ];
+
+        return $this->request('POST', $path, $params, $payload);
+    }
+
+    public function getPackageShippingDocument(string $packageId, string $documentType = 'SHIPPING_LABEL_AND_PACKING_SLIP', string $documentSize = 'A6', string $documentFormat = 'PDF', string $shippingPeriod = 'DEFAULT')
+    {
+        $shop = $this->getPrimaryShop();
+        $path = '/fulfillment/202309/packages/' . $packageId . '/shipping_documents';
+        $params = [
+            'access_token'    => $this->getAccessToken(),
+            'app_key'         => $this->getAppKey(),
+            'shop_cipher'     => $shop['cipher'],
+            'shop_id'         => $shop['id'] ?? '',
+            'timestamp'       => time(),
+            'version'         => '202309',
+            'document_type'   => $documentType,
+            'document_size'   => $documentSize,
+            'document_format' => $documentFormat,
+            'shipping_period' => $shippingPeriod,
+        ];
+
+        $sign = $this->generateSign($path, $params, null);
+        $url = rtrim((string) config('marketplace.tiktok_shop.base_url'), '/') . $path;
+
+        $finalParams = [
+            ...$params,
+            'sign' => $sign,
+        ];
+
+        $headers = [
+            'x-tts-access-token' => $this->getAccessToken(),
+            'Content-Type'       => 'application/json',
+        ];
+
+        $response = $this->http()->withHeaders($headers)->get($url, $finalParams);
+
+        if (!$response->successful()) {
+            throw new RuntimeException('TikTok API request failed: ' . $this->extractError($response));
+        }
+
+        return $response;
+    }
+
     /**
      * Upserts TikTok orders into trx_orders.
-     *
-     * Mapping requested by user:
      * - order_sn = id
      * - awb_code = tracking number (first non-empty in line_items)
      * - item_count = total items (count(line_items))
