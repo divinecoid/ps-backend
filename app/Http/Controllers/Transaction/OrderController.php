@@ -376,6 +376,7 @@ class OrderController extends Controller
     public function assignedOrders(Request $request)
     {
         $user = auth()->user();
+        $isPrepared = $request->query('is_prepared');
 
         return $this->baseIndex(
             $request,
@@ -383,8 +384,13 @@ class OrderController extends Controller
             [],
             ["marketplace_id", "awb_code", "status", "online_store_id"],
             $this->structure(),
-            function ($query) use ($user) {
+            function ($query) use ($user, $isPrepared) {
                 $query->where('preparist_user_id', $user->id);
+                if ($isPrepared === 'true') {
+                    $query->whereNotNull('prepared_at');
+                } elseif ($isPrepared === 'false') {
+                    $query->whereNull('prepared_at');
+                }
             }
         );
     }
