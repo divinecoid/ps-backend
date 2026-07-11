@@ -296,8 +296,8 @@ class CheckerController extends Controller
         $matchedOrderItem = OrderItem::query()
             ->where('order_id', $order->id)
             ->whereRaw('LOWER(sku) = ?', [strtolower($parsed['sku'])])
-            ->whereRaw('LOWER(COALESCE(color, \"\")) = ?', [strtolower($parsed['color'])])
-            ->whereRaw('LOWER(COALESCE(size, \"\")) = ?', [strtolower($parsed['size'])])
+            ->whereRaw("LOWER(COALESCE(color, '')) = ?", [strtolower($parsed['color'])])
+            ->whereRaw("LOWER(COALESCE(size, '')) = ?", [strtolower($parsed['size'])])
             ->first();
 
         if (!$matchedOrderItem) {
