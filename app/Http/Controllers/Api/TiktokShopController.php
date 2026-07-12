@@ -70,4 +70,64 @@ class TiktokShopController extends Controller
             ], 500);
         }
     }
+
+    public function getPackageHandoverTimeSlots(string $packageId)
+    {
+        if (trim($packageId) === '') {
+            return response()->json([
+                'error' => 'Missing required packageId in URL',
+            ], 400);
+        }
+
+        try {
+            return response()->json(
+                $this->tiktokShopService->getPackageHandoverTimeSlots($packageId),
+            );
+        } catch (Throwable $e) {
+            return response()->json([
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function shipPackage(string $packageId, Request $request)
+    {
+        if (trim($packageId) === '') {
+            return response()->json([
+                'error' => 'Missing required packageId in URL',
+            ], 400);
+        }
+
+        try {
+            return response()->json(
+                $this->tiktokShopService->shipPackage(
+                    $packageId,
+                    $request->all(),
+                ),
+            );
+        } catch (Throwable $e) {
+            return response()->json([
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function getPackageShippingDocuments(string $packageId)
+    {
+        if (trim($packageId) === '') {
+            return response()->json([
+                'error' => 'Missing required packageId in URL',
+            ], 400);
+        }
+
+        try {
+            $response = $this->tiktokShopService->getPackageShippingDocument($packageId);
+
+            return response($response->body(), $response->status(), $response->headers());
+        } catch (Throwable $e) {
+            return response()->json([
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 }
