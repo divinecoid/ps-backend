@@ -53,7 +53,7 @@ class OrderController extends Controller
             ["marketplace_id", "order_sn", "awb_code", "status", "online_store_id"],
             $this->structure(),
             null,
-            ['read_at' => 'desc']
+            ['created_at' => 'desc']
         );
     }
 
