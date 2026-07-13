@@ -22,6 +22,37 @@ class ShopeeController extends Controller
     }
 
     /**
+     * Ensure the store's access token is valid before making API calls.
+     * Checks access_token_expires_at against now. If expired, attempts to refresh.
+     * Throws an exception if there is no refresh token or if the refresh fails,
+     * so the caller can return an error response without proceeding with the fetch.
+     *
+     * @param OnlineStore $store
+     * @throws \Exception
+     */
+    private function ensureValidToken(OnlineStore $store): void
+    {
+        if (!$store->isTokenExpired()) {
+            return;
+        }
+
+        if (!$store->refresh_token) {
+            throw new \Exception("Access token expired and no refresh token available for store: {$store->store_name}");
+        }
+
+        Log::info("Shopee access token expired for store [{$store->store_name}], attempting refresh.");
+
+        try {
+            $this->shopeeService->setStore($store);
+            $this->shopeeService->refreshAccessToken();
+            $store->refresh(); // Reload updated token from DB
+        } catch (\Exception $e) {
+            Log::error("Shopee token refresh failed for store [{$store->store_name}]", ['error' => $e->getMessage()]);
+            throw new \Exception("Access token expired and refresh failed for store [{$store->store_name}]: " . $e->getMessage());
+        }
+    }
+
+    /**
      * Sync Shipping Logistics from Shopee API
      * 
      * @param Request $request
@@ -35,6 +66,7 @@ class ShopeeController extends Controller
 
         try {
             $store = OnlineStore::findOrFail($request->online_store_id);
+            $this->ensureValidToken($store);
             $this->shopeeService->setStore($store);
 
             $response = $this->shopeeService->getChannelList();
@@ -199,6 +231,8 @@ class ShopeeController extends Controller
             $days = 1;
         }
 
+        // Token validation and refresh (or skip on failure) is handled
+        // per-store inside the Artisan command before each store is processed.
         Artisan::call('shopee:fetch-orders', [
             '--days' => $days,
         ]);
@@ -229,6 +263,7 @@ class ShopeeController extends Controller
             }
 
             if ($order->online_store) {
+                $this->ensureValidToken($order->online_store);
                 $this->shopeeService->setStore($order->online_store);
             }
 
@@ -274,6 +309,7 @@ class ShopeeController extends Controller
             }
 
             if ($order->online_store) {
+                $this->ensureValidToken($order->online_store);
                 $this->shopeeService->setStore($order->online_store);
             }
 
@@ -410,6 +446,7 @@ class ShopeeController extends Controller
             }
 
             if ($order->online_store) {
+                $this->ensureValidToken($order->online_store);
                 $this->shopeeService->setStore($order->online_store);
             }
 
@@ -451,6 +488,7 @@ class ShopeeController extends Controller
             }
 
             if ($order->online_store) {
+                $this->ensureValidToken($order->online_store);
                 $this->shopeeService->setStore($order->online_store);
             }
 

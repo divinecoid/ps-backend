@@ -57,6 +57,27 @@ class FetchShopeeOrders extends Command
             $this->info("Processing Store: " . $store->store_name . " (" . $store->store_code . ")");
 
             try {
+                // Check and refresh token if expired before fetching
+                if ($store->isTokenExpired()) {
+                    if (!$store->refresh_token) {
+                        $this->error("Store [{$store->store_name}] skipped: access token expired and no refresh token available.");
+                        Log::warning("FetchShopeeOrders skipped store [{$store->store_name}]: token expired, no refresh_token.");
+                        continue;
+                    }
+
+                    $this->info("Access token expired for store [{$store->store_name}], refreshing...");
+                    try {
+                        $shopeeService->setStore($store);
+                        $shopeeService->refreshAccessToken();
+                        $store->refresh(); // Reload updated token
+                        $this->info("Token refreshed successfully for store [{$store->store_name}].");
+                    } catch (\Exception $e) {
+                        $this->error("Store [{$store->store_name}] skipped: token refresh failed — " . $e->getMessage());
+                        Log::error("FetchShopeeOrders skipped store [{$store->store_name}]: token refresh failed.", ['error' => $e->getMessage()]);
+                        continue;
+                    }
+                }
+
                 // Set the store context for the service
                 $shopeeService->setStore($store);
 
