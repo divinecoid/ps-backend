@@ -25,13 +25,15 @@ class TiktokShopService
 
     public function getShops(): array
     {
+        $accessToken = $this->getAccessToken();
+
         $path = '/authorization/202309/shops';
         $params = [
             'app_key'   => $this->getAppKey(),
             'timestamp' => time(),
         ];
 
-        return $this->request('GET', $path, $params);
+        return $this->request('GET', $path, $params, null, $accessToken);
     }
 
     public function getPrimaryShop(): array
@@ -49,9 +51,11 @@ class TiktokShopService
     public function getProduct(string $productId): array
     {
         $shop = $this->getPrimaryShop();
+        $accessToken = $this->getAccessToken();
+
         $path = '/product/202309/products/' . $productId;
         $params = [
-            'access_token' => $this->getAccessToken(),
+            'access_token' => $accessToken,
             'app_key'      => $this->getAppKey(),
             'shop_cipher'  => $shop['cipher'],
             'shop_id'      => $shop['id'] ?? '',
@@ -59,15 +63,17 @@ class TiktokShopService
             'version'      => '202309',
         ];
 
-        return $this->request('GET', $path, $params);
+        return $this->request('GET', $path, $params, null, $accessToken);
     }
 
     public function getOrderList(?int $pageSize = null): array
     {
         $shop = $this->getPrimaryShop();
+        $accessToken = $this->getAccessToken();
+
         $path = '/order/202309/orders/search';
         $params = [
-            'access_token' => $this->getAccessToken(),
+            'access_token' => $accessToken,
             'app_key'      => $this->getAppKey(),
             'page_size'    => $pageSize ?? $this->getDefaultOrderPageSize(),
             'shop_cipher'  => $shop['cipher'],
@@ -75,7 +81,7 @@ class TiktokShopService
             'version'      => '202309',
         ];
 
-        $response = $this->request('POST', $path, $params, new stdClass());
+        $response = $this->request('POST', $path, $params, new stdClass(), $accessToken);
         $this->syncOrdersToDatabaseFromApiResponse($response);
 
         return $response;
@@ -84,9 +90,11 @@ class TiktokShopService
     public function getOrder(string $orderId): array
     {
         $shop = $this->getPrimaryShop();
+        $accessToken = $this->getAccessToken();
+
         $path = '/order/202507/orders';
         $params = [
-            'access_token' => $this->getAccessToken(),
+            'access_token' => $accessToken,
             'app_key'      => $this->getAppKey(),
             'ids'          => $orderId,
             'shop_cipher'  => $shop['cipher'],
@@ -95,7 +103,7 @@ class TiktokShopService
             'version'      => '202507',
         ];
 
-        $response = $this->request('GET', $path, $params);
+        $response = $this->request('GET', $path, $params, null, $accessToken);
         $this->syncOrdersToDatabaseFromApiResponse($response);
 
         return $response;
@@ -104,9 +112,11 @@ class TiktokShopService
     public function getPackageHandoverTimeSlots(string $packageId): array
     {
         $shop = $this->getPrimaryShop();
+        $accessToken = $this->getAccessToken();
+
         $path = '/fulfillment/202309/packages/' . $packageId . '/handover_time_slots';
         $params = [
-            'access_token' => $this->getAccessToken(),
+            'access_token' => $accessToken,
             'app_key'      => $this->getAppKey(),
             'shop_cipher'  => $shop['cipher'],
             'shop_id'      => $shop['id'] ?? '',
@@ -114,15 +124,17 @@ class TiktokShopService
             'version'      => '202309',
         ];
 
-        return $this->request('GET', $path, $params);
+        return $this->request('GET', $path, $params, null, $accessToken);
     }
 
     public function shipPackage(string $packageId, array $payload): array
     {
         $shop = $this->getPrimaryShop();
+        $accessToken = $this->getAccessToken();
+
         $path = '/fulfillment/202309/packages/' . $packageId . '/ship';
         $params = [
-            'access_token' => $this->getAccessToken(),
+            'access_token' => $accessToken,
             'app_key'      => $this->getAppKey(),
             'shop_cipher'  => $shop['cipher'],
             'shop_id'      => $shop['id'] ?? '',
@@ -130,15 +142,17 @@ class TiktokShopService
             'version'      => '202309',
         ];
 
-        return $this->request('POST', $path, $params, $payload);
+        return $this->request('POST', $path, $params, $payload, $accessToken);
     }
 
     public function getPackageShippingDocument(string $packageId, string $documentType = 'SHIPPING_LABEL_AND_PACKING_SLIP', string $documentSize = 'A6', string $documentFormat = 'PDF', string $shippingPeriod = 'DEFAULT')
     {
         $shop = $this->getPrimaryShop();
+        $accessToken = $this->getAccessToken();
+
         $path = '/fulfillment/202309/packages/' . $packageId . '/shipping_documents';
         $params = [
-            'access_token'    => $this->getAccessToken(),
+            'access_token'    => $accessToken,
             'app_key'         => $this->getAppKey(),
             'shop_cipher'     => $shop['cipher'],
             'shop_id'         => $shop['id'] ?? '',
@@ -159,7 +173,7 @@ class TiktokShopService
         ];
 
         $headers = [
-            'x-tts-access-token' => $this->getAccessToken(),
+            'x-tts-access-token' => $accessToken,
             'Content-Type'       => 'application/json',
         ];
 
@@ -551,8 +565,11 @@ class TiktokShopService
     // Core HTTP request + signing
     // -------------------------------------------------------------------------
 
-    private function request(string $method, string $path, array $params, mixed $payload = null): array
+    private function request(string $method, string $path, array $params, mixed $payload = null, ?string $accessToken = null): array
     {
+        // Fallback: kalau caller tidak pass token, cek/refresh di sini.
+        $accessToken ??= $this->getAccessToken();
+
         $sign = $this->generateSign($path, $params, $payload);
         $url  = rtrim((string) config('marketplace.tiktok_shop.base_url'), '/') . $path;
 
@@ -562,7 +579,7 @@ class TiktokShopService
         ];
 
         $headers = [
-            'x-tts-access-token' => $this->getAccessToken(),
+            'x-tts-access-token' => $accessToken,
             'Content-Type'       => 'application/json',
         ];
 
