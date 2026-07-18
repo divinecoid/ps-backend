@@ -22,7 +22,7 @@ class Marketplace extends Model
         'alias',
         'base_api_url',
         'description',
-        'is_needed_checker'
+        'is_need_checker'
     ];
 
     // Define relationship with Online Store model
