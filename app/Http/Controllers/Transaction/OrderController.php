@@ -53,9 +53,19 @@ class OrderController extends Controller
             ["marketplace_id", "order_sn", "awb_code", "status", "online_store_id"],
             $this->structure(),
             function ($query) {
-                // Prioritize non-cancelled orders at the top
-                $query->orderByRaw("CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END ASC")
-                      ->orderByDesc('created_at');
+                // Priority sorting:
+                // 1. ready_to_ship and ready_to_pickup (highest priority)
+                // 2. Other active statuses (pending, read, prepared, shipped, retry_ship)
+                // 3. Completed/cancelled statuses (delivered, cancelled, returned) at bottom
+                $query->orderByRaw("
+                    CASE 
+                        WHEN status IN ('ready_to_ship', 'ready_to_pickup') THEN 1
+                        WHEN status IN ('pending', 'read', 'prepared', 'shipped', 'retry_ship') THEN 2
+                        WHEN status IN ('delivered', 'cancelled', 'returned') THEN 3
+                        ELSE 4
+                    END ASC
+                ")
+                ->orderByDesc('created_at');
             },
             null
         );
