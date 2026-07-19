@@ -21,7 +21,7 @@ class FactorySeeder extends Seeder
         ];
 
         foreach ($factories as $factory) {
-            Factory::create($factory);
+            Factory::firstOrCreate(['code' => $factory['code']], $factory);
         }
     }
 }

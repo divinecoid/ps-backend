@@ -28,9 +28,17 @@ class ProductModelSeeder extends Seeder
         $sizes = \App\Models\MasterData\Size::all();
 
         foreach ($models as $modelData) {
-            $model = ProductModel::create($modelData);
-            $model->colors()->attach($colors->pluck('id'));
-            $model->sizes()->attach($sizes->pluck('id'));
+            $model = ProductModel::firstOrCreate(
+                ['sku' => $modelData['sku']],
+                $modelData
+            );
+            // Only attach colors/sizes if they haven't been attached yet
+            if ($model->colors()->doesntExist()) {
+                $model->colors()->attach($colors->pluck('id'));
+            }
+            if ($model->sizes()->doesntExist()) {
+                $model->sizes()->attach($sizes->pluck('id'));
+            }
         }
     }
 }

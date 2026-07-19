@@ -41,7 +41,7 @@ class ColorSeeder extends Seeder
         ];
 
         foreach ($colors as $color) {
-            Color::create($color);
+            Color::firstOrCreate(['code' => $color['code']], $color);
         }
     }
 }

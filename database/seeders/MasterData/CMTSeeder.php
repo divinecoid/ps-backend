@@ -27,7 +27,7 @@ class CMTSeeder extends Seeder
         ];
 
         foreach ($cmts as $cmt) {
-            CMT::create($cmt);
+            CMT::firstOrCreate(['code' => $cmt['code']], $cmt);
         }
     }
 }

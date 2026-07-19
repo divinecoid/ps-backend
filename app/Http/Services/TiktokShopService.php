@@ -76,15 +76,158 @@ class TiktokShopService
             'access_token' => $accessToken,
             'app_key'      => $this->getAppKey(),
             'page_size'    => $pageSize ?? $this->getDefaultOrderPageSize(),
+            'sort_field'   => 'create_time',
+            'sort_order'   => 'DESC',
             'shop_cipher'  => $shop['cipher'],
             'timestamp'    => time(),
             'version'      => '202309',
         ];
 
-        $response = $this->request('POST', $path, $params, new stdClass(), $accessToken);
+        $response = $this->requestPaginated('POST', $path, $params, [], $accessToken);
         $this->syncOrdersToDatabaseFromApiResponse($response);
 
         return $response;
+    }
+
+    private function requestPaginated(string $method, string $path, array $params, mixed $payload = null, ?string $accessToken = null): array
+    {
+        $accessToken ??= $this->getAccessToken();
+        $allOrders = [];
+        $orderKey = null;
+        $pagination = [];
+        $cursor = null;
+        $page = 0;
+        $response = [];
+
+        do {
+            $page++;
+            if (!empty($cursor)) {
+                $params['cursor'] = $cursor;
+            } elseif (isset($params['cursor'])) {
+                unset($params['cursor']);
+            }
+
+            $response = $this->request($method, $path, $params, $payload, $accessToken);
+
+            if ($orderKey === null) {
+                $orderKey = $this->detectOrderDataKey($response);
+            }
+
+            $orders = $this->extractOrdersFromApiResponse($response);
+            if (is_array($orders)) {
+                $allOrders = array_merge($allOrders, $orders);
+            }
+
+            $pagination = $this->extractPaginationFromApiResponse($response);
+            $cursor = $this->extractNextCursorFromApiResponse($response);
+        } while (($this->responseHasMorePages($response) || !empty($cursor)) && $page < 100);
+
+        if ($orderKey !== null && isset($response['data']) && is_array($response['data'])) {
+            $response['data'][$orderKey] = $allOrders;
+            if (!empty($pagination)) {
+                $response['data']['pagination'] = $pagination;
+            }
+        }
+
+        return $response;
+    }
+
+    private function detectOrderDataKey(array $response): ?string
+    {
+        $data = $response['data'] ?? null;
+        if (!is_array($data)) {
+            return null;
+        }
+
+        foreach (['orders', 'order_list', 'orders_list'] as $key) {
+            if (array_key_exists($key, $data) && is_array($data[$key])) {
+                return $key;
+            }
+        }
+
+        return null;
+    }
+
+    private function extractOrdersFromApiResponse(array $response): array
+    {
+        $data = $response['data'] ?? null;
+        if (!is_array($data)) {
+            return [];
+        }
+
+        foreach (['orders', 'order_list', 'orders_list'] as $key) {
+            if (isset($data[$key]) && is_array($data[$key])) {
+                return $data[$key];
+            }
+        }
+
+        return [];
+    }
+
+    private function extractPaginationFromApiResponse(array $response): array
+    {
+        $data = $response['data'] ?? null;
+        if (!is_array($data)) {
+            return [];
+        }
+
+        if (isset($data['pagination']) && is_array($data['pagination'])) {
+            return $data['pagination'];
+        }
+
+        return [];
+    }
+
+    private function extractNextCursorFromApiResponse(array $response): ?string
+    {
+        $data = $response['data'] ?? null;
+        if (!is_array($data)) {
+            return null;
+        }
+
+        $cursorKeys = ['next_cursor', 'cursor'];
+        foreach ($cursorKeys as $key) {
+            if (!empty($data[$key]) && is_string($data[$key])) {
+                return trim($data[$key]);
+            }
+        }
+
+        if (isset($data['pagination']) && is_array($data['pagination'])) {
+            foreach ($cursorKeys as $key) {
+                if (!empty($data['pagination'][$key]) && is_string($data['pagination'][$key])) {
+                    return trim($data['pagination'][$key]);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function responseHasMorePages(array $response): bool
+    {
+        $data = $response['data'] ?? null;
+        if (!is_array($data)) {
+            return false;
+        }
+
+        if (isset($data['pagination']) && is_array($data['pagination'])) {
+            if (isset($data['pagination']['more'])) {
+                return filter_var($data['pagination']['more'], FILTER_VALIDATE_BOOLEAN);
+            }
+            if (isset($data['pagination']['has_more'])) {
+                return filter_var($data['pagination']['has_more'], FILTER_VALIDATE_BOOLEAN);
+            }
+        }
+
+        if (isset($data['more'])) {
+            return filter_var($data['more'], FILTER_VALIDATE_BOOLEAN);
+        }
+
+        if (isset($data['has_more'])) {
+            return filter_var($data['has_more'], FILTER_VALIDATE_BOOLEAN);
+        }
+
+        return false;
     }
 
     public function getOrder(string $orderId): array
@@ -109,6 +252,24 @@ class TiktokShopService
         return $response;
     }
 
+    public function getPackageDetail(string $packageId): array
+    {
+        $shop = $this->getPrimaryShop();
+        $accessToken = $this->getAccessToken();
+
+        $path = '/fulfillment/202309/packages/' . $packageId;
+        $params = [
+            'access_token' => $accessToken,
+            'app_key'      => $this->getAppKey(),
+            'shop_cipher'  => $shop['cipher'],
+            'shop_id'      => $shop['id'] ?? '',
+            'timestamp'    => time(),
+            'version'      => '202309',
+        ];
+
+        return $this->request('GET', $path, $params, null, $accessToken);
+    }
+
     public function getPackageHandoverTimeSlots(string $packageId): array
     {
         $shop = $this->getPrimaryShop();
@@ -125,6 +286,28 @@ class TiktokShopService
         ];
 
         return $this->request('GET', $path, $params, null, $accessToken);
+    }
+
+    public function markPackageAsShipped(string $packageId, string $trackingNumber): array
+    {
+        $shop = $this->getPrimaryShop();
+        $accessToken = $this->getAccessToken();
+
+        $path = '/fulfillment/202309/packages/' . $packageId . '/ship';
+        $params = [
+            'access_token' => $accessToken,
+            'app_key'      => $this->getAppKey(),
+            'shop_cipher'  => $shop['cipher'],
+            'shop_id'      => $shop['id'] ?? '',
+            'timestamp'    => time(),
+            'version'      => '202309',
+        ];
+
+        $payload = [
+            'tracking_number' => $trackingNumber,
+        ];
+
+        return $this->request('POST', $path, $params, $payload, $accessToken);
     }
 
     public function shipPackage(string $packageId, array $payload): array
@@ -179,11 +362,36 @@ class TiktokShopService
 
         $response = $this->http()->withHeaders($headers)->get($url, $finalParams);
 
-        if (!$response->successful()) {
-            throw new RuntimeException('TikTok API request failed: ' . $this->extractError($response));
-        }
-
+        // Always return the raw response so the controller can inspect content-type,
+        // error codes, and decide whether to stream PDF bytes or return JSON errors.
         return $response;
+    }
+
+    public function getErrorMessage(int $code, string $message): string
+    {
+        $errorMap = [
+            11006010 => 'Internal package status error, please try again later.',
+            11034002 => 'This order uses seller shipping, not TikTok Shipping. Cannot retrieve shipping documents.',
+            11034009 => 'Warehouse does not exist.',
+            11034023 => 'Shipping document generation timeout, please try again later.',
+            11034025 => 'Internal package tag error, please try again later.',
+            11034037 => 'Shipping document is still being generated, please try again later.',
+            21008017 => 'This order uses seller shipping, not TikTok Shipping. Cannot retrieve shipping documents.',
+            21008043 => 'This package is fulfilled by TikTok. Shipping documents cannot be printed.',
+            21008109 => 'Unable to retrieve shipping information, please double check the order status.',
+            21011001 => 'Package not found.',
+            21021010 => 'Package has an after-sale request. Please process it first.',
+            21023022 => 'Unknown label print timeout error, please try again later.',
+            21023034 => 'Internal package update error, please try again later.',
+            21023035 => 'Package not shipped yet. Please arrange shipment before retrieving documents.',
+            21023046 => 'Package has already been shipped.',
+            21023059 => 'Package has already been cancelled.',
+            21042102 => 'Documents cannot be printed after pickup.',
+            21042104 => 'Documents cannot be printed before shipment. Please arrange shipment first.',
+            36009003 => 'Internal error. Please try again later.',
+        ];
+
+        return $errorMap[$code] ?? $message;
     }
 
     /**
@@ -236,6 +444,21 @@ class TiktokShopService
                 $customerName = (string) ($recipient['name'] ?? '');
                 $customerPhone = (string) ($recipient['phone_number'] ?? '');
 
+                // Build a readable address string from available fields.
+                // Prefer full_address if present; fall back to composing from parts.
+                $fullAddress = trim((string) ($recipient['full_address'] ?? ''));
+                if ($fullAddress === '') {
+                    $parts = array_filter([
+                        trim((string) ($recipient['address_line1'] ?? '')),
+                        trim((string) ($recipient['address_line2'] ?? '')),
+                        trim((string) ($recipient['address_detail'] ?? '')),
+                        trim((string) ($recipient['post_town'] ?? '')),
+                        trim((string) ($recipient['postal_code'] ?? '')),
+                    ]);
+                    $fullAddress = implode(', ', $parts);
+                }
+                $customerAddress = $fullAddress !== '' ? $fullAddress : null;
+
                 // trx_orders requires non-null customer_name; keep "as-is" when present, fallback only when empty.
                 if (trim($customerName) === '') {
                     $customerName = (string) ($order['buyer_email'] ?? 'Unknown');
@@ -267,8 +490,11 @@ class TiktokShopService
                     $orderModel->awb_code = $awbCode;
                 }
 
-                // Per request, leave address empty for newly created TikTok orders.
-                if (!$orderModel->exists) {
+                // Always sync address from TikTok when we have a value.
+                // Only skip overwrite for existing orders where address was manually set.
+                if ($customerAddress !== null) {
+                    $orderModel->customer_address = $customerAddress;
+                } elseif (!$orderModel->exists) {
                     $orderModel->customer_address = null;
                 }
 
@@ -586,7 +812,7 @@ class TiktokShopService
         $client = $this->http()->withHeaders($headers);
 
         $response = strtoupper($method) === 'POST'
-            ? $client->post($url . '?' . http_build_query($finalParams), $payload ?? new stdClass())
+            ? $client->post($url . '?' . http_build_query($finalParams), $payload ?? [])
             : $client->get($url, $finalParams);
 
         if (!$response->successful()) {

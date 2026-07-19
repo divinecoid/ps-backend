@@ -49,8 +49,9 @@ class DatabaseSeeder extends Seeder
         $model = \App\Models\MasterData\ProductModel::where('sku', 'MDL01')->first();
         $size = \App\Models\MasterData\Size::where('code', 'XS')->first();
         $factory = \App\Models\MasterData\Factory::first();
+        $color = \App\Models\MasterData\Color::where('code', 'RED')->first();
 
-        if ($cmt && $model && $size && $factory) {
+        if ($cmt && $model && $size && $factory && $color) {
             $rollSize = \App\Models\MasterData\RollSize::create([
                 'size' => '25'
             ]);
@@ -59,6 +60,7 @@ class DatabaseSeeder extends Seeder
                 'factory_id' => $factory->id,
                 'gram' => '200',
                 'roll_size_id' => $rollSize->id,
+                'color_id' => $color->id,
                 'quantity' => 100,
                 'sequence' => 'K1'
             ]);

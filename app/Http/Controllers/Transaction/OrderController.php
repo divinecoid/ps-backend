@@ -52,8 +52,12 @@ class OrderController extends Controller
             [],
             ["marketplace_id", "order_sn", "awb_code", "status", "online_store_id"],
             $this->structure(),
-            null,
-            ['created_at' => 'desc']
+            function ($query) {
+                // Prioritize non-cancelled orders at the top
+                $query->orderByRaw("CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END ASC")
+                      ->orderByDesc('created_at');
+            },
+            null
         );
     }
 
@@ -63,7 +67,7 @@ class OrderController extends Controller
         return $this->baseShow(
             Order::class,
             $id,
-            ['order_items'],
+            ['order_items', 'marketplace'],
             $this->structure()
         );
     }

@@ -42,7 +42,7 @@ class SizeSeeder extends Seeder
         ];
 
         foreach ($sizes as $size) {
-            Size::create($size);
+            Size::firstOrCreate(['code' => $size['code']], $size);
         }
     }
 }
