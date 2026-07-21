@@ -64,7 +64,7 @@ class OnlineStoreSeeder extends Seeder
         ];
 
         foreach ($stores as $store) {
-            OnlineStore::create($store);
+            OnlineStore::firstOrCreate(['store_code' => $store['store_code']], $store);
         }
 
         $this->command->info('Created ' . count($stores) . ' online stores successfully!');

@@ -37,7 +37,7 @@ class MarketplaceSeeder extends Seeder
         ];
 
         foreach ($marketplaces as $marketplace) {
-            Marketplace::create($marketplace);
+            Marketplace::firstOrCreate(['code' => $marketplace['code']], $marketplace);
         }
 
         $this->command->info('Created ' . count($marketplaces) . ' marketplaces successfully!');

@@ -120,10 +120,16 @@ class WarehouseRackSeeder extends Seeder
         ];
 
         foreach ($warehouses as $data) {
-            $warehouse = Warehouse::create(
+            $warehouse = Warehouse::firstOrCreate(
+                ['code' => $data['code']],
                 collect($data)->except('racks')->toArray()
             );
-            $warehouse->rack()->createMany($data['racks']);
+            foreach ($data['racks'] as $rack) {
+                $warehouse->rack()->firstOrCreate(
+                    ['code' => $rack['code']],
+                    $rack
+                );
+            }
         }
     }
 }

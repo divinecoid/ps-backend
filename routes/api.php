@@ -59,6 +59,7 @@ Route::prefix('tiktok-shop')->middleware('checkrole:admin')->group(function () {
     Route::get('/get-product/{productId}', [TiktokShopController::class, 'getProduct']);
     Route::get('/get-order-list', [TiktokShopController::class, 'getOrderList']);
     Route::get('/get-order/{orderId}', [TiktokShopController::class, 'getOrder']);
+    Route::get('/package/{packageId}', [TiktokShopController::class, 'getPackageDetail']);
     Route::get('/package/{packageId}/handover-time-slots', [TiktokShopController::class, 'getPackageHandoverTimeSlots']);
     Route::get('/package/{packageId}/shipping-documents', [TiktokShopController::class, 'getPackageShippingDocuments']);
     Route::post('/package/{packageId}/ship', [TiktokShopController::class, 'shipPackage']);
