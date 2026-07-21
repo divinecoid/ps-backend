@@ -366,6 +366,24 @@ class ShopeeService
     }
 
     /**
+     * Ship Order (Dropoff)
+     * 
+     * @param string $orderSn
+     * @param array $dropoffData
+     * @return array
+     */
+    public function shipOrderDropoff($orderSn, $dropoffData)
+    {
+        $path = "/api/v2/logistics/ship_order";
+        $data = [
+            'order_sn' => $orderSn,
+            'dropoff' => $dropoffData
+        ];
+
+        return $this->request('POST', $path, [], $data);
+    }
+
+    /**
      * Create Shipping Document
      * 
      * @param string $orderSn

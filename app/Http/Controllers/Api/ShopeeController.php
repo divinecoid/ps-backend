@@ -295,8 +295,9 @@ class ShopeeController extends Controller
     {
         $request->validate([
             'order_sn' => 'required|string',
-            'address_id' => 'required', // ID can be int, but sometimes string from API, better not strict int
-            'pickup_time_id' => 'required|string',
+            'address_id' => 'required_without:dropoff',
+            'pickup_time_id' => 'required_without:dropoff|string',
+            'dropoff' => 'nullable|array',
         ]);
 
         try {
@@ -321,13 +322,15 @@ class ShopeeController extends Controller
                 ], 422);
             }
 
-            $pickupData = [
-                'address_id' => $request->address_id,
-                'pickup_time_id' => $request->pickup_time_id
-            ];
-
-            // 1. Ship Order (Arrange Pickup)
-            $shipResponse = $this->shopeeService->shipOrder($request->order_sn, $pickupData);
+            if ($request->has('dropoff')) {
+                $shipResponse = $this->shopeeService->shipOrderDropoff($request->order_sn, $request->dropoff);
+            } else {
+                $pickupData = [
+                    'address_id' => $request->address_id,
+                    'pickup_time_id' => $request->pickup_time_id
+                ];
+                $shipResponse = $this->shopeeService->shipOrder($request->order_sn, $pickupData);
+            }
 
             if (isset($shipResponse['error']) && !empty($shipResponse['error'])) {
                  // Check if it's "Order has been shipped" error, treat as success (maybe state mismatch)
