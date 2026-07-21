@@ -92,16 +92,33 @@ class ReturnReceiptController extends Controller
 
         $awb = trim($request->input('awb_code'));
 
-        // Cari order yang sesuai resi/awb nya dan berstatus returned
-        $order = Order::where('awb_code', $awb)
-            ->where('status', 'returned')
+        // Cari order yang sesuai resi/awb nya atau order_sn nya
+        $order = Order::where(function ($query) use ($awb) {
+                $query->where('awb_code', $awb)
+                    ->orWhere('order_sn', $awb);
+            })
             ->first();
 
         if (!$order) {
             return response()->json([
                 'success' => false,
-                'message' => 'Order berstatus returned dengan resi tersebut tidak ditemukan.',
+                'message' => 'Order dengan resi atau nomor pesanan tersebut tidak ditemukan.',
             ], 404);
+        }
+
+        // Jika TikTok Shop dan statusnya shipped/delivered, ubah ke returned secara otomatis
+        $isTiktok = $order->marketplace && in_array(strtolower($order->marketplace->code), ['tiktok_shop', 'tiktok']);
+
+        if ($order->status !== \App\Enums\OrderStatus::RETURNED) {
+            if ($isTiktok && in_array($order->status, [\App\Enums\OrderStatus::SHIPPED, \App\Enums\OrderStatus::DELIVERED])) {
+                $order->status = \App\Enums\OrderStatus::RETURNED;
+                $order->save();
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Order tersebut tidak dalam status returned.',
+                ], 400);
+            }
         }
 
         // Cek jika return receipt sudah ada
