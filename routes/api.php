@@ -430,6 +430,17 @@ Route::prefix('order')->middleware(['checkrole', 'acm:pesanan,read'])->group(fun
     Route::get('/shopee/{id}', [OrderController::class, 'getShopeeOrder']);
 });
 
+// Return Receipts
+Route::prefix('return-receipt')->middleware(['checkrole', 'acm:retur_barang,read'])->group(function () {
+    Route::get('/', [App\Http\Controllers\Transaction\ReturnReceiptController::class, 'index']);
+    Route::get('/{id}', [App\Http\Controllers\Transaction\ReturnReceiptController::class, 'show']);
+});
+Route::prefix('return-receipt')->middleware(['checkrole', 'acm:retur_barang,create'])->group(function () {
+    Route::post('/', [App\Http\Controllers\Transaction\ReturnReceiptController::class, 'store']);
+    Route::post('/validate-barcode', [App\Http\Controllers\Transaction\ReturnReceiptController::class, 'validateBarcode']);
+    Route::post('/submit', [App\Http\Controllers\Transaction\ReturnReceiptController::class, 'submit']);
+});
+
 //Order Items
 Route::prefix('order')->middleware(['checkrole', 'acm:pesanan,read'])->group(function () {
     Route::get('/items/lazada/{id}', [OrderController::class, 'getLazadaOrderItems']);
