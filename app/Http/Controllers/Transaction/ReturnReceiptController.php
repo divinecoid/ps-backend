@@ -30,6 +30,7 @@ class ReturnReceiptController extends Controller
                 'name' => $data->user->name,
             ] : null,
             'notes' => $data->notes,
+            'created_at' => $data->created_at?->utc()->toISOString(),
             'order' => $data->order ? [
                 'id' => $data->order->id,
                 'order_sn' => $data->order->order_sn,
@@ -61,7 +62,13 @@ class ReturnReceiptController extends Controller
             ['order.marketplace', 'user', 'details.orderItem'],
             ['return_status', 'awb_code'],
             $this->structure(),
-            function ($query) {
+            function ($query) use ($request) {
+                if ($request->filled('start_date') && $request->filled('end_date')) {
+                    $query->whereBetween('created_at', [
+                        $request->input('start_date') . ' 00:00:00',
+                        $request->input('end_date') . ' 23:59:59'
+                    ]);
+                }
                 $query->orderByDesc('created_at');
             }
         );
