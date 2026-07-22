@@ -232,7 +232,8 @@ class CheckerController extends Controller
 
         $orderItems = OrderItem::query()
             ->where('order_id', $orderId)
-            ->get();
+            ->get()
+            ->unique('id');
 
         $expandedItems = [];
 
