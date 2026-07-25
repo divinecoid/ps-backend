@@ -70,7 +70,7 @@ class ShopeeController extends Controller
             $this->shopeeService->setStore($store);
 
             $response = $this->shopeeService->getChannelList();
-            
+
             if (isset($response['error']) && !empty($response['error'])) {
                 return response()->json([
                     'success' => false,
@@ -86,7 +86,7 @@ class ShopeeController extends Controller
                 ShippingLogistic::updateOrCreate(
                     [
                         'marketplace_id' => $store->marketplace_id,
-                        'logistic_id' => (string)$item['logistics_channel_id']
+                        'logistic_id' => (string) $item['logistics_channel_id']
                     ],
                     [
                         'logistic_name' => $item['logistics_channel_name'],
@@ -129,8 +129,8 @@ class ShopeeController extends Controller
         $shopId = $request->query('shop_id');
 
         if (!$state || !$code || !$shopId) {
-             Log::error('Shopee Callback Missing Parameters', ['state' => $state, 'code' => $code, 'shopId' => $shopId]);
-             return response()->json(['error' => 'Missing required parameters (state/code/shop_id). Please regenerate auth URL.'], 400);
+            Log::error('Shopee Callback Missing Parameters', ['state' => $state, 'code' => $code, 'shopId' => $shopId]);
+            return response()->json(['error' => 'Missing required parameters (state/code/shop_id). Please regenerate auth URL.'], 400);
         }
 
         // Find store by Partner ID (state)
@@ -138,12 +138,12 @@ class ShopeeController extends Controller
         // We try to find a store that matches this PartnerID.
         // Ideally we should also check shop_id if it exists, but for initial auth it might be null.
         $store = OnlineStore::where('client_id', $state)
-                    ->where(function($q) use ($shopId) {
-                        $q->where('shop_id', $shopId)
-                          ->orWhereNull('shop_id')
-                          ->orWhere('shop_id', '');
-                    })
-                    ->first();
+            ->where(function ($q) use ($shopId) {
+                $q->where('shop_id', $shopId)
+                    ->orWhereNull('shop_id')
+                    ->orWhere('shop_id', '');
+            })
+            ->first();
 
         if (!$store) {
             // Fallback: Find any store with this Partner ID (Caution: ambiguous if multiple stores)
@@ -165,7 +165,7 @@ class ShopeeController extends Controller
 
         // Exchange for Token
         try {
-            $this->shopeeService->exchangeAuthCodeForToken($code, (int)$shopId);
+            $this->shopeeService->exchangeAuthCodeForToken($code, (int) $shopId);
             return response('Shopee Auth Success! Token has been generated. You can close this window.');
         } catch (\Exception $e) {
             Log::error('Shopee Auth Failed', ['error' => $e->getMessage()]);
@@ -226,7 +226,7 @@ class ShopeeController extends Controller
 
     public function fetchOrders(Request $request)
     {
-        $days = (int)($request->query('days', 1));
+        $days = (int) ($request->query('days', 1));
         if ($days < 1) {
             $days = 1;
         }
@@ -333,16 +333,16 @@ class ShopeeController extends Controller
             }
 
             if (isset($shipResponse['error']) && !empty($shipResponse['error'])) {
-                 // Check if it's "Order has been shipped" error, treat as success (maybe state mismatch)
-                 if (isset($shipResponse['message']) && stripos($shipResponse['message'], 'shipped') !== false) {
-                      // It is shipped, proceed to update local status
-                 } else {
-                      return response()->json([
-                          'success' => false,
-                          'message' => 'Shopee API Error: ' . ($shipResponse['message'] ?? 'Unknown error'),
-                          'data' => $shipResponse
-                      ], 400);
-                 }
+                // Check if it's "Order has been shipped" error, treat as success (maybe state mismatch)
+                if (isset($shipResponse['message']) && stripos($shipResponse['message'], 'shipped') !== false) {
+                    // It is shipped, proceed to update local status
+                } else {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Shopee API Error: ' . ($shipResponse['message'] ?? 'Unknown error'),
+                        'data' => $shipResponse
+                    ], 400);
+                }
             }
 
             // Update Local Status & Fetch AWB
@@ -351,13 +351,13 @@ class ShopeeController extends Controller
                     'status' => OrderStatus::READY_TO_PICKUP,
                     'readytoship_at' => now(),
                 ];
-                
+
                 Log::info("Attempting to update order status to READY_TO_PICKUP for order: " . $request->order_sn);
 
                 // Try to fetch AWB + logistics channel mapping
                 $detailResponse = $this->shopeeService->getOrderDetail([$request->order_sn]);
                 $detail = $detailResponse['response']['order_list'][0] ?? null;
-                
+
                 if ($detail) {
                     $awb = $detail['order_sn'] ?? null;
                     if ($awb) {
@@ -387,10 +387,10 @@ class ShopeeController extends Controller
                 // Verify update
                 $order->refresh();
                 if ($order->status !== OrderStatus::READY_TO_PICKUP) {
-                     $currentStatus = $order->status instanceof \BackedEnum ? $order->status->value : $order->status;
-                     Log::warning("Order status update verification failed. Status is still: " . $currentStatus);
-                     // Force direct update
-                     DB::table('trx_orders')
+                    $currentStatus = $order->status instanceof \BackedEnum ? $order->status->value : $order->status;
+                    Log::warning("Order status update verification failed. Status is still: " . $currentStatus);
+                    // Force direct update
+                    DB::table('trx_orders')
                         ->where('id', $order->id)
                         ->update(['status' => 'ready_to_pickup', 'readytoship_at' => now()]);
                 }
@@ -452,8 +452,8 @@ class ShopeeController extends Controller
                 $this->ensureValidToken($order->online_store);
                 $this->shopeeService->setStore($order->online_store);
             }
-
-            $result = $this->shopeeService->createShippingDocument($request->order_sn);
+            $type = $request->shipping_document_type ?? 'THERMAL_AIR_WAYBILL';
+            $result = $this->shopeeService->createShippingDocument($request->order_sn, $type);
 
             return response()->json([
                 'success' => true,
@@ -478,7 +478,7 @@ class ShopeeController extends Controller
     {
         $request->validate([
             'order_sn' => 'required|string',
-            'shipping_document_type' => 'nullable|string' // Default NORMAL_AIR_WAYBILL
+            'shipping_document_type' => 'nullable|string' // Default THERMAL_AIR_WAYBILL
         ]);
 
         try {
@@ -509,13 +509,13 @@ class ShopeeController extends Controller
                 ], 422);
             }
 
-            $type = $request->shipping_document_type ?? 'NORMAL_AIR_WAYBILL';
+            $type = $request->shipping_document_type ?? 'THERMAL_AIR_WAYBILL';
             $fileContent = $this->shopeeService->downloadShippingDocument($request->order_sn, $type);
 
             // Robust check: PDF files MUST start with %PDF-
             if (strpos($fileContent, '%PDF-') !== 0) {
                 Log::warning('Shopee download returned invalid PDF content', ['order_sn' => $request->order_sn, 'preview' => substr($fileContent, 0, 100)]);
-                
+
                 // If it looks like JSON, return as JSON
                 if (strpos(trim($fileContent), '{') === 0) {
                     return response()->json([

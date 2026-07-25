@@ -392,7 +392,13 @@ class ShopeeService
     public function getTrackingNumber($orderSn)
     {
         $path = "/api/v2/logistics/get_tracking_number";
-        return $this->request('GET', $path . '?partner_id=' . (int) $this->getStore()->client_id . '&order_sn=' . $orderSn);
+        return $this->request(
+            'GET',
+            $path,
+            [
+                "order_sn" => $orderSn
+            ]
+        );
     }
 
     /**
@@ -401,7 +407,7 @@ class ShopeeService
      * @param string $orderSn
      * @return array
      */
-    public function createShippingDocument($orderSn)
+    public function createShippingDocument($orderSn, $type = 'NORMAL_AIR_WAYBILL')
     {
         $res = $this->getTrackingNumber($orderSn);
         if ($res) {
@@ -413,7 +419,9 @@ class ShopeeService
                     'order_list' => [
                         [
                             'order_sn' => $orderSn,
-                            'tracking_number' => $tracking_number
+                            'tracking_number' => $tracking_number,
+                            'shipping_document_type' => $type,
+                            'package_number' => 'OFG238694317275377'
                         ]
                     ]
                 ];
