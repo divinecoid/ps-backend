@@ -384,6 +384,18 @@ class ShopeeService
     }
 
     /**
+     * Get Tracking Number
+     * 
+     * @param string $orderSn
+     * @return array
+     */
+    public function getTrackingNumber($orderSn)
+    {
+        $path = "/api/v2/logistics/get_tracking_number";
+        return $this->request('GET', $path, $orderSn);
+    }
+
+    /**
      * Create Shipping Document
      * 
      * @param string $orderSn
@@ -391,10 +403,15 @@ class ShopeeService
      */
     public function createShippingDocument($orderSn)
     {
+        $response = $this->getTrackingNumber($orderSn);
+        $tracking_number = $response['response']['tracking_number'];
         $path = "/api/v2/logistics/create_shipping_document";
         $data = [
             'order_list' => [
-                ['order_sn' => $orderSn]
+                [
+                    'order_sn' => $orderSn,
+                    'tracking_number' => $tracking_number
+                ]
             ]
         ];
 
