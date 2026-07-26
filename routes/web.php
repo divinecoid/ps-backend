@@ -42,20 +42,7 @@ Route::get('/tiktok_shop/refresh/{id}', [TiktokAuthController::class, 'refreshTo
 
 Route::get('/logs', [LogViewerController::class, 'index']);
 
-Route::get('/debug-search', function () {
-    $filePath = app_path('Services/ShopeeService.php');
-    if (!file_exists($filePath)) {
-        return response('File not found', 404);
-    }
-    $lines = file($filePath);
-    $results = [];
-    for ($i = 380; $i <= 420; $i++) {
-        if (isset($lines[$i - 1])) {
-            $results[$i] = trim($lines[$i - 1]);
-        }
-    }
-    return response()->json($results);
-});
+
 
 // SPA fallback: Serve the React index.html for unmatched web requests (for browser users)
 Route::fallback(function () {
