@@ -416,6 +416,7 @@ class ShopeeService
         $tracking_number = $response['tracking_number'];
         $path = "/api/v2/logistics/create_shipping_document";
         $data = [
+            'shipping_document_type' => 'NORMAL_AIR_WAYBILL',
             'order_list' => [
                 [
                     'order_sn' => $orderSn,
