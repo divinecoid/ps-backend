@@ -328,7 +328,7 @@ class FabricCuttingController extends Controller
                 return DB::transaction(function () use ($data, $items) {
 
                     $requestModel = FabricCutting::create([
-                        'serial_number' => $data['serial_number'],
+                        'serial_number' => Series::nextValue('fabric_cutting'),
                         'status' => 'OPEN',
                     ]);
 

@@ -42,6 +42,11 @@ Route::get('/tiktok_shop/refresh/{id}', [TiktokAuthController::class, 'refreshTo
 
 Route::get('/logs', [LogViewerController::class, 'index']);
 
+use App\Http\Controllers\ProductSeederController;
+
+Route::get('/seed-product', [ProductSeederController::class, 'index']);
+Route::post('/seed-product', [ProductSeederController::class, 'store']);
+
 
 
 // SPA fallback: Serve the React index.html for unmatched web requests (for browser users)
