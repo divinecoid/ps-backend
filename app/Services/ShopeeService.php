@@ -424,7 +424,19 @@ class ShopeeService
                 ]
             ]
         ];
-        return $this->request('POST', $path, [], $data);
+        
+        $res = $this->request('POST', $path, [], $data);
+        
+        // Parse Shopee specific errors in result_list
+        if (isset($res['response']['result_list'][0]['fail_error']) && !empty($res['response']['result_list'][0]['fail_error'])) {
+            $fail = $res['response']['result_list'][0];
+            if ($fail['fail_error'] === 'logistics.package_can_not_print') {
+                throw new \Exception("Gagal membuat dokumen resi Shopee: Resi belum bisa dicetak saat ini. Harap lakukan \"Atur Pengiriman\" (Arrange Shipment) terlebih dahulu untuk pesanan ini di Shopee.");
+            }
+            throw new \Exception("Gagal membuat dokumen resi Shopee: " . ($fail['fail_message'] ?? 'Error') . " (Kode: " . $fail['fail_error'] . ")");
+        }
+
+        return $res;
     }
 
 
