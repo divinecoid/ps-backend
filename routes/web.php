@@ -42,6 +42,25 @@ Route::get('/tiktok_shop/refresh/{id}', [TiktokAuthController::class, 'refreshTo
 
 Route::get('/logs', [LogViewerController::class, 'index']);
 
+Route::get('/debug-search', function () {
+    $results = [];
+    $folders = [app_path(), base_path('routes'), base_path('config')];
+    foreach ($folders as $folder) {
+        if (!is_dir($folder)) continue;
+        $dir = new RecursiveDirectoryIterator($folder);
+        $iterator = new RecursiveIteratorIterator($dir);
+        foreach ($iterator as $file) {
+            if ($file->isFile() && $file->getExtension() === 'php') {
+                $content = file_get_contents($file->getPathname());
+                if (strpos($content, 'get_tracking_number') !== false) {
+                    $results[] = $file->getPathname();
+                }
+            }
+        }
+    }
+    return response()->json($results);
+});
+
 // SPA fallback: Serve the React index.html for unmatched web requests (for browser users)
 Route::fallback(function () {
     if (file_exists(public_path('index.html'))) {
