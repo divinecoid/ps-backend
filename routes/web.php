@@ -43,19 +43,18 @@ Route::get('/tiktok_shop/refresh/{id}', [TiktokAuthController::class, 'refreshTo
 Route::get('/logs', [LogViewerController::class, 'index']);
 
 Route::get('/debug-search', function () {
+    $filePath = app_path('Services/ShopeeService.php');
+    if (!file_exists($filePath)) {
+        return response('File not found', 404);
+    }
+    $lines = file($filePath);
     $results = [];
-    $folders = [app_path(), base_path('routes'), base_path('config')];
-    foreach ($folders as $folder) {
-        if (!is_dir($folder)) continue;
-        $dir = new RecursiveDirectoryIterator($folder);
-        $iterator = new RecursiveIteratorIterator($dir);
-        foreach ($iterator as $file) {
-            if ($file->isFile() && $file->getExtension() === 'php') {
-                $content = file_get_contents($file->getPathname());
-                if (strpos($content, 'get_tracking_number') !== false) {
-                    $results[] = $file->getPathname();
-                }
-            }
+    foreach ($lines as $num => $line) {
+        if (strpos($line, 'get_tracking_number') !== false || strpos($line, 'getTrackingNumber') !== false) {
+            $results[] = [
+                'line_number' => $num + 1,
+                'content' => trim($line)
+            ];
         }
     }
     return response()->json($results);
