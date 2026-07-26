@@ -410,7 +410,7 @@ class ShopeeService
 
         $response = $res['response'] ?? null;
         if (!$response || empty($response['tracking_number'])) {
-            throw new \Exception("Failed to retrieve tracking number for order: " . $orderSn . ". Detail: " . json_encode($res));
+            throw new \Exception("Gagal mendapatkan nomor resi/tracking untuk pesanan " . $orderSn . ". Harap pastikan Anda sudah melakukan \"Atur Pengiriman\" (Arrange Shipment) terlebih dahulu untuk pesanan ini di Shopee.");
         }
 
         $tracking_number = $response['tracking_number'];
