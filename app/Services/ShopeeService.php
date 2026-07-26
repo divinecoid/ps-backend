@@ -512,7 +512,8 @@ class ShopeeService
 
             if ($isJson && isset($json['error']) && $json['error'] === 'logistics.shipping_document_should_print_first') {
                 Log::info("Shopee shipping document needs to be created first. Creating document for order: " . $orderSn);
-                $this->createShippingDocument($orderSn);
+                $createRes = $this->createShippingDocument($orderSn);
+                Log::info("Shopee createShippingDocument response:", ['response' => $createRes]);
 
                 // Wait 1 second for Shopee to process
                 sleep(1);
