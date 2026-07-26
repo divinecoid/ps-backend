@@ -49,12 +49,9 @@ Route::get('/debug-search', function () {
     }
     $lines = file($filePath);
     $results = [];
-    foreach ($lines as $num => $line) {
-        if (strpos($line, 'get_tracking_number') !== false || strpos($line, 'getTrackingNumber') !== false) {
-            $results[] = [
-                'line_number' => $num + 1,
-                'content' => trim($line)
-            ];
+    for ($i = 380; $i <= 420; $i++) {
+        if (isset($lines[$i - 1])) {
+            $results[$i] = trim($lines[$i - 1]);
         }
     }
     return response()->json($results);
