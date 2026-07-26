@@ -40,7 +40,8 @@ class OrderController extends Controller
             'customer_phone' => $data->customer_phone,
             'customer_address' => $data->customer_address,
             'marketplace_id' => $data->marketplace_id,
-            'marketplace' => $data->marketplace
+            'marketplace' => $data->marketplace,
+            'is_outbounded' => (bool) $data->is_outbounded
         ];
     }
 
@@ -312,6 +313,7 @@ class OrderController extends Controller
             $order->prepared_at = $preparedAt;
             $order->readytoship_at = $readyToShipAt;
             $order->prepare_duration = $prepareDuration;
+            $order->is_outbounded = true;
             $order->save();
 
             return response()->json([
@@ -322,6 +324,7 @@ class OrderController extends Controller
                     'prepared_at' => $order->prepared_at,
                     'readytoship_at' => $order->readytoship_at,
                     'prepare_duration' => $order->prepare_duration,
+                    'is_outbounded' => $order->is_outbounded,
                     'products_scanned' => $totalProductsScanned,
                     'order_items_processed' => count($itemsToProcess),
                 ]
