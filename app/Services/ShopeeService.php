@@ -484,6 +484,23 @@ class ShopeeService
                 }
             }
 
+            if ($isJson && isset($json['error']) && $json['error'] === 'logistics.shipping_document_should_print_first') {
+                Log::info("Shopee shipping document needs to be created first. Creating document for order: " . $orderSn);
+                $this->createShippingDocument($orderSn);
+
+                // Wait 1 second for Shopee to process
+                sleep(1);
+
+                // Retry execution
+                $response = $execute();
+                $body = $response->body();
+                $isJson = false;
+                if (strpos($response->header('Content-Type'), 'application/json') !== false || substr(trim($body), 0, 1) === '{') {
+                    $json = $response->json();
+                    $isJson = true;
+                }
+            }
+
             if ($response->failed() || ($isJson && (isset($json['error']) || isset($json['err_code'])) && !empty($json['error'] ?? $json['err_code']))) {
                 $errorBody = $isJson ? json_encode($json) : $body;
                 Log::error('Shopee downloadShippingDocument failed', ['body' => $errorBody]);
