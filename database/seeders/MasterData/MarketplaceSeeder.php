@@ -30,14 +30,14 @@ class MarketplaceSeeder extends Seeder
                 'code' => 'LAZADA',
                 'name' => 'Lazada',
                 'alias' => 'Lazada',
-                'base_api_url' => 'https://api.lazada.com/rest',
+                'base_api_url' => 'https://api.lazada.co.id/rest',
                 'description' => 'Lazada marketplace integration for e-commerce',
                 'is_need_checker' => true,
             ],
         ];
 
         foreach ($marketplaces as $marketplace) {
-            Marketplace::create($marketplace);
+            Marketplace::firstOrCreate(['code' => $marketplace['code']], $marketplace);
         }
 
         $this->command->info('Created ' . count($marketplaces) . ' marketplaces successfully!');

@@ -2,6 +2,8 @@
 
 namespace App\Models\MasterData;
 
+use App\Models\FabricCuttingFabric;
+use App\Models\Transactions\FabricCutting;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -26,7 +28,7 @@ class Cloth extends Model
     ];
 
     // Define relationship with Product model
-    public function clothes()
+    public function rollSizes()
     {
         return $this->belongsTo(RollSize::class, 'roll_size_id');
     }
@@ -40,9 +42,14 @@ class Cloth extends Model
     {
         return $this->belongsTo(Color::class, 'color_id');
     }
-    
+
     public function roll_size()
     {
         return $this->belongsTo(RollSize::class, 'roll_size_id');
+    }
+
+    public function fabric_cutting_fabrics()
+    {
+        return $this->hasMany(FabricCuttingFabric::class, 'fabric_id');
     }
 }

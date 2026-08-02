@@ -22,6 +22,37 @@ class ShopeeController extends Controller
     }
 
     /**
+     * Ensure the store's access token is valid before making API calls.
+     * Checks access_token_expires_at against now. If expired, attempts to refresh.
+     * Throws an exception if there is no refresh token or if the refresh fails,
+     * so the caller can return an error response without proceeding with the fetch.
+     *
+     * @param OnlineStore $store
+     * @throws \Exception
+     */
+    private function ensureValidToken(OnlineStore $store): void
+    {
+        if (!$store->isTokenExpired()) {
+            return;
+        }
+
+        if (!$store->refresh_token) {
+            throw new \Exception("Access token expired and no refresh token available for store: {$store->store_name}");
+        }
+
+        Log::info("Shopee access token expired for store [{$store->store_name}], attempting refresh.");
+
+        try {
+            $this->shopeeService->setStore($store);
+            $this->shopeeService->refreshAccessToken();
+            $store->refresh(); // Reload updated token from DB
+        } catch (\Exception $e) {
+            Log::error("Shopee token refresh failed for store [{$store->store_name}]", ['error' => $e->getMessage()]);
+            throw new \Exception("Access token expired and refresh failed for store [{$store->store_name}]: " . $e->getMessage());
+        }
+    }
+
+    /**
      * Sync Shipping Logistics from Shopee API
      * 
      * @param Request $request
@@ -35,6 +66,7 @@ class ShopeeController extends Controller
 
         try {
             $store = OnlineStore::findOrFail($request->online_store_id);
+            $this->ensureValidToken($store);
             $this->shopeeService->setStore($store);
 
             $response = $this->shopeeService->getChannelList();
@@ -199,6 +231,8 @@ class ShopeeController extends Controller
             $days = 1;
         }
 
+        // Token validation and refresh (or skip on failure) is handled
+        // per-store inside the Artisan command before each store is processed.
         Artisan::call('shopee:fetch-orders', [
             '--days' => $days,
         ]);
@@ -229,6 +263,7 @@ class ShopeeController extends Controller
             }
 
             if ($order->online_store) {
+                $this->ensureValidToken($order->online_store);
                 $this->shopeeService->setStore($order->online_store);
             }
 
@@ -260,8 +295,9 @@ class ShopeeController extends Controller
     {
         $request->validate([
             'order_sn' => 'required|string',
-            'address_id' => 'required', // ID can be int, but sometimes string from API, better not strict int
-            'pickup_time_id' => 'required|string',
+            'address_id' => 'required_without:dropoff',
+            'pickup_time_id' => 'required_without:dropoff|string',
+            'dropoff' => 'nullable|array',
         ]);
 
         try {
@@ -274,6 +310,7 @@ class ShopeeController extends Controller
             }
 
             if ($order->online_store) {
+                $this->ensureValidToken($order->online_store);
                 $this->shopeeService->setStore($order->online_store);
             }
 
@@ -285,13 +322,15 @@ class ShopeeController extends Controller
                 ], 422);
             }
 
-            $pickupData = [
-                'address_id' => $request->address_id,
-                'pickup_time_id' => $request->pickup_time_id
-            ];
-
-            // 1. Ship Order (Arrange Pickup)
-            $shipResponse = $this->shopeeService->shipOrder($request->order_sn, $pickupData);
+            if ($request->has('dropoff')) {
+                $shipResponse = $this->shopeeService->shipOrderDropoff($request->order_sn, $request->dropoff);
+            } else {
+                $pickupData = [
+                    'address_id' => $request->address_id,
+                    'pickup_time_id' => $request->pickup_time_id
+                ];
+                $shipResponse = $this->shopeeService->shipOrder($request->order_sn, $pickupData);
+            }
 
             if (isset($shipResponse['error']) && !empty($shipResponse['error'])) {
                  // Check if it's "Order has been shipped" error, treat as success (maybe state mismatch)
@@ -320,7 +359,7 @@ class ShopeeController extends Controller
                 $detail = $detailResponse['response']['order_list'][0] ?? null;
                 
                 if ($detail) {
-                    $awb = $detail['tracking_no'] ?? $detail['shipping_carrier'] ?? null;
+                    $awb = $detail['order_sn'] ?? null;
                     if ($awb) {
                         $updateData['awb_code'] = $awb;
                     }
@@ -410,6 +449,7 @@ class ShopeeController extends Controller
             }
 
             if ($order->online_store) {
+                $this->ensureValidToken($order->online_store);
                 $this->shopeeService->setStore($order->online_store);
             }
 
@@ -451,6 +491,7 @@ class ShopeeController extends Controller
             }
 
             if ($order->online_store) {
+                $this->ensureValidToken($order->online_store);
                 $this->shopeeService->setStore($order->online_store);
             }
 

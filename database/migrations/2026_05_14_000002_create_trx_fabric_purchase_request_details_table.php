@@ -13,16 +13,12 @@ return new class extends Migration
     {
         Schema::create('trx_fabric_purchase_request_details', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->uuid('fabric_purchase_request_id');
+            $table->foreignUuid('fabric_purchase_request_id');
             $table->foreign('fabric_purchase_request_id', 'tfprd_fpr_id_fk')
                 ->references('id')
                 ->on('trx_fabric_purchase_requests')
                 ->onDelete('cascade');
-            $table->uuid('color_id');
-            $table->foreign('color_id', 'tfprd_color_id_fk')
-                ->references('id')
-                ->on('mdx_colors')
-                ->onDelete('restrict');
+            $table->foreignUuid('color_id')->constrained('mdx_colors')->onDelete('restrict');
             $table->string('series_code', 100);
             $table->unsignedSmallInteger('series_sequence');
             $table->unsignedInteger('roll_qty');

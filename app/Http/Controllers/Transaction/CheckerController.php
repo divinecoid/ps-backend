@@ -47,8 +47,8 @@ class CheckerController extends Controller
         if (!empty($search)) {
             $query->where(function ($q) use ($search) {
                 $q->whereRaw('LOWER(order_sn) LIKE ?', ['%' . strtolower($search) . '%'])
-                  ->orWhereRaw('LOWER(awb_code) LIKE ?', ['%' . strtolower($search) . '%'])
-                  ->orWhereRaw('LOWER(customer_name) LIKE ?', ['%' . strtolower($search) . '%']);
+                    ->orWhereRaw('LOWER(awb_code) LIKE ?', ['%' . strtolower($search) . '%'])
+                    ->orWhereRaw('LOWER(customer_name) LIKE ?', ['%' . strtolower($search) . '%']);
             });
         }
 
@@ -232,7 +232,8 @@ class CheckerController extends Controller
 
         $orderItems = OrderItem::query()
             ->where('order_id', $orderId)
-            ->get();
+            ->get()
+            ->unique('id');
 
         $expandedItems = [];
 
@@ -296,8 +297,8 @@ class CheckerController extends Controller
         $matchedOrderItem = OrderItem::query()
             ->where('order_id', $order->id)
             ->whereRaw('LOWER(sku) = ?', [strtolower($parsed['sku'])])
-            ->whereRaw('LOWER(COALESCE(color, \"\")) = ?', [strtolower($parsed['color'])])
-            ->whereRaw('LOWER(COALESCE(size, \"\")) = ?', [strtolower($parsed['size'])])
+            ->whereRaw("LOWER(COALESCE(color, '')) = ?", [strtolower($parsed['color'])])
+            ->whereRaw("LOWER(COALESCE(size, '')) = ?", [strtolower($parsed['size'])])
             ->first();
 
         if (!$matchedOrderItem) {

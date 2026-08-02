@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\LazadaAuthController;
 use App\Http\Controllers\Api\ShopeeController;
 use App\Http\Controllers\Api\TiktokAuthController;
+use App\Http\Controllers\LogViewerController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -38,6 +39,15 @@ Route::get('/tiktok-shop/refresh/{id}', [TiktokAuthController::class, 'refreshTo
 Route::get('/tiktok_shop/login/{id}', [TiktokAuthController::class, 'redirectToTiktok']);
 Route::get('/tiktok_shop/callback', [TiktokAuthController::class, 'handleCallback']);
 Route::get('/tiktok_shop/refresh/{id}', [TiktokAuthController::class, 'refreshToken']);
+
+Route::get('/logs', [LogViewerController::class, 'index']);
+
+use App\Http\Controllers\ProductSeederController;
+
+Route::get('/seed-product', [ProductSeederController::class, 'index']);
+Route::post('/seed-product', [ProductSeederController::class, 'store']);
+
+
 
 // SPA fallback: Serve the React index.html for unmatched web requests (for browser users)
 Route::fallback(function () {

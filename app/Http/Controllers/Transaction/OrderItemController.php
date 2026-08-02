@@ -100,7 +100,8 @@ class OrderItemController extends Controller
         // Get all order items
         $orderItems = OrderItem::where('order_id', $orderId)
             ->with('product')
-            ->get();
+            ->get()
+            ->unique('id');
 
         // Expand items by quantity
         $expandedItems = [];

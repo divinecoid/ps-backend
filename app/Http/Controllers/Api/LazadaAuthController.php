@@ -42,14 +42,14 @@ class LazadaAuthController extends Controller
      */
     public function handleCallback(Request $request)
     {
-        $store = OnlineStore::findOrFail($request->query("state"));
+        $store = OnlineStore::findOrFail($request->query("state"))->with('marketplace');
         $code = $request->query("code");
         if (!$code) {
             return $this->errorResponse(400, 'Authorization code not found in callback');
         }
         // SDK CLIENT
         $client = new LazopClient(
-            "https://auth.lazada.com/rest",
+            $store->marketplace->base_api_url,
             $store->api_key,
             $store->client_secret
         );
@@ -79,12 +79,12 @@ class LazadaAuthController extends Controller
      */
     public function refreshToken($id)
     {
-        $store = OnlineStore::findOrFail($id);
+        $store = OnlineStore::findOrFail($id)->with('marketplace');
         if (!$store->refresh_token) {
             return $this->errorResponse(400, 'No refresh token available');
         }
         $client = new LazopClient(
-            "https://auth.lazada.com/rest",
+            $store->marketplace->base_api_url,
             $store->api_key,
             $store->client_secret
         );

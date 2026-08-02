@@ -134,12 +134,10 @@ class AutomateShopeeShipment extends Command
                 $detailResponse = $this->shopeeService->getOrderDetail([$order->order_sn]);
                 $detail = $detailResponse['response']['order_list'][0] ?? null;
                 
-                $awb = $detail['tracking_no'] ?? $detail['shipping_carrier'] ?? null;
                 $shopeeStatus = $detail['order_status'] ?? null;
 
                 $order->update([
                     'status' => OrderStatus::READY_TO_PICKUP,
-                    'awb_code' => $awb ?? $order->awb_code,
                     'readytoship_at' => now(),
                     'readytoship_marketplace' => $shopeeStatus
                 ]);

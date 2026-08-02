@@ -21,6 +21,7 @@ use App\Http\Controllers\MasterData\OnlineStoreController;
 use App\Http\Controllers\MasterData\ProductModelController;
 use App\Http\Controllers\MasterData\RoleController;
 use App\Http\Controllers\MasterData\UserController;
+use App\Http\Controllers\MasterData\NotificationController;
 use App\Http\Controllers\MasterData\SizeController;
 use App\Http\Controllers\MasterData\CMTController;
 use App\Http\Controllers\MasterData\FactoryController;
@@ -37,6 +38,7 @@ use App\Http\Controllers\Transaction\FabricPurchaseController;
 use App\Http\Controllers\Transaction\DashboardController;
 use Illuminate\Http\JsonResponse;
 use App\Http\Controllers\Api\MarketplaceAuthController;
+use App\Http\Controllers\Transaction\ManualOutboundController;
 
 //Auth
 Route::prefix('auth')->group(function () {
@@ -57,6 +59,10 @@ Route::prefix('tiktok-shop')->middleware('checkrole:admin')->group(function () {
     Route::get('/get-product/{productId}', [TiktokShopController::class, 'getProduct']);
     Route::get('/get-order-list', [TiktokShopController::class, 'getOrderList']);
     Route::get('/get-order/{orderId}', [TiktokShopController::class, 'getOrder']);
+    Route::get('/package/{packageId}', [TiktokShopController::class, 'getPackageDetail']);
+    Route::get('/package/{packageId}/handover-time-slots', [TiktokShopController::class, 'getPackageHandoverTimeSlots']);
+    Route::get('/package/{packageId}/shipping-documents', [TiktokShopController::class, 'getPackageShippingDocuments']);
+    Route::post('/package/{packageId}/ship', [TiktokShopController::class, 'shipPackage']);
 });
 
 // ACM (admin only — admin bypasses ACM so no acm middleware needed here)
@@ -97,6 +103,12 @@ Route::prefix('user')->middleware('checkrole:admin')->group(function () {
     Route::delete('/force', [UserController::class, 'multiForceDestroy']);
     Route::delete('{id}', [UserController::class, 'destroy']);
     Route::delete('{id}/force', [UserController::class, 'forceDestroy']);
+});
+
+Route::prefix('notification')->middleware('checkrole:admin')->group(function () {
+    Route::get('/', [NotificationController::class, 'index']);
+    Route::get('/low-stock', [NotificationController::class, 'lowStock']);
+    Route::patch('/{id}/read', [NotificationController::class, 'markAsRead']);
 });
 
 //Marketplace
@@ -375,6 +387,7 @@ Route::prefix('roll-size')->middleware(['checkrole:admin', 'acm:master_roll_size
 //Cloth (Gudang Kain)
 Route::prefix('cloth')->middleware(['checkrole', 'acm:gudang_kain,read'])->group(function () {
     Route::get('/', [ClothController::class, 'index']);
+    Route::get('/uncut', [ClothController::class, 'uncut']);
     Route::get('/master', [ClothController::class, 'master']);
     Route::get('{id}', [ClothController::class, 'show']);
 });
@@ -417,6 +430,17 @@ Route::prefix('order')->middleware(['checkrole', 'acm:pesanan,read'])->group(fun
     Route::get('/shopee/{id}', [OrderController::class, 'getShopeeOrder']);
 });
 
+// Return Receipts
+Route::prefix('return-receipt')->middleware(['checkrole', 'acm:retur_barang,read'])->group(function () {
+    Route::get('/', [App\Http\Controllers\Transaction\ReturnReceiptController::class, 'index']);
+    Route::get('/{id}', [App\Http\Controllers\Transaction\ReturnReceiptController::class, 'show']);
+});
+Route::prefix('return-receipt')->middleware(['checkrole', 'acm:retur_barang,create'])->group(function () {
+    Route::post('/', [App\Http\Controllers\Transaction\ReturnReceiptController::class, 'store']);
+    Route::post('/validate-barcode', [App\Http\Controllers\Transaction\ReturnReceiptController::class, 'validateBarcode']);
+    Route::post('/submit', [App\Http\Controllers\Transaction\ReturnReceiptController::class, 'submit']);
+});
+
 //Order Items
 Route::prefix('order')->middleware(['checkrole', 'acm:pesanan,read'])->group(function () {
     Route::get('/items/lazada/{id}', [OrderController::class, 'getLazadaOrderItems']);
@@ -440,6 +464,16 @@ Route::prefix('outbound')->middleware('checkrole')->group(function () {
     Route::get('/assigned-orders', [OrderController::class, 'assignedOrders']);
 });
 
+//Outbound Manual (Pengeluaran Stok Manual)
+Route::prefix('outbound-manual')->middleware(['checkrole', 'acm:outbound_manual,read'])->group(function () {
+    Route::get('/', [ManualOutboundController::class, 'index']);
+    Route::get('/{id}', [ManualOutboundController::class, 'show']);
+});
+Route::prefix('outbound-manual')->middleware(['checkrole', 'acm:outbound_manual,create'])->group(function () {
+    Route::post('/validate-barcode', [ManualOutboundController::class, 'validateBarcode']);
+    Route::post('/submit', [ManualOutboundController::class, 'submit']);
+});
+
 //Shopee Auth & Logistics
 Route::prefix('shopee')->middleware('checkrole:admin')->group(function () {
     Route::post('/auth-url', [ShopeeController::class, 'generateAuthUrl']);
@@ -454,6 +488,7 @@ Route::prefix('shopee')->middleware('checkrole:admin')->group(function () {
 Route::prefix('lazada')->middleware('checkrole:admin')->group(function() {
     Route::get('/get-order/{id}', [LazadaController::class, 'getOrderList']);
     Route::get('/get-order/{id}/{orderId}', [LazadaController::class, 'getOrder']);
+    Route::get('/get-order/{id}/{orderId}/item', [LazadaController::class, 'getOrderItem']);
     Route::get('/get-order/{id}/{orderId}/pickup', [LazadaController::class, 'pickupOrder']);
     Route::get('/get-order/{id}/{orderId}/download', [LazadaController::class, 'getReceipt']);
 });
@@ -463,6 +498,7 @@ Route::get('shopee/fetch-orders', [ShopeeController::class, 'fetchOrders']);
 
 //Request CMT (Permintaan)
 Route::prefix('request')->middleware(['checkrole', 'acm:permintaan,read'])->group(function () {
+    Route::get('/search-cmt', [RequestController::class, 'searchCmt']);
     Route::get('/', [RequestController::class, 'index']);
     Route::get('/{id}', [RequestController::class, 'show']);
     Route::get('/barcode/{id}', [RequestController::class, 'barcode']);
@@ -482,6 +518,9 @@ Route::prefix('fabric-purchase')->middleware(['checkrole', 'acm:pembelian_kain,r
 });
 Route::prefix('fabric-purchase')->middleware(['checkrole', 'acm:pembelian_kain,create'])->group(function () {
     Route::post('/', [FabricPurchaseController::class, 'store']);
+});
+Route::prefix('fabric-purchase')->middleware(['checkrole', 'acm:pembelian_kain,update'])->group(function () {
+    Route::patch('/{id}/complete', [FabricPurchaseController::class, 'complete']);
 });
 Route::prefix('fabric-purchase')->middleware(['checkrole', 'acm:pembelian_kain,delete'])->group(function () {
     Route::delete('/{id}', [FabricPurchaseController::class, 'destroy']);
@@ -549,14 +588,19 @@ Route::prefix('checker')->middleware('checkrole:admin')->group(function () {
     Route::patch('/approve-order/{id}', [CheckerController::class, 'approveOrder']);
 });
 
-//Request Cutting (Permintaan)
-Route::prefix('fabric-cutting')->middleware(['checkrole', 'acm:permintaan,read'])->group(function () {
+//Fabric Cutting (Pemotongan Kain)
+Route::prefix('fabric-cutting')->middleware(['checkrole', 'acm:pemotongan_kain,read'])->group(function () {
+    Route::get('/search-cutting', [FabricCuttingController::class, 'searchCutting']);
+    Route::get('/closed', [FabricCuttingController::class, 'closedIndex']);
+    Route::get('/get-next-series', [FabricCuttingController::class, 'getNextSeries']);
     Route::get('/', [FabricCuttingController::class, 'index']);
     Route::get('/{id}', [FabricCuttingController::class, 'show']);
+    Route::get('/{id}/fabrics', [FabricCuttingController::class, 'getFabrics']);
 });
 Route::prefix('fabric-cutting')->middleware(['checkrole', 'acm:permintaan,create'])->group(function () {
     Route::post('/', [FabricCuttingController::class, 'store']);
-    Route::patch('/{id}', [FabricCuttingController::class, 'setReceived']);
+    Route::patch('/{id}', [FabricCuttingController::class, 'update']);
+    Route::patch('/{id}/receive', [FabricCuttingController::class, 'setReceived']);
 });
 Route::prefix('fabric-cutting')->middleware(['checkrole', 'acm:permintaan,delete'])->group(function () {
     Route::delete('/{id}', [FabricCuttingController::class, 'destroy']);

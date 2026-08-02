@@ -4,7 +4,11 @@ namespace App\Http\Controllers\Transaction;
 
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
+use App\Models\FabricCuttingFabric;
+use App\Models\MasterData\Cloth;
 use App\Models\MasterData\ProductModel;
+use App\Models\MasterData\Series;
+use App\Models\Transactions\FabricCutting;
 use App\Models\Transactions\FabricCuttingDetail;
 use DB;
 use Illuminate\Http\Request;
@@ -18,19 +22,17 @@ class FabricCuttingController extends Controller
     {
         return fn($data) => [
             'id' => $data->id,
-            'fabric_id' => $data->fabric_id,
             'serial_number' => $data->serial_number,
-            'fabric' => $data->clothes,
-            'created_at' => $data->created_at,
             'status' => $data->status,
-            'request_detail' => $data->fabric_cutting_request_detail->map(fn($detail) => [
-                'req_dozen_qty' => floor($detail->req_qty / 12),
-                'req_piece_qty' => $detail->req_qty % 12,
-                'rec_dozen_qty' => floor($detail->rec_qty / 12),
-                'rec_piece_qty' => $detail->rec_qty % 12,
-                'model_id' => $detail->model_id,
-                'models' => $detail->model
-            ]),
+            'created_at' => $data->created_at,
+
+            'fabric_count' => $data->fabric_detail->count(),
+
+            'fabric_detail' => $data->fabric_detail->map(fn($fabric) => [
+                'fabric_id' => $fabric->fabric_id,
+                'quantity' => $fabric->quantity,
+                'sequence' => $fabric->cloth?->sequence,
+            ])->values(),
         ];
     }
 
@@ -38,120 +40,364 @@ class FabricCuttingController extends Controller
     {
         return $this->baseIndex(
             $request,
-            \App\Models\Transactions\FabricCutting::class,
+            FabricCutting::class,
             [
-                'clothes',
-                'fabric_cutting_request_detail'
+                'fabric_detail.cloth',
+                'fabric_cutting_request_detail.model',
+                'fabric_cutting_request_detail.size',
             ],
             [
-                'clothes.sequence',
                 'serial_number',
+                'fabric_detail.cloth.sequence',
                 'fabric_cutting_request_detail.model.sku',
                 'fabric_cutting_request_detail.model.name',
                 'fabric_cutting_request_detail.size.code',
                 'fabric_cutting_request_detail.size.name',
             ],
-            $this->structure()
-        );
-    }
-
-
-    public function show($id)
-    {
-        $request = \App\Models\Transactions\FabricCutting::with(['fabric_cutting_request_detail'])->findOrFail($id);
-        return $this->successResponse(
+            $this->structure(),
+            null,
             [
-                'fabric_id' => $request->fabric_id,
-                'quantity' => $request->quantity,
-                'serial_number' => $request->serial_number,
-                'status' => $request->status,
-                'request_detail' => $request->fabric_cutting_request_detail
-                    ->groupBy(fn($item) => $item->model_id)
-                    ->map(function ($group) {
-                        $first = $group->first();
-                        return [
-                            'model_id' => $first->model_id,
-                            'variant_detail' => $group->map(function ($item) {
-                                return [
-                                    'size_id' => $item->size_id,
-                                    'dozen_qty' => floor($item->req_qty / 12),
-                                    'piece_qty' => $item->req_qty % 12,
-                                ];
-                            })->values(),
-                        ];
-                    })
-                    ->values(),
+                'created_at',
+                'desc'
             ]
         );
     }
 
+    /**
+     * Returns CLOSED fabric cuttings for the CMT Request serial number dropdown.
+     * Includes receive_detail grouped by model_id so the frontend can autofill request_detail.
+     */
+    public function closedIndex(Request $request)
+    {
+        return $this->baseIndex(
+            $request,
+            FabricCutting::class,
+            [
+                'fabric_cutting_request_detail' => fn($q) => $q
+                    ->where('req_qty', '>', 0)
+                    ->where('avl_qty', '>', 0),
+            ],
+            ['serial_number'],
+            fn($data) => [
+                'id' => $data->id,
+                'serial_number' => $data->serial_number,
+                'receive_detail' => $data->fabric_cutting_request_detail
+                    ->groupBy('model_id')
+                    ->map(function ($group) use ($data) {
+                        return [
+                            'model_id' => $group->first()->model_id,
+                            'cloth_id' => $data->id, // cutting_id used as cloth_id in request_detail
+                            'cloth_detail' => $group->map(fn($r) => [
+                                'size_id' => $r->size_id,
+                                'avl_qty' => $r->avl_qty,
+                            ])->values(),
+                            'variant_detail' => $group->map(fn($r) => [
+                                'size_id' => $r->size_id,
+                                'dozen_qty' => intdiv($r->avl_qty, 12),
+                                'piece_qty' => $r->avl_qty % 12,
+                            ])->values(),
+                        ];
+                    })
+                    ->values(),
+            ],
+            fn($q) => $q->where('status', 'CLOSED')->whereHas('fabric_cutting_request_detail', function ($q) {
+                $q->where('req_qty', '>', 0)
+                    ->where('avl_qty', '>', 0);
+            })
+        );
+    }
 
+    public function show($id)
+    {
+        $request = FabricCutting::with([
+            'fabric_detail.cloth',
+            'fabric_cutting_request_detail.model',
+            'fabric_cutting_request_detail.size',
+            'fabric_cutting_receives'
+        ])->findOrFail($id);
+        return $this->successResponse([
+            'serial_number' => $request->serial_number,
+            'fabric_detail' => $request->fabric_detail
+                ->map(function ($item) {
+                    return [
+                        'fabric_id' => $item->fabric_id,
+                        'quantity' => $item->quantity,
+                        'sequence' => $item->cloth->sequence
+                    ];
+                })
+                ->values(),
+            'request_detail' => $request->fabric_cutting_request_detail
+                ->groupBy('model_id')
+                ->map(function ($group) {
+                    return [
+                        'model_id' => $group->first()->model_id,
+                        'variant_detail' => $group
+                            ->map(function ($item) {
+                                return [
+                                    'size_id' => $item->size_id,
+                                    'qty' => $item->req_qty,
+                                ];
+                            })
+                            ->values(),
+                    ];
+                })
+                ->values(),
+
+            'receive_detail' => $request->fabric_cutting_receives
+                ->groupBy(fn($r) => $r->cloth_id . '-' . $r->model_id)
+                ->map(function ($group) {
+                    $first = $group->first();
+                    return [
+                        'model_id' => $first->model_id,
+                        'cloth_id' => $first->cloth_id,
+                        'variant_detail' => $group->map(function ($r) {
+                            return [
+                                'size_id' => $r->size_id,
+                                'dozen_qty' => intdiv($r->qty, 12),
+                                'piece_qty' => $r->qty % 12,
+                            ];
+                        })->values(),
+                    ];
+                })
+                ->values(),
+
+            'status' => $request->status,
+        ]);
+
+    }
+
+
+    public function update(Request $request, $id)
+    {
+        $data = $request->validate([
+            'receive_detail' => 'required|array|min:1',
+            'receive_detail.*.model_id' => 'required|uuid',
+            'receive_detail.*.cloth_id' => 'required|uuid',
+            'receive_detail.*.variant_detail' => 'required|array|min:1',
+            'receive_detail.*.variant_detail.*.size_id' => 'required|uuid',
+            'receive_detail.*.variant_detail.*.dozen_qty' => 'required|integer|min:0',
+            'receive_detail.*.variant_detail.*.piece_qty' => 'required|integer|min:0|max:11',
+        ]);
+
+        return DB::transaction(function () use ($data, $id) {
+            $fabricCutting = FabricCutting::findOrFail($id);
+
+            foreach ($data['receive_detail'] as $detail) {
+                foreach ($detail['variant_detail'] as $variant) {
+                    $qty =
+                        ($variant['dozen_qty'] * 12)
+                        + $variant['piece_qty'];
+
+                    FabricCuttingDetail::where([
+                        'fabric_cutting_id' => $fabricCutting->id,
+                        'model_id' => $detail['model_id'],
+                        'size_id' => $variant['size_id'],
+                    ])->update([
+                                'avl_qty' => $qty,
+                            ]);
+                }
+            }
+
+            $allReceived = !FabricCuttingDetail::where(
+                'fabric_cutting_id',
+                $fabricCutting->id
+            )
+                ->whereColumn('avl_qty', '<', 'req_qty')
+                ->exists();
+
+            if ($allReceived) {
+                $fabricCutting->update([
+                    'status' => 'CLOSED',
+                ]);
+            }
+
+            return $this->successResponse($data);
+        });
+    }
+
+
+
+    public function searchCutting(Request $request)
+    {
+        $request->validate([
+            'model_id' => 'required|uuid',
+            'color_id' => 'required|uuid',
+            'size_id' => 'required|uuid',
+        ]);
+
+        $modelId = $request->model_id;
+        $colorId = $request->color_id;
+        $sizeId = $request->size_id;
+
+        $cuttings = FabricCutting::query()
+            ->whereHas('fabric_cutting_request_detail', function ($q) use ($modelId, $sizeId) {
+                $q->where('model_id', $modelId)
+                    ->where('size_id', $sizeId)
+                    ->having('req_qty', '>', 0);
+            })
+            ->whereHas('fabric_detail.cloth', function ($q) use ($colorId) {
+                $q->where('color_id', $colorId);
+            })
+            ->with([
+                'fabric_cutting_request_detail' => function ($q) use ($modelId, $sizeId) {
+                    $q->where('model_id', $modelId)
+                        ->where('size_id', $sizeId);
+                }
+            ])
+            ->get();
+
+        $result = $cuttings->map(function ($cut) {
+            $totalAvlQty = $cut->fabric_cutting_request_detail->sum('avl_qty');
+            $totalReqQty = $cut->fabric_cutting_request_detail->sum('req_qty');
+
+            return [
+                'fabric_cutting_id' => $cut->id,
+                'serial_number' => $cut->serial_number,
+                'status' => $cut->status,
+                'avl_qty' => $totalAvlQty,
+                'req_qty' => $totalReqQty,
+            ];
+        });
+
+        return $this->successResponse($result);
+    }
 
     public function store(Request $request)
     {
         return $this->baseValidate(
             $request,
             [
-                'fabric_id' => 'required|uuid|exists:mdx_clothes,id',
                 'serial_number' => 'required|string|max:255',
-                'quantity' => 'required|integer|min:1',
+                'fabric_detail' => 'required|array|min:1',
+                'fabric_detail.*.fabric_id' => 'required|uuid|exists:mdx_clothes,id',
+                'fabric_detail.*.quantity' => 'required|integer|min:1',
                 'request_detail' => 'required|array|min:1',
                 'request_detail.*.model_id' => 'required|uuid',
                 'request_detail.*.variant_detail' => 'required|array|min:1',
                 'request_detail.*.variant_detail.*.size_id' => 'required|uuid',
-                'request_detail.*.variant_detail.*.dozen_qty' => 'required|integer|min:0',
-                'request_detail.*.variant_detail.*.piece_qty' => 'required|integer|min:0',
+                'request_detail.*.variant_detail.*.qty' => 'required|integer|min:0',
             ],
             function ($data) {
+
                 $items = [];
+
                 foreach ($data['request_detail'] as $detail) {
                     foreach ($detail['variant_detail'] as $variant) {
                         $items[] = [
                             'model_id' => $detail['model_id'],
                             'size_id' => $variant['size_id'],
-                            'req_qty' => ($variant['dozen_qty'] * 12) + $variant['piece_qty'],
+                            'req_qty' => $variant['qty'],
                         ];
                     }
                 }
+
                 $models = ProductModel::with(['sizes'])
-                    ->whereIn('id', collect($items)->pluck('model_id')->unique())
+                    ->whereIn(
+                        'id',
+                        collect($items)
+                            ->pluck('model_id')
+                            ->unique()
+                    )
                     ->get()
                     ->keyBy('id');
+
                 foreach ($items as &$item) {
+
                     $model = $models[$item['model_id']] ?? null;
+
                     if (!$model) {
-                        return $this->errorResponse(422, "Model {$item['model_id']} not found");
+                        return $this->errorResponse(
+                            422,
+                            "Model {$item['model_id']} not found"
+                        );
                     }
 
-                    $size = $model->sizes->firstWhere('id', $item['size_id']);
+                    $size = $model->sizes
+                        ->firstWhere('id', $item['size_id']);
+
                     if (!$size) {
-                        return $this->errorResponse(422, "Invalid size for model {$model->name}");
+                        return $this->errorResponse(
+                            422,
+                            "Invalid size for model {$model->name}"
+                        );
                     }
-                    $item['model'] = $model;
-                    $item['size'] = $size;
                 }
+
                 unset($item);
+
                 return DB::transaction(function () use ($data, $items) {
-                    // $serial = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT); //TODO: ganti dengan input dari proses potong baju
-                    $requestModel = \App\Models\Transactions\FabricCutting::create([
-                        'fabric_id' => $data['fabric_id'],
-                        'quantity' => $data['quantity'],
-                        'serial_number' => $data['serial_number']
-                        // 'serial_number' => $serial
+
+                    $requestModel = FabricCutting::create([
+                        'serial_number' => Series::nextValue('fabric_cutting'),
+                        'status' => 'OPEN',
                     ]);
+
+                    $fabricDetails = [];
+
+                    foreach ($data['fabric_detail'] as $fabric) {
+
+                        $cloth = Cloth::findOrFail(
+                            $fabric['fabric_id']
+                        );
+
+                        $affected = Cloth::whereKey($cloth->id)
+                            ->where(
+                                'quantity',
+                                '>=',
+                                $fabric['quantity']
+                            )
+                            ->decrement(
+                                'quantity',
+                                $fabric['quantity']
+                            );
+
+                        if ($affected === 0) {
+
+                            $currentQty = Cloth::find(
+                                $cloth->id
+                            )?->quantity ?? 0;
+
+                            throw new \Illuminate\Http\Exceptions\HttpResponseException(
+                                $this->errorResponse(
+                                    400,
+                                    "Quantity kain tinggal {$currentQty}"
+                                )
+                            );
+                        }
+
+                        $fabricDetails[] = [
+                            'id' => (string) Str::uuid(),
+                            'fabric_cutting_id' => $requestModel->id,
+                            'fabric_id' => $fabric['fabric_id'],
+                            'quantity' => $fabric['quantity'],
+                        ];
+                    }
+
+                    FabricCuttingFabric::insert(
+                        $fabricDetails
+                    );
+
                     $details = [];
+
                     foreach ($items as $item) {
+
                         $details[] = [
-                            'id' => Str::uuid(),
+                            'id' => (string) Str::uuid(),
                             'fabric_cutting_id' => $requestModel->id,
                             'model_id' => $item['model_id'],
                             'size_id' => $item['size_id'],
                             'req_qty' => $item['req_qty'],
-                            'rec_qty' => 0,
+                            'avl_qty' => 0,
                         ];
                     }
-                    FabricCuttingDetail::insert($details);
-                    return $this->successResponse($requestModel);
+
+                    FabricCuttingDetail::insert(
+                        $details
+                    );
+
+                    return $this->successResponse(
+                        $requestModel
+                    );
                 });
             }
         );
@@ -160,7 +406,7 @@ class FabricCuttingController extends Controller
     public function destroy($id)
     {
         return $this->baseDelete(
-            \App\Models\Transactions\FabricCutting::class,
+            FabricCutting::class,
             $id
         );
     }
@@ -168,17 +414,112 @@ class FabricCuttingController extends Controller
     public function multiDestroy(Request $request)
     {
         return $this->baseDelete(
-            \App\Models\Transactions\FabricCutting::class,
+            FabricCutting::class,
             $request->all()
         );
     }
 
-    public function setReceived($id)
+    public function setReceived(Request $request, $id)
     {
-        FabricCuttingDetail::where('fabric_cutting_id', $id)
-            ->update([
-                'rec_qty' => DB::raw('req_qty')
-            ]);
+        return $this->baseValidate(
+            $request,
+            [
+                'receive_detail' => 'required|array|min:1',
+                'receive_detail.*.model_id' => 'required|uuid',
+                'receive_detail.*.cloth_id' => 'required|uuid',
+                'receive_detail.*.variant_detail' => 'required|array|min:1',
+                'receive_detail.*.variant_detail.*.size_id' => 'required|uuid',
+                'receive_detail.*.variant_detail.*.dozen_qty' => 'required|integer|min:0',
+                'receive_detail.*.variant_detail.*.piece_qty' => 'required|integer|min:0',
+            ],
+            function ($data) use ($id) {
+                return DB::transaction(function () use ($data, $id) {
+                    $fabricCutting = FabricCutting::with('fabric_detail')->findOrFail($id);
+                    if ($fabricCutting->status === 'CLOSED') {
+                        throw new \Illuminate\Http\Exceptions\HttpResponseException(
+                            $this->errorResponse(422, 'Hasil potong sudah dikunci dan tidak bisa diubah.')
+                        );
+                    }
+
+                    $validFabricIds = $fabricCutting->fabric_detail->pluck('fabric_id')->toArray();
+
+                    $receives = [];
+                    $receivedQtyByVariant = [];
+                    foreach ($data['receive_detail'] as $detail) {
+                        if (!in_array($detail['cloth_id'], $validFabricIds)) {
+                            throw new \Illuminate\Http\Exceptions\HttpResponseException(
+                                $this->errorResponse(422, "Kain tidak terdaftar di pemotongan ini.")
+                            );
+                        }
+                        foreach ($detail['variant_detail'] as $variant) {
+                            $total_piece = ($variant['dozen_qty'] * 12) + $variant['piece_qty'];
+                            if ($total_piece > 0) {
+                                $variantKey = $detail['model_id'] . '|' . $variant['size_id'];
+                                $receivedQtyByVariant[$variantKey] = ($receivedQtyByVariant[$variantKey] ?? 0) + $total_piece;
+
+                                $receives[] = [
+                                    'id' => (string) Str::uuid(),
+                                    'fabric_cutting_id' => $id,
+                                    'model_id' => $detail['model_id'],
+                                    'cloth_id' => $detail['cloth_id'],
+                                    'size_id' => $variant['size_id'],
+                                    'qty' => $total_piece,
+                                ];
+                            }
+                        }
+                    }
+
+                    if (!empty($receives)) {
+                        \App\Models\Transactions\FabricCuttingReceive::insert($receives);
+                    }
+
+                    foreach ($receivedQtyByVariant as $variantKey => $qty) {
+                        [$modelId, $sizeId] = explode('|', $variantKey);
+
+                        FabricCuttingDetail::where([
+                            'fabric_cutting_id' => $id,
+                            'model_id' => $modelId,
+                            'size_id' => $sizeId,
+                        ])->update([
+                                    'avl_qty' => $qty,
+                                ]);
+                    }
+
+                    $fabricCutting->update([
+                        'status' => 'CLOSED',
+                    ]);
+
+                    return $this->successResponse(FabricCutting::find($id));
+                });
+            }
+        );
     }
 
+    public function getFabrics($id)
+    {
+        $cutting = FabricCutting::with(['fabric_detail.cloth.color', 'fabric_cutting_request_detail'])->findOrFail($id);
+
+        $clothes = $cutting->fabric_detail->map(function ($cloth_item) use ($cutting) {
+            return [
+                'id' => $cloth_item->fabric_id,
+                'name' => ($cloth_item->cloth->color->name ?? '') . ' - ' . ($cloth_item->cloth->sequence ?? ''),
+                'detail' => $cutting->fabric_cutting_request_detail->map(function ($detail) {
+                    return [
+                        'size_id' => $detail->size_id,
+                        'avl_qty' => $detail->req_qty,
+                    ];
+                })
+            ];
+        });
+
+        return $this->successResponse($clothes);
+    }
+
+    public function getNextSeries()
+    {
+        $preview = Series::previewNextValue('fabric_cutting', 5);
+        return $this->successResponse([
+            'next_series' => $preview
+        ]);
+    }
 }

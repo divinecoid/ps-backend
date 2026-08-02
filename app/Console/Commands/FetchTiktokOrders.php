@@ -57,55 +57,72 @@ class FetchTiktokOrders extends Command
 
             $url = $baseUrl . '/order/202309/orders/search';
 
-            $query = [
+            $baseQuery = [
                 'app_key' => $appKey,
-                'page_size' => 20,
+                'page_size' => config('marketplace.tiktok_shop.order_page_size', 20),
                 'sort_field' => 'create_time',
-                'sort_order' => 'ASC',
+                'sort_order' => 'DESC',
                 'timestamp' => $timeTo,
                 'shop_cipher' => $shopCipher,
                 'shop_id' => $store->shop_id ?? '',
                 'version' => '202309',
             ];
 
-            $body = new \stdClass();
-
-            $sign = $this->generateSignature('/order/202309/orders/search', $query, $clientSecret, $body);
-            $query['sign'] = $sign;
-
-            $this->info('   Requesting TikTok orders from ' . date('Y-m-d H:i:s', $timeFrom) . ' to ' . date('Y-m-d H:i:s', $timeTo));
-
+            $body = [];
+            $cursor = null;
+            $page = 0;
             $headers = [
                 'x-tts-access-token' => $accessToken,
                 'content-type' => 'application/json',
             ];
 
-            $response = Http::withHeaders($headers)->post($url . '?' . http_build_query($query), $body);
+            do {
+                $page++;
+                $query = $baseQuery;
 
-            if (!$response->ok()) {
-                $this->error('   TikTok API HTTP error: ' . $response->status());
-                $this->line($response->body());
-                continue;
-            }
+                if (!empty($cursor)) {
+                    $query['cursor'] = $cursor;
+                }
 
-            $json = $response->json();
+                $sign = $this->generateSignature('/order/202309/orders/search', $query, $clientSecret, $body);
+                $query['sign'] = $sign;
 
-            $code = $json['code'] ?? null;
-            $message = $json['message'] ?? '';
+                $this->info('   Requesting TikTok orders page ' . $page . ' from ' . date('Y-m-d H:i:s', $timeFrom) . ' to ' . date('Y-m-d H:i:s', $timeTo));
 
-            $this->info('   TikTok API responded with code: ' . $code);
-            $this->info('   Message: ' . $message);
+                $response = Http::withHeaders($headers)->post($url . '?' . http_build_query($query), $body);
 
-            $this->saveApiResponse('order_search_' . $store->store_code, [
-                'request' => [
-                    'method' => 'POST',
-                    'url' => $url,
-                    'query' => $query,
-                    'body' => $body,
-                    'headers' => $headers,
-                ],
-                'response' => $json,
-            ]);
+                if (!$response->ok()) {
+                    $this->error('   TikTok API HTTP error: ' . $response->status());
+                    $this->line($response->body());
+                    break;
+                }
+
+                $json = $response->json();
+
+                $code = $json['code'] ?? null;
+                $message = $json['message'] ?? '';
+
+                $this->info('   TikTok API responded with code: ' . $code);
+                $this->info('   Message: ' . $message);
+
+                $this->saveApiResponse('order_search_' . $store->store_code . '_page_' . $page, [
+                    'request' => [
+                        'method' => 'POST',
+                        'url' => $url,
+                        'query' => $query,
+                        'body' => $body,
+                        'headers' => $headers,
+                    ],
+                    'response' => $json,
+                ]);
+
+                $cursor = $this->extractOrderSearchCursor($json);
+                $hasMore = $this->hasMoreOrderSearchResults($json);
+
+                if ($hasMore || !empty($cursor)) {
+                    $this->info('   More pages detected; continuing with cursor ' . ($cursor ?? '[none]') . '.');
+                }
+            } while (($hasMore || !empty($cursor)) && $page < 100);
         }
 
         return 0;
@@ -357,6 +374,62 @@ class FetchTiktokOrders extends Command
         $input = $secret . $input . $secret;
 
         return hash_hmac('sha256', $input, $secret, false);
+    }
+
+    private function extractOrderSearchCursor(array $json): ?string
+    {
+        $data = $json['data'] ?? null;
+        if (!is_array($data)) {
+            return null;
+        }
+
+        $cursorKeys = [
+            'cursor',
+            'next_cursor',
+        ];
+
+        foreach ($cursorKeys as $key) {
+            if (!empty($data[$key]) && is_string($data[$key])) {
+                return trim($data[$key]);
+            }
+        }
+
+        if (isset($data['pagination']) && is_array($data['pagination'])) {
+            foreach ($cursorKeys as $key) {
+                if (!empty($data['pagination'][$key]) && is_string($data['pagination'][$key])) {
+                    return trim($data['pagination'][$key]);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function hasMoreOrderSearchResults(array $json): bool
+    {
+        $data = $json['data'] ?? null;
+        if (!is_array($data)) {
+            return false;
+        }
+
+        if (isset($data['pagination']) && is_array($data['pagination'])) {
+            if (isset($data['pagination']['more'])) {
+                return filter_var($data['pagination']['more'], FILTER_VALIDATE_BOOLEAN);
+            }
+            if (isset($data['pagination']['has_more'])) {
+                return filter_var($data['pagination']['has_more'], FILTER_VALIDATE_BOOLEAN);
+            }
+        }
+
+        if (isset($data['more'])) {
+            return filter_var($data['more'], FILTER_VALIDATE_BOOLEAN);
+        }
+
+        if (isset($data['has_more'])) {
+            return filter_var($data['has_more'], FILTER_VALIDATE_BOOLEAN);
+        }
+
+        return false;
     }
 
     private function saveApiResponse(string $type, array $data): void

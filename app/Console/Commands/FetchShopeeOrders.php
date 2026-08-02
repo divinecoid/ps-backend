@@ -57,6 +57,27 @@ class FetchShopeeOrders extends Command
             $this->info("Processing Store: " . $store->store_name . " (" . $store->store_code . ")");
 
             try {
+                // Check and refresh token if expired before fetching
+                if ($store->isTokenExpired()) {
+                    if (!$store->refresh_token) {
+                        $this->error("Store [{$store->store_name}] skipped: access token expired and no refresh token available.");
+                        Log::warning("FetchShopeeOrders skipped store [{$store->store_name}]: token expired, no refresh_token.");
+                        continue;
+                    }
+
+                    $this->info("Access token expired for store [{$store->store_name}], refreshing...");
+                    try {
+                        $shopeeService->setStore($store);
+                        $shopeeService->refreshAccessToken();
+                        $store->refresh(); // Reload updated token
+                        $this->info("Token refreshed successfully for store [{$store->store_name}].");
+                    } catch (\Exception $e) {
+                        $this->error("Store [{$store->store_name}] skipped: token refresh failed — " . $e->getMessage());
+                        Log::error("FetchShopeeOrders skipped store [{$store->store_name}]: token refresh failed.", ['error' => $e->getMessage()]);
+                        continue;
+                    }
+                }
+
                 // Set the store context for the service
                 $shopeeService->setStore($store);
 
@@ -214,20 +235,10 @@ class FetchShopeeOrders extends Command
                     'read_at' => now(), // Update waktu terakhir ditarik
                 ]);
 
-                // Update AWB HANYA jika di database masih kosong DAN Shopee punya data barunya
-                if (empty($order->awb_code) && !empty($detail['tracking_number'])) {
-                    $order->update(['awb_code' => $detail['tracking_number']]);
-                }
-
                 $this->info("   Updating Order Status only: " . $detail['order_sn'] . " -> " . $detail['order_status']);
             } else {
                 // Jika order belum ada (baru), buat data lengkap
                 $orderData['order_sn'] = $detail['order_sn'];
-                
-                // Tambahkan AWB jika ada dari Shopee
-                if (!empty($detail['tracking_number'])) {
-                    $orderData['awb_code'] = $detail['tracking_number'];
-                }
 
                 $order = Order::create($orderData);
                 $this->info("   Creating New Order: " . $detail['order_sn']);

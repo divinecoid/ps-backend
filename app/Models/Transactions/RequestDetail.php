@@ -36,16 +36,17 @@ class RequestDetail extends Model
     {
         return $this->belongsTo(ProductModel::class, 'model_id');
     }
-    public function cloth()
+
+    public function cutting()
     {
-        return $this->belongsTo(Cloth::class, 'cloth_id');
+        return $this->belongsTo(FabricCutting::class, 'cloth_id');
     }
     public function size()
     {
         return $this->belongsTo(Size::class, 'size_id');
     }
 
-    public function receivedlog_detail ()
+    public function receivedlog_detail()
     {
         return $this->hasMany(ReceivedlogDetail::class, 'request_detail_id');
     }

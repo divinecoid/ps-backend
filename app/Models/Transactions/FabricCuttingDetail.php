@@ -20,7 +20,7 @@ class FabricCuttingDetail extends Model
         'model_id',
         'size_id',
         'req_qty',
-        'rec_qty',
+        'avl_qty',
         'barcode'
     ];
 

@@ -43,8 +43,8 @@ class OrderSeeder extends Seeder
         $statuses = [
             OrderStatus::PENDING,
             OrderStatus::READ,
-            OrderStatus::PREPARED,
             OrderStatus::READY_TO_SHIP,
+            OrderStatus::RETURNED, // Ditambahkan agar ada sample order berstatus returned
         ];
 
         foreach ($stores as $store) {
@@ -99,11 +99,11 @@ class OrderSeeder extends Seeder
                 ];
 
                 // ⬇️ OVERRIDE SESUAI STATUS
-                if ($status === OrderStatus::READ || $status === OrderStatus::PREPARED || $status === OrderStatus::READY_TO_SHIP) {
+                if ($status === OrderStatus::READ || $status === OrderStatus::READY_TO_SHIP) {
                     $orderData['read_at'] = now()->subDays(rand(0, 10));
                 }
 
-                if ($status === OrderStatus::PREPARED || $status === OrderStatus::READY_TO_SHIP) {
+                if ($status === OrderStatus::READY_TO_SHIP) {
                     $orderData['prepared_at'] = now()->subDays(rand(0, 5));
                     $orderData['prepare_duration'] = rand(300, 3600);
                 }

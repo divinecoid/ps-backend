@@ -26,6 +26,12 @@ class LazadaController extends Controller
         return $lazada->setStore($store)->getOrder($orderId);
     }
 
+    public function getOrderItem($id, $orderId, LazadaService $lazada)
+    {
+        $store = OnlineStore::findOrFail($id);
+        return $lazada->setStore($store)->getOrderItem($orderId);
+    }
+
     public function getReceipt($id, $orderItemId, LazadaService $lazada)
     {
         $store = OnlineStore::findOrFail($id);

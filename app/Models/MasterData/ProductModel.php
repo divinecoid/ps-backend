@@ -2,6 +2,7 @@
 
 namespace App\Models\MasterData;
 
+use App\Models\Transactions\FabricCutting;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -38,5 +39,10 @@ class ProductModel extends Model
     public function racks()
     {
         return $this->hasMany(Rack::class, 'model_id');
+    }
+
+    public function cutting()
+    {
+        return $this->hasMany(FabricCutting::class, 'model_id');
     }
 }

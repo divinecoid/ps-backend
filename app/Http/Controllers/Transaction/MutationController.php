@@ -156,7 +156,7 @@ class MutationController extends Controller
                                             'receivedlog_id' => $log->id,
                                             'request_detail_id' => $rd->id,
                                             'model_id' => $rd->model_id,
-                                            'color_id' => $rd->color_id,
+                                            'color_id' => $rd->cutting->clothes->color_id,
                                             'size_id' => $rd->size_id,
                                             'qty' => 1,
                                             'barcode' => $barcode
@@ -165,7 +165,7 @@ class MutationController extends Controller
                                         Product::create([
                                             'rack_id' => $item['rack_id'],
                                             'model_id' => $rd->model_id,
-                                            'color_id' => $rd->color_id,
+                                            'color_id' => $rd->cutting->clothes->color_id,
                                             'size_id' => $rd->size_id,
                                             'series' => $series,
                                             'barcode' => $barcode
@@ -174,7 +174,7 @@ class MutationController extends Controller
                                             ->whereHas('inventory', function ($q) use ($rd) {
                                                 $q->where([
                                                     'model_id' => $rd->model_id,
-                                                    'color_id' => $rd->color_id,
+                                                    'color_id' => $rd->cutting->clothes->color_id,
                                                     'size_id' => $rd->size_id
                                                 ]);
                                             })
@@ -208,7 +208,12 @@ class MutationController extends Controller
 
     private function findRequestDetail(string $prefix)
     {
-        return RequestDetail::where('barcode', $prefix)->first();
+        return RequestDetail::with([
+            'request',
+            'model',
+            'size',
+            'cutting.clothes.color',
+        ])->where('barcode', $prefix)->first();
     }
 
     private function parseBarcode(string $barcode)
@@ -255,7 +260,7 @@ class MutationController extends Controller
 
                 $cmt = $requestDetail->request->cmt;
                 $model = $requestDetail->model;
-                $color = $requestDetail->color;
+                $color =  $requestDetail->cutting->clothes->color;
                 $size = $requestDetail->size;
                 return $this->successResponse([
                     'cmt' => (object) [

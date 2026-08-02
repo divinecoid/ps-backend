@@ -39,7 +39,7 @@ class LazadaService
     public function getOrderList($from, $to)
     {
         $request = new LazopRequest('/orders/get', 'GET');
-        $request->addApiParam('status', 'shipped');
+        // $request->addApiParam('status', 'shipped');
         $request->addApiParam('created_after', $from->toIso8601String());
         $request->addApiParam('created_before', $to->toIso8601String());
         return json_decode($this->client->execute($request, $this->store->access_token));
@@ -48,6 +48,13 @@ class LazadaService
     public function getOrder($orderId)
     {
         $request = new LazopRequest('/order/get', 'GET');
+        $request->addApiParam('order_id', $orderId);
+        return json_decode($this->client->execute($request, $this->store->access_token));
+    }
+
+    public function getOrderItem($orderId)
+    {
+        $request = new LazopRequest('/order/items/get', 'GET');
         $request->addApiParam('order_id', $orderId);
         return json_decode($this->client->execute($request, $this->store->access_token));
     }
