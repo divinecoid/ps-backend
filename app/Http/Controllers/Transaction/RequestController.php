@@ -55,8 +55,8 @@ class RequestController extends Controller
                 'serial_number',
                 'request_detail.model.sku',
                 'request_detail.model.name',
-                'request_detail.cutting.cloth.color.code',
-                'request_detail.cutting.cloth.color.name',
+                'request_detail.cutting.clothes.color.code',
+                'request_detail.cutting.clothes.color.name',
                 'request_detail.size.code',
                 'request_detail.size.name',
                 'request_detail.barcode'
@@ -75,7 +75,7 @@ class RequestController extends Controller
     {
         $request = \App\Models\Transactions\Request::with([
             'request_detail.model',
-            'request_detail.cloth.color',
+            'request_detail.cutting.clothes.color',
             'request_detail.size',
             'request_detail.receivedlog_detail.receivedlog.warehouse',
             'request_detail.receivedlog_detail.receivedlog'
@@ -89,7 +89,7 @@ class RequestController extends Controller
             $dozenCount = floor($reqQty / 12);
 
             $modelName = $detail->model?->name;
-            $colorName = $detail->cloth?->color?->name;
+            $colorName = $detail->cutting?->clothes?->color?->name;
             $sizeName = $detail->size?->name;
 
             // Gather all received barcodes for this detail
