@@ -67,7 +67,87 @@ class RequestController extends Controller
 
     public function show($id)
     {
-        $request = \App\Models\Transactions\Request::with(['request_detail', 'request_detail.receivedlog_detail.receivedlog.warehouse', 'request_detail.receivedlog_detail.receivedlog'])->findOrFail($id);
+        $request = \App\Models\Transactions\Request::with([
+            'request_detail.model',
+            'request_detail.cloth.color',
+            'request_detail.size',
+            'request_detail.receivedlog_detail.receivedlog.warehouse',
+            'request_detail.receivedlog_detail.receivedlog'
+        ])->findOrFail($id);
+
+        $pendingBarcodes = [];
+
+        foreach ($request->request_detail as $detail) {
+            $baseBarcode = $detail->barcode;
+            $reqQty = $detail->req_qty;
+            $dozenCount = floor($reqQty / 12);
+
+            $modelName = $detail->model?->name;
+            $colorName = $detail->cloth?->color?->name;
+            $sizeName = $detail->size?->name;
+
+            // Gather all received barcodes for this detail
+            $detailReceived = $detail->receivedlog_detail->pluck('barcode')->toArray();
+
+            // Helper to check if a piece is received (directly or via dozen)
+            $isPieceReceived = function ($j) use ($baseBarcode, $detailReceived) {
+                $pieceBarcode = "{$baseBarcode}|P|{$j}";
+                if (in_array($pieceBarcode, $detailReceived)) {
+                    return true;
+                }
+                $dozenIndex = ceil($j / 12);
+                $dozenBarcode = "{$baseBarcode}|D|{$dozenIndex}";
+                if (in_array($dozenBarcode, $detailReceived)) {
+                    return true;
+                }
+                return false;
+            };
+
+            // Check dozen barcodes
+            for ($i = 1; $i <= $dozenCount; $i++) {
+                $dozenBarcode = "{$baseBarcode}|D|{$i}";
+                $isReceived = false;
+                if (in_array($dozenBarcode, $detailReceived)) {
+                    $isReceived = true;
+                } else {
+                    // Check if all 12 pieces for this dozen are received
+                    $allPiecesReceived = true;
+                    for ($p = ($i - 1) * 12 + 1; $p <= $i * 12; $p++) {
+                        if (!$isPieceReceived($p)) {
+                            $allPiecesReceived = false;
+                            break;
+                        }
+                    }
+                    if ($allPiecesReceived) {
+                        $isReceived = true;
+                    }
+                }
+
+                if (!$isReceived) {
+                    $pendingBarcodes[] = [
+                        'barcode' => $dozenBarcode,
+                        'type' => 'Dozen',
+                        'model' => $modelName,
+                        'color' => $colorName,
+                        'size' => $sizeName,
+                    ];
+                }
+            }
+
+            // Check piece barcodes
+            for ($j = 1; $j <= $reqQty; $j++) {
+                if (!$isPieceReceived($j)) {
+                    $pendingBarcodes[] = [
+                        'barcode' => "{$baseBarcode}|P|{$j}",
+                        'type' => 'Piece',
+                        'model' => $modelName,
+                        'color' => $colorName,
+                        'size' => $sizeName,
+                    ];
+                }
+            }
+        }
+
         return $this->successResponse(
             [
                 'cmt_id' => $request->cmt_id,
@@ -128,8 +208,8 @@ class RequestController extends Controller
                                 ];
                             })->values()
                         ];
-                    })
-
+                    }),
+                'pending_barcodes' => $pendingBarcodes
             ]
         );
     }
