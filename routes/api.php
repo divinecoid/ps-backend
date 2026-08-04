@@ -105,9 +105,10 @@ Route::prefix('user')->middleware('checkrole:admin')->group(function () {
     Route::delete('{id}/force', [UserController::class, 'forceDestroy']);
 });
 
-Route::prefix('notification')->middleware('checkrole:admin')->group(function () {
+Route::prefix('notification')->middleware('checkrole')->group(function () {
     Route::get('/', [NotificationController::class, 'index']);
-    Route::get('/low-stock', [NotificationController::class, 'lowStock']);
+    Route::post('/', [NotificationController::class, 'store']);
+    Route::get('/low-stock', [NotificationController::class, 'lowStock'])->middleware('checkrole:admin');
     Route::patch('/{id}/read', [NotificationController::class, 'markAsRead']);
 });
 

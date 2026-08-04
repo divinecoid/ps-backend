@@ -201,6 +201,52 @@ class NotificationController extends Controller
         });
     }
 
+    public function store(Request $request)
+    {
+        $request->validate([
+            'title' => 'required|string',
+            'message' => 'required|string',
+            'type' => 'required|string',
+            'data' => 'nullable|array',
+        ]);
+
+        $adminUsers = User::whereHas('roles', function ($query) {
+            $query->whereRaw('LOWER(name) = ?', ['admin']);
+        })->get();
+
+        if ($adminUsers->isEmpty()) {
+            return response()->json(['success' => false, 'message' => 'No admin user found'], 400);
+        }
+
+        $notification = DB::transaction(function () use ($request, $adminUsers) {
+            $notification = Notification::create([
+                'unique_key' => 'outbound:delete:' . uniqid(),
+                'type' => $request->type,
+                'title' => $request->title,
+                'message' => $request->message,
+                'data' => $request->data ?? [],
+                'created_by' => auth()->id(),
+                'updated_by' => auth()->id(),
+            ]);
+
+            foreach ($adminUsers as $adminUser) {
+                NotificationRecipient::create([
+                    'notification_id' => $notification->id,
+                    'user_id' => $adminUser->id,
+                    'is_read' => false,
+                ]);
+            }
+
+            return $notification;
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Notification created successfully',
+            'data' => $notification
+        ]);
+    }
+
     private function buildUniqueKey($rackId)
     {
         return 'low_stock:rack:' . ($rackId ?? 'none');
