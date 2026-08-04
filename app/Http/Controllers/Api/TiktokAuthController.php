@@ -23,9 +23,10 @@ class TiktokAuthController extends Controller
         $store = OnlineStore::findOrFail($id);
 
         // OAuth URL resmi yang dipakai Seller Authorization
+        // Note: Scope permissions are configured in TikTok Developer Portal, not in the URL
         $authUrl = "https://services.tiktokshop.com/open/authorize?" . http_build_query([
-            "service_id" => $store->client_id,
-            "state"      => $store->id,
+            "app_key" => $store->api_key ?: $store->client_id,
+            "state"   => $store->id,
         ]);
 
         return redirect($authUrl);

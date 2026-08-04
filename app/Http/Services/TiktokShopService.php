@@ -272,6 +272,32 @@ class TiktokShopService
 
     public function getPackageHandoverTimeSlots(string $packageId): array
     {
+        // First, check if package is in correct status for handover time slots
+        try {
+            $packageDetail = $this->getPackageDetail($packageId);
+            $packageStatus = $packageDetail['data']['package_status'] ?? '';
+            
+            // Log package status for debugging
+            \Log::info('TikTok Package Status Check', [
+                'package_id' => $packageId,
+                'status' => $packageStatus,
+                'shipping_type' => $packageDetail['data']['shipping_type'] ?? '',
+            ]);
+            
+            // Check if package is eligible for handover time slots
+            $eligibleStatuses = ['READY_TO_SHIP', 'PENDING_COLLECTION'];
+            if (!in_array($packageStatus, $eligibleStatuses)) {
+                throw new RuntimeException("Package status '{$packageStatus}' is not eligible for handover time slots. Package must be in READY_TO_SHIP or PENDING_COLLECTION status.");
+            }
+            
+        } catch (\Exception $e) {
+            \Log::warning('Could not verify package status for handover time slots', [
+                'package_id' => $packageId,
+                'error' => $e->getMessage()
+            ]);
+            // Continue with the API call anyway - let TikTok return the actual error
+        }
+
         $shop = $this->getPrimaryShop();
         $accessToken = $this->getAccessToken();
 
@@ -285,7 +311,27 @@ class TiktokShopService
             'version'      => '202309',
         ];
 
-        return $this->request('GET', $path, $params, null, $accessToken);
+        // Debug: Log the request details for troubleshooting
+        \Log::info('TikTok Handover Time Slots Request', [
+            'path' => $path,
+            'shop_cipher' => $shop['cipher'],
+            'shop_id' => $shop['id'] ?? '',
+            'package_id' => $packageId,
+            'app_key' => $this->getAppKey(),
+        ]);
+
+        try {
+            $result = $this->request('GET', $path, $params, null, $accessToken);
+            \Log::info('TikTok Handover Time Slots Success', ['response' => $result]);
+            return $result;
+        } catch (\Exception $e) {
+            \Log::error('TikTok Handover Time Slots Error', [
+                'error' => $e->getMessage(),
+                'package_id' => $packageId,
+                'shop_cipher' => $shop['cipher']
+            ]);
+            throw $e;
+        }
     }
 
     public function markPackageAsShipped(string $packageId, string $trackingNumber): array
@@ -390,6 +436,11 @@ class TiktokShopService
             21042104 => 'Documents cannot be printed before shipment. Please arrange shipment first.',
             36009003 => 'Internal error. Please try again later.',
         ];
+
+        // Handle scope permission errors specifically
+        if (str_contains(strtolower($message), 'denied') && str_contains(strtolower($message), 'scope')) {
+            return 'Timeslot tidak tersedia: Aplikasi belum memiliki akses fulfillment scope. Silakan hubungi admin untuk mengotorisasi ulang TikTok Shop dengan scope yang tepat. Pengiriman mungkin tetap bisa diproses tanpa memilih slot.';
+        }
 
         return $errorMap[$code] ?? $message;
     }
@@ -894,12 +945,21 @@ class TiktokShopService
 
     private function http(): PendingRequest
     {
+        $options = [
+            'verify' => false, // Temporarily disable SSL verification
+            'timeout' => 30,   // Add timeout to prevent hanging
+        ];
+
+        // Check if custom CA bundle is specified (for production)
         $caBundle = config('marketplace.tiktok_shop.ca_bundle');
         if (is_string($caBundle) && trim($caBundle) !== '') {
-            return Http::withOptions(['verify' => $caBundle]);
+            $options['verify'] = $caBundle;
+        } else {
+            // Use the TLS verify setting from config
+            $options['verify'] = $this->getTlsVerifyValue();
         }
 
-        return Http::withOptions(['verify' => $this->getTlsVerifyValue()]);
+        return Http::withOptions($options);
     }
 
     private function getTlsVerifyValue(): bool

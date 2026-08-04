@@ -104,8 +104,31 @@ class TiktokShopController extends Controller
                 $this->tiktokShopService->getPackageHandoverTimeSlots($packageId),
             );
         } catch (Throwable $e) {
+            $errorMessage = $e->getMessage();
+            
+            // Check if this is a scope permission error and try token refresh
+            if (str_contains(strtolower($errorMessage), 'denied') && str_contains(strtolower($errorMessage), 'scope')) {
+                
+                // Try refreshing the token and retry once
+                try {
+                    \Log::info('Attempting token refresh due to scope error', ['package_id' => $packageId]);
+                    $this->tiktokShopService->getAccessToken(true); // Force refresh
+                    return response()->json(
+                        $this->tiktokShopService->getPackageHandoverTimeSlots($packageId),
+                    );
+                } catch (Throwable $retryException) {
+                    \Log::error('Token refresh retry also failed', ['error' => $retryException->getMessage()]);
+                    
+                    return response()->json([
+                        'error' => 'Timeslot tidak tersedia: Token mungkin perlu diperbarui. Silakan hubungi admin untuk mengotorisasi ulang TikTok Shop. Pengiriman mungkin tetap bisa diproses tanpa memilih slot.',
+                        'can_ship_without_timeslot' => true,
+                        'technical_error' => $retryException->getMessage(),
+                    ], 403);
+                }
+            }
+
             return response()->json([
-                'error' => $e->getMessage(),
+                'error' => $errorMessage,
             ], 500);
         }
     }
