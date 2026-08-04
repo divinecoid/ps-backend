@@ -42,7 +42,8 @@ class OrderController extends Controller
             'marketplace_id' => $data->marketplace_id,
             'marketplace' => $data->marketplace,
             'is_outbounded' => (bool) $data->is_outbounded,
-            'is_label_printed' => (bool) $data->is_label_printed
+            'is_label_printed' => (bool) $data->is_label_printed,
+            'created_at' => $data->created_at?->utc()->toISOString()
         ];
     }
 
