@@ -44,7 +44,10 @@ class ProductController extends Controller
             Product::class,
             ['rack', 'model', 'color', 'size'],
             ['barcode'],
-            $this->structure()
+            $this->structure(),
+            function ($query) {
+                $query->orderByDesc('created_at');
+            }
         );
     }
 
@@ -55,7 +58,10 @@ class ProductController extends Controller
             Product::class,
             ['rack', 'model', 'color', 'size'],
             ['barcode'],
-            $this->structure()
+            $this->structure(),
+            function ($query) {
+                $query->orderByDesc('created_at');
+            }
         );
     }
 
