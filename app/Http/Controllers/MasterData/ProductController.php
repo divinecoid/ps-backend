@@ -26,6 +26,12 @@ class ProductController extends Controller
             'rack' => (object) [
                 'name' => $data->rack->name
             ],
+            'color' => $data->color ? (object) [
+                'name' => $data->color->name
+            ] : null,
+            'size' => $data->size ? (object) [
+                'name' => $data->size->name
+            ] : null,
             'barcode' => $data->barcode,
             'series' => $data->series
         ];
@@ -36,7 +42,7 @@ class ProductController extends Controller
         return $this->baseIndex(
             $request,
             Product::class,
-            ['rack', 'model'],
+            ['rack', 'model', 'color', 'size'],
             ['barcode'],
             $this->structure()
         );
@@ -47,7 +53,7 @@ class ProductController extends Controller
         return $this->baseMaster(
             $request,
             Product::class,
-            ['rack', 'model'],
+            ['rack', 'model', 'color', 'size'],
             ['barcode'],
             $this->structure()
         );
@@ -58,7 +64,7 @@ class ProductController extends Controller
         return $this->baseShow(
             Product::class,
             $id,
-            ['rack', 'model'],
+            ['rack', 'model', 'color', 'size'],
             $this->structure()
         );
     }
