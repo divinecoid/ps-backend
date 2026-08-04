@@ -462,6 +462,7 @@ Route::prefix('outbound')->middleware('checkrole')->group(function () {
     Route::post('/assign-order', [OrderController::class, 'assignToMe']);
     Route::post('/unassign-order', [OrderController::class, 'unassignOrder']);
     Route::get('/assigned-orders', [OrderController::class, 'assignedOrders']);
+    Route::post('/orders/{id}/mark-as-printed', [OrderController::class, 'markAsPrinted']);
 });
 
 //Outbound Manual (Pengeluaran Stok Manual)

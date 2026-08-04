@@ -532,6 +532,8 @@ class ShopeeController extends Controller
                 ], 500);
             }
 
+            $order->update(['is_label_printed' => true]);
+
             // Return as downloadable PDF
             return response($fileContent)
                 ->header('Access-Control-Expose-Headers', 'Content-Disposition')

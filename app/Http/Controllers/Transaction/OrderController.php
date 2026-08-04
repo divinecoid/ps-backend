@@ -41,7 +41,8 @@ class OrderController extends Controller
             'customer_address' => $data->customer_address,
             'marketplace_id' => $data->marketplace_id,
             'marketplace' => $data->marketplace,
-            'is_outbounded' => (bool) $data->is_outbounded
+            'is_outbounded' => (bool) $data->is_outbounded,
+            'is_label_printed' => (bool) $data->is_label_printed
         ];
     }
 
@@ -453,5 +454,23 @@ class OrderController extends Controller
             'message' => 'Order berhasil dilepas',
             'data' => $this->structure()($order)
         ], 200);
+    }
+
+    /**
+     * Mark the order's label as printed
+     * 
+     * @param string $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function markAsPrinted($id)
+    {
+        $order = Order::findOrFail($id);
+        $order->update(['is_label_printed' => true]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Order label marked as printed successfully',
+            'data' => $this->structure()($order)
+        ]);
     }
 }
