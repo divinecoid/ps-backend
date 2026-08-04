@@ -233,4 +233,59 @@ class ProductSeederController extends Controller
 </html>
 HTML;
     }
+
+    public function seedApi(Request $request)
+    {
+        $request->validate([
+            'model_id' => 'required|exists:mdx_models,id',
+            'color_id' => 'required|exists:mdx_colors,id',
+            'size_id' => 'required|exists:mdx_sizes,id',
+            'cmt_id' => 'required|exists:mdx_cmts,id',
+            'rack_id' => 'nullable|exists:mdx_racks,id',
+            'type' => 'required|in:D,P',
+            'number' => 'required|integer|min:1',
+            'qty' => 'required|integer|min:1|max:100',
+        ]);
+
+        $model = ProductModel::find($request->model_id);
+        $color = Color::find($request->color_id);
+        $size = Size::find($request->size_id);
+        $cmt = CMT::find($request->cmt_id);
+
+        $barcodes = [];
+        $baseTime = now();
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($request, $model, $color, $size, $cmt, &$barcodes, $baseTime) {
+            for ($i = 0; $i < $request->qty; $i++) {
+                $series = $baseTime->copy()->addSeconds($i)->format('YmdHis');
+                $barcode = implode('|', [
+                    $cmt->code,
+                    $series,
+                    $model->sku,
+                    $color->code,
+                    $size->code,
+                    $request->type,
+                    $request->number + $i
+                ]);
+
+                Product::create([
+                    'id' => (string) Str::uuid(),
+                    'model_id' => $request->model_id,
+                    'rack_id' => $request->rack_id,
+                    'color_id' => $request->color_id,
+                    'size_id' => $request->size_id,
+                    'series' => $series,
+                    'barcode' => $barcode,
+                ]);
+
+                $barcodes[] = $barcode;
+            }
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Berhasil membuat ' . count($barcodes) . ' produk stok lama.',
+            'data' => $barcodes
+        ]);
+    }
 }

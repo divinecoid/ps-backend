@@ -229,6 +229,7 @@ Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,rea
 });
 Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,create'])->group(function () {
     Route::post('/', [ProductController::class, 'store']);
+    Route::post('/seed-dummy', [\App\Http\Controllers\ProductSeederController::class, 'seedApi']);
     Route::post('{id}/restore', [ProductController::class, 'restore']);
 });
 Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,update'])->group(function () {
