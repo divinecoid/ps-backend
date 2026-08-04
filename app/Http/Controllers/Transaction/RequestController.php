@@ -55,8 +55,8 @@ class RequestController extends Controller
                 'serial_number',
                 'request_detail.model.sku',
                 'request_detail.model.name',
-                'request_detail.cutting.cloth.color.code',
-                'request_detail.cutting.cloth.color.name',
+                'request_detail.cutting.clothes.color.code',
+                'request_detail.cutting.clothes.color.name',
                 'request_detail.size.code',
                 'request_detail.size.name',
                 'request_detail.barcode'
@@ -64,7 +64,8 @@ class RequestController extends Controller
             $this->structure(),
             null,
             [
-                'created_at', 'desc'
+                'created_at',
+                'desc'
             ]
         );
     }
@@ -72,7 +73,87 @@ class RequestController extends Controller
 
     public function show($id)
     {
-        $request = \App\Models\Transactions\Request::with(['request_detail', 'request_detail.receivedlog_detail.receivedlog.warehouse', 'request_detail.receivedlog_detail.receivedlog'])->findOrFail($id);
+        $request = \App\Models\Transactions\Request::with([
+            'request_detail.model',
+            'request_detail.cutting.clothes.color',
+            'request_detail.size',
+            'request_detail.receivedlog_detail.receivedlog.warehouse',
+            'request_detail.receivedlog_detail.receivedlog'
+        ])->findOrFail($id);
+
+        $pendingBarcodes = [];
+
+        foreach ($request->request_detail as $detail) {
+            $baseBarcode = $detail->barcode;
+            $reqQty = $detail->req_qty;
+            $dozenCount = floor($reqQty / 12);
+
+            $modelName = $detail->model?->name;
+            $colorName = $detail->cutting?->clothes?->color?->name;
+            $sizeName = $detail->size?->name;
+
+            // Gather all received barcodes for this detail
+            $detailReceived = $detail->receivedlog_detail->pluck('barcode')->toArray();
+
+            // Helper to check if a piece is received (directly or via dozen)
+            $isPieceReceived = function ($j) use ($baseBarcode, $detailReceived) {
+                $pieceBarcode = "{$baseBarcode}|P|{$j}";
+                if (in_array($pieceBarcode, $detailReceived)) {
+                    return true;
+                }
+                $dozenIndex = ceil($j / 12);
+                $dozenBarcode = "{$baseBarcode}|D|{$dozenIndex}";
+                if (in_array($dozenBarcode, $detailReceived)) {
+                    return true;
+                }
+                return false;
+            };
+
+            // Check dozen barcodes
+            for ($i = 1; $i <= $dozenCount; $i++) {
+                $dozenBarcode = "{$baseBarcode}|D|{$i}";
+                $isReceived = false;
+                if (in_array($dozenBarcode, $detailReceived)) {
+                    $isReceived = true;
+                } else {
+                    // Check if all 12 pieces for this dozen are received
+                    $allPiecesReceived = true;
+                    for ($p = ($i - 1) * 12 + 1; $p <= $i * 12; $p++) {
+                        if (!$isPieceReceived($p)) {
+                            $allPiecesReceived = false;
+                            break;
+                        }
+                    }
+                    if ($allPiecesReceived) {
+                        $isReceived = true;
+                    }
+                }
+
+                if (!$isReceived) {
+                    $pendingBarcodes[] = [
+                        'barcode' => $dozenBarcode,
+                        'type' => 'Dozen',
+                        'model' => $modelName,
+                        'color' => $colorName,
+                        'size' => $sizeName,
+                    ];
+                }
+            }
+
+            // Check piece barcodes
+            for ($j = 1; $j <= $reqQty; $j++) {
+                if (!$isPieceReceived($j)) {
+                    $pendingBarcodes[] = [
+                        'barcode' => "{$baseBarcode}|P|{$j}",
+                        'type' => 'Piece',
+                        'model' => $modelName,
+                        'color' => $colorName,
+                        'size' => $sizeName,
+                    ];
+                }
+            }
+        }
+
         return $this->successResponse(
             [
                 'cmt_id' => $request->cmt_id,
@@ -133,8 +214,8 @@ class RequestController extends Controller
                             ];
                         })->values()
                     ];
-                })
-
+                }),
+                'pending_barcodes' => $pendingBarcodes
             ]
         );
     }
@@ -173,20 +254,22 @@ class RequestController extends Controller
         $requests = \App\Models\Transactions\Request::with(['cmt'])
             ->whereHas('request_detail', function ($q) use ($modelId, $sizeId, $colorId) {
                 $q->where('model_id', $modelId)
-                  ->where('size_id', $sizeId)
-                  ->whereRaw('(req_qty - rec_qty - rec_bs_qty) > 0')
-                  ->whereHas('cutting.clothes', function ($q2) use ($colorId) {
-                      $q2->where('color_id', $colorId);
-                  });
+                    ->where('size_id', $sizeId)
+                    ->whereRaw('(req_qty - rec_qty - rec_bs_qty) > 0')
+                    ->whereHas('cutting.clothes', function ($q2) use ($colorId) {
+                        $q2->where('color_id', $colorId);
+                    });
             })
-            ->with(['request_detail' => function ($q) use ($modelId, $sizeId, $colorId) {
-                $q->where('model_id', $modelId)
-                  ->where('size_id', $sizeId)
-                  ->whereRaw('(req_qty - rec_qty - rec_bs_qty) > 0')
-                  ->whereHas('cutting.clothes', function ($q2) use ($colorId) {
-                      $q2->where('color_id', $colorId);
-                  });
-            }])
+            ->with([
+                'request_detail' => function ($q) use ($modelId, $sizeId, $colorId) {
+                    $q->where('model_id', $modelId)
+                        ->where('size_id', $sizeId)
+                        ->whereRaw('(req_qty - rec_qty - rec_bs_qty) > 0')
+                        ->whereHas('cutting.clothes', function ($q2) use ($colorId) {
+                            $q2->where('color_id', $colorId);
+                        });
+                }
+            ])
             ->get();
 
         $result = $requests->map(function ($req) {
@@ -194,7 +277,7 @@ class RequestController extends Controller
                 return $detail->req_qty - $detail->rec_qty - $detail->rec_bs_qty;
             });
             $totalReqQty = $req->request_detail->sum('req_qty');
-            
+
             return [
                 'request_id' => $req->id,
                 'serial_number' => $req->serial_number,
