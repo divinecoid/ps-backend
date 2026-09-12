@@ -14,31 +14,37 @@
             margin: 0;
             padding: 0;
         }
-        .grid {
+        table.grid {
             width: 100%;
+            border-collapse: separate;
+            border-spacing: 4px;
+            table-layout: fixed;
+        }
+        table.grid td {
+            width: 20%;
+            vertical-align: top;
+            padding: 0;
         }
         .cell {
-            display: inline-block;
-            width: 19%;
-            margin: 0.5%;
             padding: 10px 6px;
             text-align: center;
             border-radius: 12px;
             border-width: 2px;
             border-style: solid;
-            vertical-align: top;
+            page-break-inside: avoid;
         }
         .cell-dozen {
-            background-color: #f0fdf4;
-            border-color: #bbf7d0;
+            background-color: #f7fdf9;
+            border-color: #d3f5df;
         }
         .cell-piece {
-            background-color: #eff6ff;
-            border-color: #bfdbfe;
+            background-color: #f7fafd;
+            border-color: #d6e8fa;
+            padding-top: 240px;
         }
         .qr {
-            width: 90px;
-            height: 90px;
+            width: 150px;
+            height: 150px;
         }
         .label {
             font-size: 9px;
@@ -49,19 +55,37 @@
     </style>
 </head>
 <body>
-    <div class="grid">
-        @foreach ($dozenBarcodes as $code)
-            <div class="cell cell-dozen">
-                <img class="qr" src="{{ $code['qr'] }}">
-                <div class="label">{{ $code['serial_number'] }} - {{ $code['cutting'] }} - {{ $code['sizes'] }}</div>
-            </div>
+    <table class="grid">
+        @foreach ($dozenBarcodes->chunk(5) as $row)
+            <tr>
+                @foreach ($row as $code)
+                    <td>
+                        <div class="cell cell-dozen">
+                            <img class="qr" src="{{ $code['qr'] }}">
+                            <div class="label">{{ $code['serial_number'] }} - {{ $code['cutting'] }} - {{ $code['sizes'] }}</div>
+                        </div>
+                    </td>
+                @endforeach
+                @for ($i = $row->count(); $i < 5; $i++)
+                    <td></td>
+                @endfor
+            </tr>
         @endforeach
-        @foreach ($barcodes as $code)
-            <div class="cell cell-piece">
-                <img class="qr" src="{{ $code['qr'] }}">
-                <div class="label">{{ $code['serial_number'] }} - {{ $code['cutting'] }} - {{ $code['sizes'] }}</div>
-            </div>
+        @foreach ($barcodes->chunk(5) as $row)
+            <tr>
+                @foreach ($row as $code)
+                    <td>
+                        <div class="cell cell-piece">
+                            <img class="qr" src="{{ $code['qr'] }}">
+                            <div class="label">{{ $code['serial_number'] }} - {{ $code['cutting'] }} - {{ $code['sizes'] }}</div>
+                        </div>
+                    </td>
+                @endforeach
+                @for ($i = $row->count(); $i < 5; $i++)
+                    <td></td>
+                @endfor
+            </tr>
         @endforeach
-    </div>
+    </table>
 </body>
 </html>

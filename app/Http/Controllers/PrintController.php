@@ -46,8 +46,8 @@ class PrintController extends Controller
             return $barcode;
         };
 
-        $barcodes = array_map($renderQr, $data['barcodes'] ?? []);
-        $dozenBarcodes = array_map($renderQr, $data['dozenBarcodes'] ?? []);
+        $barcodes = collect(array_map($renderQr, $data['barcodes'] ?? []));
+        $dozenBarcodes = collect(array_map($renderQr, $data['dozenBarcodes'] ?? []));
 
         $pdf = Pdf::loadView('print.barcodes', [
             'barcodes' => $barcodes,
