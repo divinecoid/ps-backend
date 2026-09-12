@@ -233,7 +233,7 @@ class FabricCuttingController extends Controller
             ->whereHas('fabric_cutting_request_detail', function ($q) use ($modelId, $sizeId) {
                 $q->where('model_id', $modelId)
                     ->where('size_id', $sizeId)
-                    ->having('req_qty', '>', 0);
+                    ->where('req_qty', '>', 0);
             })
             ->whereHas('fabric_detail.cloth', function ($q) use ($colorId) {
                 $q->where('color_id', $colorId);
