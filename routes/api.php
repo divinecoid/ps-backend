@@ -39,6 +39,9 @@ use App\Http\Controllers\Transaction\DashboardController;
 use Illuminate\Http\JsonResponse;
 use App\Http\Controllers\Api\MarketplaceAuthController;
 use App\Http\Controllers\Transaction\ManualOutboundController;
+use App\Http\Controllers\PrintController;
+
+Route::post('/print/barcodes', [PrintController::class, 'barcodes'])->middleware('checkrole');
 
 //Auth
 Route::prefix('auth')->group(function () {
@@ -346,11 +349,13 @@ Route::prefix('warehouse')->middleware('checkrole')->group(function () {
 });
 Route::prefix('warehouse')->middleware(['checkrole:admin', 'acm:master_gudang,read'])->group(function () {
     Route::get('/', [WarehouseController::class, 'index']);
+    Route::get('template', [WarehouseController::class, 'downloadTemplate']);
     Route::get('{id}', [WarehouseController::class, 'show']);
 });
 Route::prefix('warehouse')->middleware(['checkrole:admin', 'acm:master_gudang,create'])->group(function () {
     Route::post('/', [WarehouseController::class, 'store']);
     Route::post('{id}/restore', [WarehouseController::class, 'restore']);
+    Route::post('import', [WarehouseController::class, 'import']);
 });
 Route::prefix('warehouse')->middleware(['checkrole:admin', 'acm:master_gudang,update'])->group(function () {
     Route::patch('{id}', [WarehouseController::class, 'update']);
