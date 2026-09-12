@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers\MasterData;
 
+use App\Exports\ProductModelTemplateExport;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
+use App\Imports\ProductModelImport;
 use App\Models\MasterData\ProductModel;
 use App\Models\Transactions\FabricCutting;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ProductModelController extends Controller
 {
@@ -154,6 +157,31 @@ class ProductModelController extends Controller
             ProductModel::class,
             $request->all()
         );
+    }
+
+    public function downloadTemplate()
+    {
+        return Excel::download(new ProductModelTemplateExport(), 'template-model-produk.xlsx');
+    }
+
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv',
+        ]);
+
+        $import = new ProductModelImport();
+        Excel::import($import, $request->file('file'));
+
+        if ($import->failures()->isNotEmpty()) {
+            $first = $import->failures()->first();
+            return $this->errorResponse(
+                422,
+                "Baris {$first->row()}: " . implode(', ', $first->errors())
+            );
+        }
+
+        return $this->successResponse(null);
     }
 
     public function modelColor(Request $request, $id)

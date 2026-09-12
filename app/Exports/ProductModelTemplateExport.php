@@ -5,18 +5,17 @@ namespace App\Exports;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 
-class WarehouseTemplateExport implements FromArray, WithHeadings
+class ProductModelTemplateExport implements FromArray, WithHeadings
 {
     public function array(): array
     {
         return [
-            ['GDG-01', 'Gudang Utama', 1, 'BESAR'],
-            ['GDG-02', 'Gudang Kecil', 2, 'KECIL'],
+            ['MDL-001', 'Kemeja Polos', 'BLK,WHT', 'S,M'],
         ];
     }
 
     public function headings(): array
     {
-        return ['code', 'name', 'priority', 'type'];
+        return ['sku', 'name', 'color_codes', 'size_codes'];
     }
 }

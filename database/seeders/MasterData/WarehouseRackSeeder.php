@@ -25,7 +25,7 @@ class WarehouseRackSeeder extends Seeder
                 'code' => 'WH1',
                 'name' => 'Gudang Besar Utama',
                 'priority' => 1,
-                'type' => 'BIG',
+                'type' => 'BESAR',
                 'racks' => [
                     [
                         'code' => 'RR1',
@@ -63,7 +63,7 @@ class WarehouseRackSeeder extends Seeder
                 'code' => 'WH2',
                 'name' => 'Gudang Lantai 2 (Sedang)',
                 'priority' => 2,
-                'type' => 'BIG',
+                'type' => 'BESAR',
                 'racks' => [
                     [
                         'code' => 'RR2',
@@ -89,7 +89,7 @@ class WarehouseRackSeeder extends Seeder
                 'code' => 'WH3',
                 'name' => 'Gudang Kecil Lantai 3',
                 'priority' => 3,
-                'type' => 'SMALL',
+                'type' => 'KECIL',
                 'racks' => [
                     [
                         'code' => 'RR3',

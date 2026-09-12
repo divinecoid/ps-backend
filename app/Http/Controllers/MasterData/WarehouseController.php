@@ -66,7 +66,7 @@ class WarehouseController extends Controller
                 'code' => 'required|string|unique:mdx_warehouses,code|max:255',
                 'name' => 'required|string|unique:mdx_warehouses,name|max:255',
                 'priority' => 'required|integer',
-                'type' => 'nullable|string|in:BIG,SMALL',
+                'type' => 'nullable|string|in:BESAR,KECIL',
             ],
             null
         );
@@ -92,7 +92,7 @@ class WarehouseController extends Controller
                     Rule::unique('mdx_warehouses', 'name')->ignore($id)
                 ],
                 'priority' => 'required|integer',
-                'type' => 'nullable|string|in:BIG,SMALL',
+                'type' => 'nullable|string|in:BESAR,KECIL',
             ],
             null
         );

@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers\MasterData;
 
+use App\Exports\ColorTemplateExport;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
+use App\Imports\ColorImport;
 use App\Models\MasterData\Color;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ColorController extends Controller
 {
@@ -120,5 +123,30 @@ class ColorController extends Controller
             Color::class,
             $request->all()
         );
+    }
+
+    public function downloadTemplate()
+    {
+        return Excel::download(new ColorTemplateExport(), 'template-warna.xlsx');
+    }
+
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv',
+        ]);
+
+        $import = new ColorImport();
+        Excel::import($import, $request->file('file'));
+
+        if ($import->failures()->isNotEmpty()) {
+            $first = $import->failures()->first();
+            return $this->errorResponse(
+                422,
+                "Baris {$first->row()}: " . implode(', ', $first->errors())
+            );
+        }
+
+        return $this->successResponse(null);
     }
 }
