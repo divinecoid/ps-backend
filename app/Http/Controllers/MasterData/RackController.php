@@ -75,7 +75,7 @@ class RackController extends Controller
             Rack::class,
             [
                 'code' => 'required|string|unique:mdx_racks,code|max:255',
-                'name' => 'required|string|max:255',
+                'name' => 'required|string|unique:mdx_racks,name|max:255',
                 'warehouse_id' => [
                     'required',
                     Rule::exists('mdx_warehouses', 'id')->whereNull('deleted_at'),
@@ -106,7 +106,12 @@ class RackController extends Controller
                     'max:255',
                     Rule::unique('mdx_racks', 'code')->ignore($id)
                 ],
-                'name' => 'required|string|max:255',
+                'name' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('mdx_racks', 'name')->ignore($id)
+                ],
                 'warehouse_id' => [
                     'required',
                     Rule::exists('mdx_warehouses', 'id')->whereNull('deleted_at'),
@@ -173,7 +178,15 @@ class RackController extends Controller
         ]);
 
         $import = new RackImport();
-        Excel::import($import, $request->file('file'));
+
+        try {
+            Excel::import($import, $request->file('file'));
+        } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+            return $this->errorResponse(
+                422,
+                'Gagal impor: ada kode atau nama rak yang sudah dipakai oleh rak lain.'
+            );
+        }
 
         if ($import->failures()->isNotEmpty()) {
             $first = $import->failures()->first();
