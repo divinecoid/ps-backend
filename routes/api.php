@@ -592,6 +592,7 @@ Route::prefix('cmt-payroll')->middleware(['checkrole', 'acm:cmt_payroll,create']
 Route::prefix('cmt-payroll')->middleware(['checkrole', 'acm:cmt_payroll,update'])->group(function () {
     Route::patch('/{id}/approve', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'approve']);
     Route::patch('/{id}/mark-paid', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'markPaid']);
+    Route::patch('/{id}/mark-unpaid', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'markUnpaid']);
 });
 Route::prefix('cmt-payroll')->middleware(['checkrole', 'acm:cmt_payroll,delete'])->group(function () {
     Route::delete('/{id}', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'destroy']);

@@ -23,6 +23,7 @@ class CmtPayroll extends Model
         'total_pcs',
         'total_amount',
         'status',
+        'is_paid',
         'paid_at',
     ];
 
@@ -30,6 +31,7 @@ class CmtPayroll extends Model
         'period_start' => 'date',
         'period_end' => 'date',
         'paid_at' => 'datetime',
+        'is_paid' => 'boolean',
     ];
 
     public function cmt()

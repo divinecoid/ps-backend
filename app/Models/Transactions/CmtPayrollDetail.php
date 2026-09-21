@@ -21,6 +21,7 @@ class CmtPayrollDetail extends Model
         'received_log_detail_id',
         'model_id',
         'qty',
+        'qty_lusin',
         'unit_fee',
         'amount',
     ];
