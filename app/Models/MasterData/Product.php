@@ -24,6 +24,7 @@ class Product extends Model
         'size_id',
         'series',
         'barcode',
+        'stock_batch_id',
     ];
 
     // Define relationship with Order Item model
@@ -49,5 +50,10 @@ class Product extends Model
     public function rack()
     {
         return $this->belongsTo(Rack::class, 'rack_id');
+    }
+
+    public function cost()
+    {
+        return $this->hasOne(ProductCost::class, 'product_id');
     }
 }

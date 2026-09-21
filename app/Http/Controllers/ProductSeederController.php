@@ -45,6 +45,7 @@ class ProductSeederController extends Controller
 
         $barcodes = [];
         $baseTime = now();
+        $batchId = (string) Str::uuid();
 
         for ($i = 0; $i < $request->qty; $i++) {
             $series = $baseTime->copy()->addSeconds($i)->format('YmdHis');
@@ -66,6 +67,7 @@ class ProductSeederController extends Controller
                 'size_id' => $request->size_id,
                 'series' => $series,
                 'barcode' => $barcode,
+                'stock_batch_id' => $batchId,
             ]);
 
             $barcodes[] = $barcode;
@@ -254,8 +256,9 @@ HTML;
 
         $barcodes = [];
         $baseTime = now();
+        $batchId = (string) Str::uuid();
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($request, $model, $color, $size, $cmt, &$barcodes, $baseTime) {
+        \Illuminate\Support\Facades\DB::transaction(function () use ($request, $model, $color, $size, $cmt, &$barcodes, $baseTime, $batchId) {
             for ($i = 0; $i < $request->qty; $i++) {
                 $series = $baseTime->copy()->addSeconds($i)->format('YmdHis');
                 $barcode = implode('|', [
@@ -276,6 +279,7 @@ HTML;
                     'size_id' => $request->size_id,
                     'series' => $series,
                     'barcode' => $barcode,
+                    'stock_batch_id' => $batchId,
                 ]);
 
                 $barcodes[] = $barcode;

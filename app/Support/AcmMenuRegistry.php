@@ -33,6 +33,7 @@ class AcmMenuRegistry
             'master_gudang'      => ['label' => 'Master Gudang'],
             'master_rak'         => ['label' => 'Master Rak'],
             'master_cmt'         => ['label' => 'Master CMT'],
+            'master_cmt_rate'    => ['label' => 'Master Gaji CMT'],
             'master_product'     => ['label' => 'Master Product'],
             'master_ukuran'      => ['label' => 'Master Ukuran'],
             'master_warna'       => ['label' => 'Master Warna'],

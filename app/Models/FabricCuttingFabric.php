@@ -17,6 +17,7 @@ class FabricCuttingFabric extends Model
         'fabric_cutting_id',
         'fabric_id',
         'quantity',
+        'unit_cost_snapshot',
     ];
 
     public function fabricCutting()

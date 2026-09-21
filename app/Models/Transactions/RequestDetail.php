@@ -24,6 +24,7 @@ class RequestDetail extends Model
         'req_qty',
         'rec_qty',
         'rec_bs_qty',
+        'unit_fee',
         'barcode'
     ];
 

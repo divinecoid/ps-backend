@@ -167,10 +167,13 @@ class ManualOutboundController extends Controller
                 'marketplace_id' => ['nullable', Rule::exists('mdx_marketplaces', 'id')->whereNull('deleted_at')],
                 'barcodes'       => 'required|array|min:1',
                 'barcodes.*'     => 'required|string|distinct',
+                'sell_prices'    => 'nullable|array',
+                'sell_prices.*'  => 'nullable|numeric|min:0',
                 'notes'          => 'nullable|string|max:1000',
             ],
             function ($data) {
                 $barcodes      = $data['barcodes'];
+                $sellPrices    = $data['sell_prices'] ?? [];
                 $marketplaceId = $data['marketplace_id'] ?? null;
                 $notes         = $data['notes'] ?? null;
 
@@ -212,7 +215,7 @@ class ManualOutboundController extends Controller
                 }
 
                 try {
-                    DB::transaction(function () use ($data, $marketplaceId, $notes, $productsToProcess) {
+                    DB::transaction(function () use ($data, $marketplaceId, $notes, $productsToProcess, $sellPrices) {
                         // Buat header outbound manual
                         $outbound = ManualOutbound::create([
                             'marketplace_id' => $marketplaceId,
@@ -231,6 +234,7 @@ class ManualOutboundController extends Controller
                                 'model_id'           => $product->model_id,
                                 'color_id'           => $product->color_id,
                                 'size_id'            => $product->size_id,
+                                'sell_price'         => $sellPrices[$barcode] ?? null,
                             ]);
 
                             // Potong stok: soft-delete produk

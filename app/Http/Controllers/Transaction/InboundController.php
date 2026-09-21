@@ -341,7 +341,7 @@ class InboundController extends Controller
                                         $barcode,
                                         1
                                     );
-                                    Product::create([
+                                    $createdProduct = Product::create([
                                         'rack_id' => $items['rack_id'],
                                         'model_id' => $rd->model_id,
                                         'color_id' => $rd->cutting->clothes->color_id,
@@ -349,6 +349,9 @@ class InboundController extends Controller
                                         'series' => $series,
                                         'barcode' => $barcode
                                     ]);
+
+                                    (new \App\Services\ProductCostingService())
+                                        ->calculateForProduct($createdProduct, $rd);
                                 }
                             }
 

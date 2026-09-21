@@ -24,7 +24,10 @@ class Cloth extends Model
         'roll_size_id',
         'color_id',
         'quantity',
-        'sequence'
+        'sequence',
+        'unit_price',
+        'shipping_cost_allocated',
+        'remaining_quantity',
     ];
 
     // Define relationship with Product model

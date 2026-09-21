@@ -23,7 +23,8 @@ class CMTController extends Controller
             'name' => $data->name,
             'contact_person' => $data->contact_person,
             'phone' => $data->phone,
-            'address' => $data->address
+            'address' => $data->address,
+            'kategori' => $data->kategori
         ];
     }
 
@@ -69,7 +70,8 @@ class CMTController extends Controller
                 'name' => 'required|string|max:255',
                 'contact_person' => 'required|string|max:255',
                 'phone' => 'required|string|max:255',
-                'address' => 'required|string|max:255'
+                'address' => 'required|string|max:255',
+                'kategori' => 'required|in:DALAM_KOTA,LUAR_KOTA'
             ],
             null
         );
@@ -91,7 +93,8 @@ class CMTController extends Controller
                 'name' => 'required|string|max:255',
                 'contact_person' => 'required|string|max:255',
                 'phone' => 'required|string|max:255',
-                'address' => 'required|string|max:255'
+                'address' => 'required|string|max:255',
+                'kategori' => 'required|in:DALAM_KOTA,LUAR_KOTA'
             ],
             null
         );

@@ -235,6 +235,8 @@ Route::prefix('size')->middleware(['checkrole:admin', 'acm:master_ukuran,force_d
 Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,read'])->group(function () {
     Route::get('/', [ProductController::class, 'index']);
     Route::get('/master', [ProductController::class, 'master']);
+    Route::get('/batches', [ProductController::class, 'batches']);
+    Route::get('/batch-items', [ProductController::class, 'batchItems']);
     Route::get('{id}', [ProductController::class, 'show']);
 });
 Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,create'])->group(function () {
@@ -300,6 +302,24 @@ Route::prefix('cmt')->middleware(['checkrole:admin', 'acm:master_cmt,delete'])->
 Route::prefix('cmt')->middleware(['checkrole:admin', 'acm:master_cmt,force_delete'])->group(function () {
     Route::delete('/force', [CMTController::class, 'multiForceDestroy']);
     Route::delete('{id}/force', [CMTController::class, 'forceDestroy']);
+});
+
+//CMT Model Rate (Gaji CMT per Model & Kategori)
+Route::prefix('cmt-model-rate')->middleware(['checkrole:admin', 'acm:master_cmt_rate,read'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\MasterData\CmtModelRateController::class, 'index']);
+    Route::get('/master', [\App\Http\Controllers\MasterData\CmtModelRateController::class, 'master']);
+    Route::get('{id}', [\App\Http\Controllers\MasterData\CmtModelRateController::class, 'show']);
+});
+Route::prefix('cmt-model-rate')->middleware(['checkrole:admin', 'acm:master_cmt_rate,create'])->group(function () {
+    Route::post('/', [\App\Http\Controllers\MasterData\CmtModelRateController::class, 'store']);
+    Route::post('{id}/restore', [\App\Http\Controllers\MasterData\CmtModelRateController::class, 'restore']);
+});
+Route::prefix('cmt-model-rate')->middleware(['checkrole:admin', 'acm:master_cmt_rate,update'])->group(function () {
+    Route::patch('{id}', [\App\Http\Controllers\MasterData\CmtModelRateController::class, 'update']);
+});
+Route::prefix('cmt-model-rate')->middleware(['checkrole:admin', 'acm:master_cmt_rate,delete'])->group(function () {
+    Route::delete('/', [\App\Http\Controllers\MasterData\CmtModelRateController::class, 'multiDestroy']);
+    Route::delete('{id}', [\App\Http\Controllers\MasterData\CmtModelRateController::class, 'destroy']);
 });
 
 //Inventory Small
@@ -559,6 +579,28 @@ Route::prefix('inbound')->middleware(['checkrole', 'acm:penerimaan,create'])->gr
     Route::post('/', [InboundController::class, 'store']);
     Route::post('/validate', [InboundController::class, 'validate']);
     Route::post('/generate-next', [InboundController::class, 'generateNext']);
+});
+
+// CMT Payroll (Penggajian CMT)
+Route::prefix('cmt-payroll')->middleware(['checkrole', 'acm:cmt_payroll,read'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'index']);
+    Route::get('/{id}', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'show']);
+});
+Route::prefix('cmt-payroll')->middleware(['checkrole', 'acm:cmt_payroll,create'])->group(function () {
+    Route::post('/generate', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'generate']);
+});
+Route::prefix('cmt-payroll')->middleware(['checkrole', 'acm:cmt_payroll,update'])->group(function () {
+    Route::patch('/{id}/approve', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'approve']);
+    Route::patch('/{id}/mark-paid', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'markPaid']);
+});
+Route::prefix('cmt-payroll')->middleware(['checkrole', 'acm:cmt_payroll,delete'])->group(function () {
+    Route::delete('/{id}', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'destroy']);
+});
+
+// Finance / Profit Reports
+Route::prefix('finance')->middleware(['checkrole', 'acm:finance,read'])->group(function () {
+    Route::get('/profit-report', [\App\Http\Controllers\Transaction\FinanceReportController::class, 'profitReport']);
+    Route::get('/cmt-payroll-summary', [\App\Http\Controllers\Transaction\FinanceReportController::class, 'cmtPayrollSummary']);
 });
 
 Route::prefix('model_color')->middleware(['checkrole:admin', 'acm:master_model,read'])->group(function () {

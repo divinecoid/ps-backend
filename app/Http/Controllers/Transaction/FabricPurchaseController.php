@@ -113,6 +113,8 @@ class FabricPurchaseController extends Controller
                 'details' => 'required|array|min:1',
                 'details.*.color_id' => 'required|uuid|exists:mdx_colors,id',
                 'details.*.quantity' => 'required|integer|min:1',
+                'details.*.unit_price' => 'nullable|numeric|min:0',
+                'details.*.shipping_cost' => 'nullable|numeric|min:0',
             ],
             function ($data) {
                 $factory = Factory::findOrFail($data['factory_id']);
@@ -189,6 +191,8 @@ class FabricPurchaseController extends Controller
                                 'color_id' => $detail['color_id'],
                                 'quantity' => (int) $detail['quantity'],
                                 'sequence' => $sequenceValue,
+                                'unit_price' => $detail['unit_price'] ?? null,
+                                'shipping_cost' => $detail['shipping_cost'] ?? null,
                                 'created_at' => now(),
                                 'updated_at' => now(),
                             ];
@@ -251,11 +255,20 @@ class FabricPurchaseController extends Controller
                 foreach ($purchase->details as $detail) {
                     $existingCloth = Cloth::withTrashed()->where('sequence', $detail->sequence)->first();
 
+                    // FIFO per-roll costing: shipping cost is allocated pro-rata across this
+                    // detail's own quantity (each purchase detail line becomes its own lot).
+                    $shippingAllocated = $detail->quantity > 0
+                        ? round(($detail->shipping_cost ?? 0) / $detail->quantity, 2)
+                        : null;
+
                     if ($existingCloth) {
                         if ($existingCloth->trashed()) {
                             $existingCloth->restore();
                         }
                         $existingCloth->quantity = $existingCloth->quantity + $detail->quantity;
+                        $existingCloth->remaining_quantity = ($existingCloth->remaining_quantity ?? 0) + $detail->quantity;
+                        $existingCloth->unit_price = $detail->unit_price ?? $existingCloth->unit_price;
+                        $existingCloth->shipping_cost_allocated = $shippingAllocated ?? $existingCloth->shipping_cost_allocated;
                         $existingCloth->save();
                     } else {
                         Cloth::create([
@@ -265,6 +278,9 @@ class FabricPurchaseController extends Controller
                             'color_id' => $detail->color_id,
                             'quantity' => $detail->quantity,
                             'sequence' => $detail->sequence,
+                            'unit_price' => $detail->unit_price,
+                            'shipping_cost_allocated' => $shippingAllocated,
+                            'remaining_quantity' => $detail->quantity,
                         ]);
                     }
                 }
