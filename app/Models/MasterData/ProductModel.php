@@ -17,8 +17,15 @@ class ProductModel extends Model
 
     protected $fillable = [
         'sku',
-        'name'
+        'name',
+        'cmt_rate_group_id'
     ];
+
+    // Define relationship with CmtRateGroup model (used to look up CMT payroll rates)
+    public function cmtRateGroup()
+    {
+        return $this->belongsTo(CmtRateGroup::class, 'cmt_rate_group_id');
+    }
 
     // Define relationship with Product model
     public function product()

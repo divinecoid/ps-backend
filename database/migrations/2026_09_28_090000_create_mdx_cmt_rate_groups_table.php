@@ -11,15 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('mdx_cmt_model_rates', function (Blueprint $table) {
+        Schema::create('mdx_cmt_rate_groups', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('model_id')->constrained('mdx_models')->onDelete('restrict');
-            $table->enum('kategori', ['DALAM_KOTA', 'LUAR_KOTA']);
-            $table->decimal('rate', 15, 2)->default(0);
+            $table->string('name')->unique();
             $table->softDeletes();
             $table->timestamps();
-
-            $table->unique(['model_id', 'kategori']);
         });
     }
 
@@ -28,6 +24,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('mdx_cmt_model_rates');
+        Schema::dropIfExists('mdx_cmt_rate_groups');
     }
 };

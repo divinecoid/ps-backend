@@ -21,6 +21,9 @@ class RackController extends Controller
             'id' => $data->id,
             'code' => $data->code,
             'name' => $data->name,
+            'display_name' => $data->name
+                . ($data->model ? ' - ' . $data->model->name : '')
+                . ($data->color ? ' - ' . $data->color->name : ''),
             'warehouse_id' => $data->warehouse_id,
             'warehouse' => (object) [
                 'name' => $data->warehouse?->name
@@ -36,6 +39,18 @@ class RackController extends Controller
         ];
     }
 
+    private function filterByModel(Request $request)
+    {
+        return function ($query) use ($request) {
+            if ($request->filled('model_id')) {
+                $query->where('model_id', $request->input('model_id'));
+            }
+            if ($request->filled('color_id')) {
+                $query->where('color_id', $request->input('color_id'));
+            }
+        };
+    }
+
     public function index(Request $request)
     {
         return $this->baseIndex(
@@ -43,7 +58,8 @@ class RackController extends Controller
             Rack::class,
             ['warehouse', 'model', 'color'],
             ['id', 'code', 'name', 'warehouse.name', 'model.name', 'color.name'],
-            $this->structure()
+            $this->structure(),
+            $this->filterByModel($request)
         );
     }
 
@@ -54,7 +70,8 @@ class RackController extends Controller
             Rack::class,
             ['warehouse', 'model', 'color'],
             ['code', 'name', 'warehouse.name', 'model.name', 'color.name'],
-            $this->structure()
+            $this->structure(),
+            $this->filterByModel($request)
         );
     }
 

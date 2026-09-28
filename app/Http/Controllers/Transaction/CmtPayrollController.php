@@ -68,6 +68,7 @@ class CmtPayrollController extends Controller
             'paid_at' => $data->paid_at,
             'created_at' => $data->created_at,
             'details' => $data->details->map(fn(CmtPayrollDetail $d) => [
+                'id' => $d->id,
                 'model' => $d->model?->name,
                 'qty' => $d->qty,
                 'qty_lusin' => $d->qty_lusin,
@@ -103,12 +104,14 @@ class CmtPayrollController extends Controller
     /**
      * Generate a draft payroll for a CMT over a period: sums non-rejected
      * ReceivedlogDetail rows in that window not yet attached to any payroll.
-     * The rate is looked up from the CMT model rate master data (per
-     * garment model + CMT kategori) and is priced **per lusin (dozen)**,
-     * not per piece — pieces are converted to their lusin equivalent via
-     * pcsToLusin() before multiplying by the rate. If no rate is
-     * configured for a model/kategori combination, falls back to the
-     * manual per-piece unit_fee captured on the RequestDetail.
+     * The rate is looked up from the CMT model rate master data — keyed by
+     * the garment model's CMT rate GROUP (e.g. "Pendek"/"Panjang"/"Saku",
+     * since several models share the same rate) + CMT kategori — and is
+     * priced **per lusin (dozen)**, not per piece; pieces are converted to
+     * their lusin equivalent via pcsToLusin() before multiplying by the
+     * rate. If the model has no rate group, or no rate is configured for
+     * that group/kategori combination, falls back to the manual per-piece
+     * unit_fee captured on the RequestDetail.
      */
     public function generate(Request $request)
     {
@@ -125,7 +128,7 @@ class CmtPayrollController extends Controller
                 $alreadyPaidDetailIds = CmtPayrollDetail::whereNotNull('received_log_detail_id')
                     ->pluck('received_log_detail_id');
 
-                $receivedDetails = ReceivedlogDetail::with(['requestDetail.request', 'model'])
+                $receivedDetails = ReceivedlogDetail::with(['requestDetail.request', 'model.cmtRateGroup'])
                     ->where('is_rejected', false)
                     ->whereHas('requestDetail.request', fn($q) => $q->where('cmt_id', $cmt->id))
                     ->whereBetween('created_at', [
@@ -150,7 +153,7 @@ class CmtPayrollController extends Controller
                     ]);
 
                     $rateMap = CmtModelRate::where('kategori', $cmt->kategori)
-                        ->pluck('rate', 'model_id');
+                        ->pluck('rate', 'group_id');
 
                     $rows = [];
                     $totalPcs = 0;
@@ -158,7 +161,8 @@ class CmtPayrollController extends Controller
 
                     foreach ($receivedDetails as $rd) {
                         $requestDetail = $rd->requestDetail;
-                        $modelRate = $rateMap->get($rd->model_id);
+                        $groupId = $rd->model?->cmt_rate_group_id;
+                        $modelRate = $groupId ? $rateMap->get($groupId) : null;
                         $qty = (int) $rd->qty;
 
                         if ($modelRate !== null) {
@@ -201,6 +205,51 @@ class CmtPayrollController extends Controller
                         ($this->structure())($payroll->fresh(['cmt', 'details.model']))
                     );
                 });
+            }
+        );
+    }
+
+    /**
+     * Edits a single detail row's qty/unit_fee while the payroll is still
+     * draft. qty_lusin/amount are recalculated from the new qty (lusin
+     * conversion only applies when the row already had a lusin rate — a
+     * legacy per-piece row stays per-piece). The payroll's totals are
+     * recomputed afterwards.
+     */
+    public function updateDetail(Request $request, $id, $detailId)
+    {
+        return $this->baseValidate(
+            $request,
+            [
+                'qty' => 'required|integer|min:1',
+                'unit_fee' => 'required|numeric|min:0',
+            ],
+            function ($data) use ($id, $detailId) {
+                $payroll = CmtPayroll::findOrFail($id);
+                if ($payroll->status !== 'draft') {
+                    return $this->errorResponse(422, 'Hanya payroll berstatus draft yang bisa diedit.');
+                }
+
+                $detail = CmtPayrollDetail::where('cmt_payroll_id', $payroll->id)->findOrFail($detailId);
+
+                $qty = (int) $data['qty'];
+                $unitFee = (float) $data['unit_fee'];
+                $qtyLusin = $detail->qty_lusin !== null ? $this->pcsToLusin($qty) : null;
+                $amount = $qtyLusin !== null ? round($unitFee * $qtyLusin, 2) : round($unitFee * $qty, 2);
+
+                $detail->update([
+                    'qty' => $qty,
+                    'qty_lusin' => $qtyLusin,
+                    'unit_fee' => $unitFee,
+                    'amount' => $amount,
+                ]);
+
+                $payroll->update([
+                    'total_pcs' => $payroll->details()->sum('qty'),
+                    'total_amount' => $payroll->details()->sum('amount'),
+                ]);
+
+                return $this->successResponse(($this->structure())($payroll->fresh(['cmt', 'details.model'])));
             }
         );
     }

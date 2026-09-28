@@ -15,14 +15,14 @@ class CmtModelRate extends Model
     protected $keyType = 'string';
 
     protected $fillable = [
-        'model_id',
+        'group_id',
         'kategori',
         'rate',
     ];
 
-    // Define relationship with ProductModel model
-    public function model()
+    // Define relationship with CmtRateGroup model
+    public function group()
     {
-        return $this->belongsTo(ProductModel::class, 'model_id');
+        return $this->belongsTo(CmtRateGroup::class, 'group_id');
     }
 }

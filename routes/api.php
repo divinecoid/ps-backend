@@ -322,6 +322,24 @@ Route::prefix('cmt-model-rate')->middleware(['checkrole:admin', 'acm:master_cmt_
     Route::delete('{id}', [\App\Http\Controllers\MasterData\CmtModelRateController::class, 'destroy']);
 });
 
+//CMT Rate Group (Grup Model untuk Gaji CMT, mis. Pendek, Panjang, Saku)
+Route::prefix('cmt-rate-group')->middleware(['checkrole:admin', 'acm:master_cmt_rate,read'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\MasterData\CmtRateGroupController::class, 'index']);
+    Route::get('/master', [\App\Http\Controllers\MasterData\CmtRateGroupController::class, 'master']);
+    Route::get('{id}', [\App\Http\Controllers\MasterData\CmtRateGroupController::class, 'show']);
+});
+Route::prefix('cmt-rate-group')->middleware(['checkrole:admin', 'acm:master_cmt_rate,create'])->group(function () {
+    Route::post('/', [\App\Http\Controllers\MasterData\CmtRateGroupController::class, 'store']);
+    Route::post('{id}/restore', [\App\Http\Controllers\MasterData\CmtRateGroupController::class, 'restore']);
+});
+Route::prefix('cmt-rate-group')->middleware(['checkrole:admin', 'acm:master_cmt_rate,update'])->group(function () {
+    Route::patch('{id}', [\App\Http\Controllers\MasterData\CmtRateGroupController::class, 'update']);
+});
+Route::prefix('cmt-rate-group')->middleware(['checkrole:admin', 'acm:master_cmt_rate,delete'])->group(function () {
+    Route::delete('/', [\App\Http\Controllers\MasterData\CmtRateGroupController::class, 'multiDestroy']);
+    Route::delete('{id}', [\App\Http\Controllers\MasterData\CmtRateGroupController::class, 'destroy']);
+});
+
 //Inventory Small
 Route::prefix('small-inventory')->middleware(['checkrole', 'acm:gudang_kecil,read'])->group(function () {
     Route::get('/', [SmallInventoryController::class, 'index']);
@@ -593,6 +611,7 @@ Route::prefix('cmt-payroll')->middleware(['checkrole', 'acm:cmt_payroll,update']
     Route::patch('/{id}/approve', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'approve']);
     Route::patch('/{id}/mark-paid', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'markPaid']);
     Route::patch('/{id}/mark-unpaid', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'markUnpaid']);
+    Route::patch('/{id}/details/{detailId}', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'updateDetail']);
 });
 Route::prefix('cmt-payroll')->middleware(['checkrole', 'acm:cmt_payroll,delete'])->group(function () {
     Route::delete('/{id}', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'destroy']);

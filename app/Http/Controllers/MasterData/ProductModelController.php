@@ -22,6 +22,10 @@ class ProductModelController extends Controller
             'id' => $data->id,
             'sku' => $data->sku,
             'name' => $data->name,
+            'cmt_rate_group_id' => $data->cmt_rate_group_id,
+            'cmt_rate_group' => $data->cmtRateGroup ? [
+                'name' => $data->cmtRateGroup->name
+            ] : null,
             'color_id' => $data->colors->pluck('id'),
             'size_id' => $data->sizes->pluck('id'),
             'colors' => $data->colors->map(fn($c) => [
@@ -40,7 +44,7 @@ class ProductModelController extends Controller
         return $this->baseIndex(
             $request,
             ProductModel::class,
-            ['colors', 'sizes'],
+            ['colors', 'sizes', 'cmtRateGroup'],
             ['sku', 'name'],
             $this->structure()
         );
@@ -50,7 +54,7 @@ class ProductModelController extends Controller
         return $this->baseMaster(
             $request,
             ProductModel::class,
-            ['colors', 'sizes'],
+            ['colors', 'sizes', 'cmtRateGroup'],
             ['sku', 'name'],
             $this->structure()
         );
@@ -61,7 +65,7 @@ class ProductModelController extends Controller
         return $this->baseShow(
             ProductModel::class,
             $id,
-            ['colors', 'sizes'],
+            ['colors', 'sizes', 'cmtRateGroup'],
             $this->structure()
         );
     }
@@ -74,6 +78,10 @@ class ProductModelController extends Controller
             [
                 'sku' => 'required|string|unique:mdx_models,sku|max:255',
                 'name' => 'required|string|max:255',
+                'cmt_rate_group_id' => [
+                    'nullable',
+                    Rule::exists('mdx_cmt_rate_groups', 'id')->whereNull('deleted_at'),
+                ],
                 'size_id' => [
                     'required',
                     Rule::exists('mdx_sizes', 'id')->whereNull('deleted_at'),
@@ -104,6 +112,10 @@ class ProductModelController extends Controller
                     Rule::unique('mdx_models', 'sku')->ignore($id)
                 ],
                 'name' => 'required|string|max:255',
+                'cmt_rate_group_id' => [
+                    'nullable',
+                    Rule::exists('mdx_cmt_rate_groups', 'id')->whereNull('deleted_at'),
+                ],
                 'size_id' => [
                     'sometimes',
                     'required',

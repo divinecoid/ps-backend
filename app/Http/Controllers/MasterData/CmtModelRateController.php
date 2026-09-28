@@ -16,9 +16,9 @@ class CmtModelRateController extends Controller
     {
         return fn($data) => [
             'id' => $data->id,
-            'model_id' => $data->model_id,
-            'model' => $data->model ? (object) [
-                'name' => $data->model->name
+            'group_id' => $data->group_id,
+            'group' => $data->group ? (object) [
+                'name' => $data->group->name
             ] : null,
             'kategori' => $data->kategori,
             'rate' => $data->rate,
@@ -30,8 +30,8 @@ class CmtModelRateController extends Controller
         return $this->baseIndex(
             $request,
             CmtModelRate::class,
-            ['model'],
-            ['model.name', 'kategori'],
+            ['group'],
+            ['group.name', 'kategori'],
             $this->structure()
         );
     }
@@ -41,8 +41,8 @@ class CmtModelRateController extends Controller
         return $this->baseMaster(
             $request,
             CmtModelRate::class,
-            ['model'],
-            ['model.name', 'kategori'],
+            ['group'],
+            ['group.name', 'kategori'],
             $this->structure()
         );
     }
@@ -52,7 +52,7 @@ class CmtModelRateController extends Controller
         return $this->baseShow(
             CmtModelRate::class,
             $id,
-            ['model'],
+            ['group'],
             $this->structure()
         );
     }
@@ -63,10 +63,10 @@ class CmtModelRateController extends Controller
             $request,
             CmtModelRate::class,
             [
-                'model_id' => [
+                'group_id' => [
                     'required',
-                    Rule::exists('mdx_models', 'id')->whereNull('deleted_at'),
-                    Rule::unique('mdx_cmt_model_rates', 'model_id')->where(fn($q) => $q->where('kategori', $request->input('kategori'))),
+                    Rule::exists('mdx_cmt_rate_groups', 'id')->whereNull('deleted_at'),
+                    Rule::unique('mdx_cmt_model_rates', 'group_id')->where(fn($q) => $q->where('kategori', $request->input('kategori'))),
                 ],
                 'kategori' => 'required|in:DALAM_KOTA,LUAR_KOTA',
                 'rate' => 'required|numeric|min:0',
@@ -82,10 +82,10 @@ class CmtModelRateController extends Controller
             CmtModelRate::class,
             $id,
             [
-                'model_id' => [
+                'group_id' => [
                     'required',
-                    Rule::exists('mdx_models', 'id')->whereNull('deleted_at'),
-                    Rule::unique('mdx_cmt_model_rates', 'model_id')->where(fn($q) => $q->where('kategori', $request->input('kategori')))->ignore($id),
+                    Rule::exists('mdx_cmt_rate_groups', 'id')->whereNull('deleted_at'),
+                    Rule::unique('mdx_cmt_model_rates', 'group_id')->where(fn($q) => $q->where('kategori', $request->input('kategori')))->ignore($id),
                 ],
                 'kategori' => 'required|in:DALAM_KOTA,LUAR_KOTA',
                 'rate' => 'required|numeric|min:0',
