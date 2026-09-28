@@ -237,11 +237,13 @@ Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,rea
     Route::get('/master', [ProductController::class, 'master']);
     Route::get('/batches', [ProductController::class, 'batches']);
     Route::get('/batch-items', [ProductController::class, 'batchItems']);
+    Route::get('/seed-dummy/template', [ProductController::class, 'downloadSeedTemplate']);
     Route::get('{id}', [ProductController::class, 'show']);
 });
 Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,create'])->group(function () {
     Route::post('/', [ProductController::class, 'store']);
     Route::post('/seed-dummy', [\App\Http\Controllers\ProductSeederController::class, 'seedApi']);
+    Route::post('/seed-dummy/import', [ProductController::class, 'importSeedDummy']);
     Route::post('{id}/restore', [ProductController::class, 'restore']);
 });
 Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,update'])->group(function () {

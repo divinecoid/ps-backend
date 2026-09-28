@@ -11,6 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // On environments where the table already exists from the earlier
+        // model_id-based version of this migration, the follow-up
+        // "migrate model_id to group_id" migration handles the conversion
+        // instead of recreating the table here.
+        if (Schema::hasTable('mdx_cmt_model_rates')) {
+            return;
+        }
+
         Schema::create('mdx_cmt_model_rates', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('group_id')->constrained('mdx_cmt_rate_groups')->onDelete('restrict');
