@@ -69,7 +69,8 @@ class RackController extends Controller
             ['warehouse', 'model', 'color'],
             ['id', 'code', 'name', 'warehouse.name', 'model.name', 'color.name'],
             $this->structure(),
-            $this->filterByModel($request)
+            $this->filterByModel($request),
+            ['id' => 'asc']
         );
     }
 
