@@ -5,6 +5,7 @@ namespace App\Http\Controllers\MasterData;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
 use App\Models\MasterData\CmtRateGroup;
+use App\Models\MasterData\ProductModel;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -17,7 +18,23 @@ class CmtRateGroupController extends Controller
         return fn($data) => [
             'id' => $data->id,
             'name' => $data->name,
+            'model_ids' => $data->models()->pluck('mdx_models.id'),
         ];
+    }
+
+    private function syncModels(CmtRateGroup $group, Request $request)
+    {
+        if (!$request->has('model_ids')) {
+            return;
+        }
+        $ids = array_filter((array) $request->input('model_ids'));
+        ProductModel::where('cmt_rate_group_id', $group->id)
+            ->whereNotIn('id', $ids)
+            ->update(['cmt_rate_group_id' => null]);
+        if (!empty($ids)) {
+            ProductModel::whereIn('id', $ids)
+                ->update(['cmt_rate_group_id' => $group->id]);
+        }
     }
 
     public function index(Request $request)
@@ -59,8 +76,10 @@ class CmtRateGroupController extends Controller
             CmtRateGroup::class,
             [
                 'name' => 'required|string|unique:mdx_cmt_rate_groups,name|max:255',
+                'model_ids' => 'array',
+                'model_ids.*' => 'string|exists:mdx_models,id',
             ],
-            null
+            fn($data, $request) => $this->syncModels($data, $request)
         );
     }
 
@@ -77,8 +96,10 @@ class CmtRateGroupController extends Controller
                     'max:255',
                     Rule::unique('mdx_cmt_rate_groups', 'name')->ignore($id)
                 ],
+                'model_ids' => 'array',
+                'model_ids.*' => 'string|exists:mdx_models,id',
             ],
-            null
+            fn($data, $request) => $this->syncModels($data, $request)
         );
     }
 
