@@ -42,11 +42,21 @@ class RackController extends Controller
     private function filterByModel(Request $request)
     {
         return function ($query) use ($request) {
+            if ($request->filled('warehouse_id')) {
+                $query->where('warehouse_id', $request->input('warehouse_id'));
+            }
             if ($request->filled('model_id')) {
                 $query->where('model_id', $request->input('model_id'));
             }
             if ($request->filled('color_id')) {
                 $query->where('color_id', $request->input('color_id'));
+            }
+            if ($request->filled('status')) {
+                if ($request->input('status') === 'active') {
+                    $query->whereNull('deleted_at');
+                } elseif ($request->input('status') === 'inactive') {
+                    $query->whereNotNull('deleted_at');
+                }
             }
         };
     }
