@@ -19,6 +19,8 @@ class PrintController extends Controller
             'barcodes.*.sizes' => 'nullable|string',
             'barcodes.*.color' => 'nullable|string',
             'barcodes.*.model' => 'nullable|string',
+            'barcodes.*.label' => 'nullable|string',
+            'barcodes.*.sublabel' => 'nullable|string',
             'dozenBarcodes' => 'nullable|array',
             'dozenBarcodes.*.code' => 'required_with:dozenBarcodes|string',
             'dozenBarcodes.*.serial_number' => 'nullable|string',
@@ -28,7 +30,7 @@ class PrintController extends Controller
             'dozenBarcodes.*.model' => 'nullable|string',
             'paper.width' => 'required|numeric|min:10',
             'paper.height' => 'required|numeric|min:10',
-            'style' => 'nullable|in:hangtag,compact',
+            'style' => 'nullable|in:hangtag,compact,rack,rack-bulk',
         ]);
 
         if (empty($data['barcodes']) && empty($data['dozenBarcodes'])) {
@@ -58,7 +60,7 @@ class PrintController extends Controller
         $paperWidthMm = $data['paper']['width'];
         $paperHeightMm = $data['paper']['height'];
 
-        if ($style === 'compact') {
+        if ($style === 'compact' || $style === 'rack-bulk') {
             // Real A4 paper — printed on an actual printer, not a giant
             // continuous roll. Cards use fixed mm sizing (see
             // barcodes.blade.php) so dompdf's page-break math lines up

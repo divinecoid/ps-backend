@@ -6,6 +6,7 @@ use App\Http\Controllers\MasterData\AuditLogController;
 use App\Http\Controllers\MasterData\ClothController;
 use App\Http\Controllers\MasterData\RollSizeController;
 use App\Http\Controllers\MasterData\SmallInventoryController;
+use App\Http\Controllers\MasterData\RackStockController;
 use App\Http\Controllers\Transaction\FabricCuttingController;
 use App\Http\Controllers\Transaction\MutationController;
 use App\Http\Controllers\Transaction\RequestController;
@@ -370,6 +371,9 @@ Route::prefix('inventory')->middleware(['checkrole', 'acm:gudang_besar,force_del
     Route::delete('/force', [InventoryController::class, 'multiForceDestroy']);
     Route::delete('{id}/force', [InventoryController::class, 'forceDestroy']);
 });
+
+//Cek Stok Rak (mobile)
+Route::get('/rack-stock', [RackStockController::class, 'byCode'])->middleware('checkrole');
 
 //Rack
 Route::prefix('rack')->middleware(['checkrole:admin', 'acm:master_rak,read'])->group(function () {
