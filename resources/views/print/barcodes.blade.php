@@ -36,11 +36,16 @@
         .cell-dozen {
             background-color: #f7fdf9;
             border-color: #d3f5df;
+            padding: 3mm 2mm;
         }
+        /* Hangtag is printed on real A4 (210x297mm, 4mm margins): 5 columns
+         * x exactly 3 rows per page. Fixed mm sizing so each card is 93mm
+         * tall (50 + 30 + 1 + 9 + 2 + border) and 3 rows + spacing fill the
+         * page without dompdf pushing a row to the next page. */
         .cell-piece {
             background-color: #f7fafd;
             border-color: #d6e8fa;
-            padding-top: 240px;
+            padding: 50mm 2mm 2mm;
         }
         /* Fixed mm sizing (not px) so the backend can compute an exact page
          * height for this row count — no leftover blank space at the end. */
@@ -50,18 +55,22 @@
             padding: 3mm 2mm;
         }
         .qr {
-            width: 150px;
-            height: 150px;
+            width: 30mm;
+            height: 30mm;
         }
         .cell-piece-compact .qr {
             width: 32.5mm;
             height: 32.5mm;
         }
         .label {
-            font-size: 9px;
+            font-size: 7px;
             color: #000;
-            white-space: nowrap;
-            margin-top: 4px;
+            white-space: normal;
+            word-break: break-word;
+            line-height: 1.2;
+            margin-top: 1mm;
+            height: 9mm;
+            overflow: hidden;
         }
         .cell-piece-compact .label {
             font-size: 7px;
