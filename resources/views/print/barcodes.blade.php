@@ -53,7 +53,11 @@
             width: 150px;
             height: 150px;
         }
-        .cell-piece-compact .qr {
+        .cell-dozen-compact {
+            padding: 3mm 2mm;
+        }
+        .cell-piece-compact .qr,
+        .cell-dozen-compact .qr {
             width: 32.5mm;
             height: 32.5mm;
         }
@@ -63,7 +67,8 @@
             white-space: nowrap;
             margin-top: 4px;
         }
-        .cell-piece-compact .label {
+        .cell-piece-compact .label,
+        .cell-dozen-compact .label {
             font-size: 7px;
             white-space: normal;
             word-break: break-word;
@@ -141,9 +146,9 @@
             <tr>
                 @foreach ($row as $code)
                     <td>
-                        <div class="cell cell-dozen">
+                        <div class="cell cell-dozen {{ ($style ?? 'hangtag') === 'compact' ? 'cell-dozen-compact' : '' }}">
                             <img class="qr" src="{{ $code['qr'] }}">
-                            <div class="label">{{ $code['serial_number'] }}{{ !empty($code['model']) ? ' - ' . $code['model'] : '' }} - {{ $code['cutting'] }} - {{ $code['sizes'] }}</div>
+                            <div class="label">{{ $code['serial_number'] }}{{ !empty($code['model']) ? ' - ' . $code['model'] : '' }} - {{ $code['cutting'] }}{{ !empty($code['color']) ? ' - ' . $code['color'] : '' }} - {{ $code['sizes'] }}</div>
                         </div>
                     </td>
                 @endforeach
