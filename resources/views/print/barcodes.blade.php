@@ -39,13 +39,15 @@
             padding: 3mm 2mm;
         }
         /* Hangtag is printed on real A4 (210x297mm, 4mm margins): 5 columns
-         * x exactly 3 rows per page. Fixed mm sizing so each card is 93mm
-         * tall (50 + 30 + 1 + 9 + 2 + border) and 3 rows + spacing fill the
-         * page without dompdf pushing a row to the next page. */
+         * x exactly 3 rows per page. Fixed mm sizing so each card is ~94.7mm
+         * tall (51.8 + 30 + 1 + 9 + 2 + border) and 3 rows + spacing fill the
+         * 289mm printable height (~0.4mm slack, measured on dompdf) without
+         * pushing a row to the next page. If you change any size above,
+         * re-render and check there's still no blank strip at the bottom. */
         .cell-piece {
             background-color: #f7fafd;
             border-color: #d6e8fa;
-            padding: 50mm 2mm 2mm;
+            padding: 51.8mm 2mm 2mm;
         }
         /* Fixed mm sizing (not px) so the backend can compute an exact page
          * height for this row count — no leftover blank space at the end. */
