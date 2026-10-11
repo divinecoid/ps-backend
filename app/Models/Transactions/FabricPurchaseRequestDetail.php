@@ -19,6 +19,8 @@ class FabricPurchaseRequestDetail extends Model
         'color_id',
         'quantity',
         'sequence',
+        'unit_price',
+        'shipping_cost',
     ];
 
     public function request()

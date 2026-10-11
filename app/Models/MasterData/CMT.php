@@ -21,12 +21,18 @@ class CMT extends Model
         'name',
         'contact_person',
         'phone',
-        'address'
+        'address',
+        'kategori'
     ];
 
     // Define relationship with Inventory model
     public function inventory()
     {
         return $this->hasMany(Inventory::class, 'cmt_id');
+    }
+
+    public function payrolls()
+    {
+        return $this->hasMany(\App\Models\Transactions\CmtPayroll::class, 'cmt_id');
     }
 }

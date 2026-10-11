@@ -225,12 +225,13 @@ class RequestController extends Controller
         return $this->baseShow(
             \App\Models\Transactions\Request::class,
             $id,
-            ['request_detail'],
+            ['request_detail', 'request_detail.model'],
             fn($data) => [
                 'request_detail' => $data->request_detail->map(fn($detail) => [
                     'req_dozen_qty' => floor($detail->req_qty / 12),
                     'req_piece_qty' => $detail->req_qty % 12,
                     'serial_number' => $data->serial_number,
+                    'model' => $detail->model->name ?? null,
                     'cutting' => $detail->cutting->clothes->color->code ?? null,
                     'sizes' => $detail->size->code,
                     'barcode' => $detail->barcode,
@@ -304,6 +305,7 @@ class RequestController extends Controller
                 'request_detail.*.variant_detail.*.size_id' => 'required|uuid',
                 'request_detail.*.variant_detail.*.dozen_qty' => 'required|integer|min:0',
                 'request_detail.*.variant_detail.*.piece_qty' => 'required|integer|min:0',
+                'request_detail.*.variant_detail.*.unit_fee' => 'nullable|numeric|min:0',
             ],
             function ($data) {
                 $items = [];
@@ -316,6 +318,7 @@ class RequestController extends Controller
                                 'cloth_id' => $detail['cloth_id'],
                                 'size_id' => $variant['size_id'],
                                 'req_qty' => $reqQty,
+                                'unit_fee' => $variant['unit_fee'] ?? null,
                             ];
                         }
                     }
@@ -378,6 +381,7 @@ class RequestController extends Controller
                             'size_id' => $item['size_id'],
                             'req_qty' => $item['req_qty'],
                             'rec_qty' => 0,
+                            'unit_fee' => $item['unit_fee'],
                             'barcode' => implode('|', [
                                 $cmt->code,
                                 // now()->format('YmdHis'),

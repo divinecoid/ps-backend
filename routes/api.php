@@ -6,6 +6,7 @@ use App\Http\Controllers\MasterData\AuditLogController;
 use App\Http\Controllers\MasterData\ClothController;
 use App\Http\Controllers\MasterData\RollSizeController;
 use App\Http\Controllers\MasterData\SmallInventoryController;
+use App\Http\Controllers\MasterData\RackStockController;
 use App\Http\Controllers\Transaction\FabricCuttingController;
 use App\Http\Controllers\Transaction\MutationController;
 use App\Http\Controllers\Transaction\RequestController;
@@ -39,6 +40,9 @@ use App\Http\Controllers\Transaction\DashboardController;
 use Illuminate\Http\JsonResponse;
 use App\Http\Controllers\Api\MarketplaceAuthController;
 use App\Http\Controllers\Transaction\ManualOutboundController;
+use App\Http\Controllers\PrintController;
+
+Route::post('/print/barcodes', [PrintController::class, 'barcodes'])->middleware('checkrole');
 
 //Auth
 Route::prefix('auth')->group(function () {
@@ -160,11 +164,13 @@ Route::prefix('onlinestore')->middleware(['checkrole:admin', 'acm:master_toko,fo
 Route::prefix('color')->middleware(['checkrole:admin', 'acm:master_warna,read'])->group(function () {
     Route::get('/', [ColorController::class, 'index']);
     Route::get('/master', [ColorController::class, 'master']);
+    Route::get('template', [ColorController::class, 'downloadTemplate']);
     Route::get('{id}', [ColorController::class, 'show']);
 });
 Route::prefix('color')->middleware(['checkrole:admin', 'acm:master_warna,create'])->group(function () {
     Route::post('/', [ColorController::class, 'store']);
     Route::post('{id}/restore', [ColorController::class, 'restore']);
+    Route::post('import', [ColorController::class, 'import']);
 });
 Route::prefix('color')->middleware(['checkrole:admin', 'acm:master_warna,update'])->group(function () {
     Route::patch('{id}', [ColorController::class, 'update']);
@@ -182,11 +188,13 @@ Route::prefix('color')->middleware(['checkrole:admin', 'acm:master_warna,force_d
 Route::prefix('model')->middleware(['checkrole:admin', 'acm:master_model,read'])->group(function () {
     Route::get('/', [ProductModelController::class, 'index']);
     Route::get('/master', [ProductModelController::class, 'master']);
+    Route::get('template', [ProductModelController::class, 'downloadTemplate']);
     Route::get('{id}', [ProductModelController::class, 'show']);
 });
 Route::prefix('model')->middleware(['checkrole:admin', 'acm:master_model,create'])->group(function () {
     Route::post('/', [ProductModelController::class, 'store']);
     Route::post('{id}/restore', [ProductModelController::class, 'restore']);
+    Route::post('import', [ProductModelController::class, 'import']);
 });
 Route::prefix('model')->middleware(['checkrole:admin', 'acm:master_model,update'])->group(function () {
     Route::patch('{id}', [ProductModelController::class, 'update']);
@@ -204,11 +212,13 @@ Route::prefix('model')->middleware(['checkrole:admin', 'acm:master_model,force_d
 Route::prefix('size')->middleware(['checkrole:admin', 'acm:master_ukuran,read'])->group(function () {
     Route::get('/', [SizeController::class, 'index']);
     Route::get('/master', [SizeController::class, 'master']);
+    Route::get('template', [SizeController::class, 'downloadTemplate']);
     Route::get('{id}', [SizeController::class, 'show']);
 });
 Route::prefix('size')->middleware(['checkrole:admin', 'acm:master_ukuran,create'])->group(function () {
     Route::post('/', [SizeController::class, 'store']);
     Route::post('{id}/restore', [SizeController::class, 'restore']);
+    Route::post('import', [SizeController::class, 'import']);
 });
 Route::prefix('size')->middleware(['checkrole:admin', 'acm:master_ukuran,update'])->group(function () {
     Route::patch('{id}', [SizeController::class, 'update']);
@@ -226,11 +236,15 @@ Route::prefix('size')->middleware(['checkrole:admin', 'acm:master_ukuran,force_d
 Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,read'])->group(function () {
     Route::get('/', [ProductController::class, 'index']);
     Route::get('/master', [ProductController::class, 'master']);
+    Route::get('/batches', [ProductController::class, 'batches']);
+    Route::get('/batch-items', [ProductController::class, 'batchItems']);
+    Route::get('/seed-dummy/template', [ProductController::class, 'downloadSeedTemplate']);
     Route::get('{id}', [ProductController::class, 'show']);
 });
 Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,create'])->group(function () {
     Route::post('/', [ProductController::class, 'store']);
     Route::post('/seed-dummy', [\App\Http\Controllers\ProductSeederController::class, 'seedApi']);
+    Route::post('/seed-dummy/import', [ProductController::class, 'importSeedDummy']);
     Route::post('{id}/restore', [ProductController::class, 'restore']);
 });
 Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,update'])->group(function () {
@@ -249,11 +263,13 @@ Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,for
 Route::prefix('factory')->middleware(['checkrole:admin', 'acm:master_pabrik,read'])->group(function () {
     Route::get('/', [FactoryController::class, 'index']);
     Route::get('/master', [FactoryController::class, 'master']);
+    Route::get('template', [FactoryController::class, 'downloadTemplate']);
     Route::get('{id}', [FactoryController::class, 'show']);
 });
 Route::prefix('factory')->middleware(['checkrole:admin', 'acm:master_pabrik,create'])->group(function () {
     Route::post('/', [FactoryController::class, 'store']);
     Route::post('{id}/restore', [FactoryController::class, 'restore']);
+    Route::post('import', [FactoryController::class, 'import']);
 });
 Route::prefix('factory')->middleware(['checkrole:admin', 'acm:master_pabrik,update'])->group(function () {
     Route::patch('{id}', [FactoryController::class, 'update']);
@@ -271,11 +287,13 @@ Route::prefix('factory')->middleware(['checkrole:admin', 'acm:master_pabrik,forc
 Route::prefix('cmt')->middleware(['checkrole:admin', 'acm:master_cmt,read'])->group(function () {
     Route::get('/', [CMTController::class, 'index']);
     Route::get('/master', [CMTController::class, 'master']);
+    Route::get('template', [CMTController::class, 'downloadTemplate']);
     Route::get('{id}', [CMTController::class, 'show']);
 });
 Route::prefix('cmt')->middleware(['checkrole:admin', 'acm:master_cmt,create'])->group(function () {
     Route::post('/', [CMTController::class, 'store']);
     Route::post('{id}/restore', [CMTController::class, 'restore']);
+    Route::post('import', [CMTController::class, 'import']);
 });
 Route::prefix('cmt')->middleware(['checkrole:admin', 'acm:master_cmt,update'])->group(function () {
     Route::patch('{id}', [CMTController::class, 'update']);
@@ -287,6 +305,42 @@ Route::prefix('cmt')->middleware(['checkrole:admin', 'acm:master_cmt,delete'])->
 Route::prefix('cmt')->middleware(['checkrole:admin', 'acm:master_cmt,force_delete'])->group(function () {
     Route::delete('/force', [CMTController::class, 'multiForceDestroy']);
     Route::delete('{id}/force', [CMTController::class, 'forceDestroy']);
+});
+
+//CMT Model Rate (Gaji CMT per Model & Kategori)
+Route::prefix('cmt-model-rate')->middleware(['checkrole:admin', 'acm:master_cmt_rate,read'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\MasterData\CmtModelRateController::class, 'index']);
+    Route::get('/master', [\App\Http\Controllers\MasterData\CmtModelRateController::class, 'master']);
+    Route::get('{id}', [\App\Http\Controllers\MasterData\CmtModelRateController::class, 'show']);
+});
+Route::prefix('cmt-model-rate')->middleware(['checkrole:admin', 'acm:master_cmt_rate,create'])->group(function () {
+    Route::post('/', [\App\Http\Controllers\MasterData\CmtModelRateController::class, 'store']);
+    Route::post('{id}/restore', [\App\Http\Controllers\MasterData\CmtModelRateController::class, 'restore']);
+});
+Route::prefix('cmt-model-rate')->middleware(['checkrole:admin', 'acm:master_cmt_rate,update'])->group(function () {
+    Route::patch('{id}', [\App\Http\Controllers\MasterData\CmtModelRateController::class, 'update']);
+});
+Route::prefix('cmt-model-rate')->middleware(['checkrole:admin', 'acm:master_cmt_rate,delete'])->group(function () {
+    Route::delete('/', [\App\Http\Controllers\MasterData\CmtModelRateController::class, 'multiDestroy']);
+    Route::delete('{id}', [\App\Http\Controllers\MasterData\CmtModelRateController::class, 'destroy']);
+});
+
+//CMT Rate Group (Grup Model untuk Gaji CMT, mis. Pendek, Panjang, Saku)
+Route::prefix('cmt-rate-group')->middleware(['checkrole:admin', 'acm:master_cmt_rate,read'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\MasterData\CmtRateGroupController::class, 'index']);
+    Route::get('/master', [\App\Http\Controllers\MasterData\CmtRateGroupController::class, 'master']);
+    Route::get('{id}', [\App\Http\Controllers\MasterData\CmtRateGroupController::class, 'show']);
+});
+Route::prefix('cmt-rate-group')->middleware(['checkrole:admin', 'acm:master_cmt_rate,create'])->group(function () {
+    Route::post('/', [\App\Http\Controllers\MasterData\CmtRateGroupController::class, 'store']);
+    Route::post('{id}/restore', [\App\Http\Controllers\MasterData\CmtRateGroupController::class, 'restore']);
+});
+Route::prefix('cmt-rate-group')->middleware(['checkrole:admin', 'acm:master_cmt_rate,update'])->group(function () {
+    Route::patch('{id}', [\App\Http\Controllers\MasterData\CmtRateGroupController::class, 'update']);
+});
+Route::prefix('cmt-rate-group')->middleware(['checkrole:admin', 'acm:master_cmt_rate,delete'])->group(function () {
+    Route::delete('/', [\App\Http\Controllers\MasterData\CmtRateGroupController::class, 'multiDestroy']);
+    Route::delete('{id}', [\App\Http\Controllers\MasterData\CmtRateGroupController::class, 'destroy']);
 });
 
 //Inventory Small
@@ -318,15 +372,20 @@ Route::prefix('inventory')->middleware(['checkrole', 'acm:gudang_besar,force_del
     Route::delete('{id}/force', [InventoryController::class, 'forceDestroy']);
 });
 
+//Cek Stok Rak (mobile)
+Route::get('/rack-stock', [RackStockController::class, 'byCode'])->middleware('checkrole');
+
 //Rack
 Route::prefix('rack')->middleware(['checkrole:admin', 'acm:master_rak,read'])->group(function () {
     Route::get('/', [RackController::class, 'index']);
     Route::get('/master', [RackController::class, 'master']);
+    Route::get('template', [RackController::class, 'downloadTemplate']);
     Route::get('{id}', [RackController::class, 'show']);
 });
 Route::prefix('rack')->middleware(['checkrole:admin', 'acm:master_rak,create'])->group(function () {
     Route::post('/', [RackController::class, 'store']);
     Route::post('{id}/restore', [RackController::class, 'restore']);
+    Route::post('import', [RackController::class, 'import']);
 });
 Route::prefix('rack')->middleware(['checkrole:admin', 'acm:master_rak,update'])->group(function () {
     Route::patch('{id}', [RackController::class, 'update']);
@@ -346,11 +405,13 @@ Route::prefix('warehouse')->middleware('checkrole')->group(function () {
 });
 Route::prefix('warehouse')->middleware(['checkrole:admin', 'acm:master_gudang,read'])->group(function () {
     Route::get('/', [WarehouseController::class, 'index']);
+    Route::get('template', [WarehouseController::class, 'downloadTemplate']);
     Route::get('{id}', [WarehouseController::class, 'show']);
 });
 Route::prefix('warehouse')->middleware(['checkrole:admin', 'acm:master_gudang,create'])->group(function () {
     Route::post('/', [WarehouseController::class, 'store']);
     Route::post('{id}/restore', [WarehouseController::class, 'restore']);
+    Route::post('import', [WarehouseController::class, 'import']);
 });
 Route::prefix('warehouse')->middleware(['checkrole:admin', 'acm:master_gudang,update'])->group(function () {
     Route::patch('{id}', [WarehouseController::class, 'update']);
@@ -368,11 +429,13 @@ Route::prefix('warehouse')->middleware(['checkrole:admin', 'acm:master_gudang,fo
 Route::prefix('roll-size')->middleware(['checkrole:admin', 'acm:master_roll_size,read'])->group(function () {
     Route::get('/', [RollSizeController::class, 'index']);
     Route::get('/master', [RollSizeController::class, 'master']);
+    Route::get('template', [RollSizeController::class, 'downloadTemplate']);
     Route::get('{id}', [RollSizeController::class, 'show']);
 });
 Route::prefix('roll-size')->middleware(['checkrole:admin', 'acm:master_roll_size,create'])->group(function () {
     Route::post('/', [RollSizeController::class, 'store']);
     Route::post('{id}/restore', [RollSizeController::class, 'restore']);
+    Route::post('import', [RollSizeController::class, 'import']);
 });
 Route::prefix('roll-size')->middleware(['checkrole:admin', 'acm:master_roll_size,update'])->group(function () {
     Route::patch('{id}', [RollSizeController::class, 'update']);
@@ -391,11 +454,13 @@ Route::prefix('cloth')->middleware(['checkrole', 'acm:gudang_kain,read'])->group
     Route::get('/', [ClothController::class, 'index']);
     Route::get('/uncut', [ClothController::class, 'uncut']);
     Route::get('/master', [ClothController::class, 'master']);
+    Route::get('template', [ClothController::class, 'downloadTemplate']);
     Route::get('{id}', [ClothController::class, 'show']);
 });
 Route::prefix('cloth')->middleware(['checkrole:admin', 'acm:master_roll_size,create'])->group(function () {
     Route::post('/', [ClothController::class, 'store']);
     Route::post('{id}/restore', [ClothController::class, 'restore']);
+    Route::post('import', [ClothController::class, 'import']);
 });
 Route::prefix('cloth')->middleware(['checkrole:admin', 'acm:master_roll_size,update'])->group(function () {
     Route::patch('{id}', [ClothController::class, 'update']);
@@ -538,6 +603,30 @@ Route::prefix('inbound')->middleware(['checkrole', 'acm:penerimaan,create'])->gr
     Route::post('/', [InboundController::class, 'store']);
     Route::post('/validate', [InboundController::class, 'validate']);
     Route::post('/generate-next', [InboundController::class, 'generateNext']);
+});
+
+// CMT Payroll (Penggajian CMT)
+Route::prefix('cmt-payroll')->middleware(['checkrole', 'acm:cmt_payroll,read'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'index']);
+    Route::get('/{id}', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'show']);
+});
+Route::prefix('cmt-payroll')->middleware(['checkrole', 'acm:cmt_payroll,create'])->group(function () {
+    Route::post('/generate', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'generate']);
+});
+Route::prefix('cmt-payroll')->middleware(['checkrole', 'acm:cmt_payroll,update'])->group(function () {
+    Route::patch('/{id}/approve', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'approve']);
+    Route::patch('/{id}/mark-paid', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'markPaid']);
+    Route::patch('/{id}/mark-unpaid', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'markUnpaid']);
+    Route::patch('/{id}/details/{detailId}', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'updateDetail']);
+});
+Route::prefix('cmt-payroll')->middleware(['checkrole', 'acm:cmt_payroll,delete'])->group(function () {
+    Route::delete('/{id}', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'destroy']);
+});
+
+// Finance / Profit Reports
+Route::prefix('finance')->middleware(['checkrole', 'acm:finance,read'])->group(function () {
+    Route::get('/profit-report', [\App\Http\Controllers\Transaction\FinanceReportController::class, 'profitReport']);
+    Route::get('/cmt-payroll-summary', [\App\Http\Controllers\Transaction\FinanceReportController::class, 'cmtPayrollSummary']);
 });
 
 Route::prefix('model_color')->middleware(['checkrole:admin', 'acm:master_model,read'])->group(function () {

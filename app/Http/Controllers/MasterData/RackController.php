@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers\MasterData;
 
+use App\Exports\RackTemplateExport;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
+use App\Imports\RackImport;
 use App\Models\MasterData\Rack;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
 
 class RackController extends Controller
 {
@@ -18,6 +21,9 @@ class RackController extends Controller
             'id' => $data->id,
             'code' => $data->code,
             'name' => $data->name,
+            'display_name' => $data->name
+                . ($data->model ? ' - ' . $data->model->name : '')
+                . ($data->color ? ' - ' . $data->color->name : ''),
             'warehouse_id' => $data->warehouse_id,
             'warehouse' => (object) [
                 'name' => $data->warehouse?->name
@@ -33,6 +39,28 @@ class RackController extends Controller
         ];
     }
 
+    private function filterByModel(Request $request)
+    {
+        return function ($query) use ($request) {
+            if ($request->filled('warehouse_id')) {
+                $query->where('warehouse_id', $request->input('warehouse_id'));
+            }
+            if ($request->filled('model_id')) {
+                $query->where('model_id', $request->input('model_id'));
+            }
+            if ($request->filled('color_id')) {
+                $query->where('color_id', $request->input('color_id'));
+            }
+            if ($request->filled('status')) {
+                if ($request->input('status') === 'active') {
+                    $query->whereNull('deleted_at');
+                } elseif ($request->input('status') === 'inactive') {
+                    $query->whereNotNull('deleted_at');
+                }
+            }
+        };
+    }
+
     public function index(Request $request)
     {
         return $this->baseIndex(
@@ -40,7 +68,9 @@ class RackController extends Controller
             Rack::class,
             ['warehouse', 'model', 'color'],
             ['id', 'code', 'name', 'warehouse.name', 'model.name', 'color.name'],
-            $this->structure()
+            $this->structure(),
+            $this->filterByModel($request),
+            ['id' => 'asc']
         );
     }
 
@@ -51,7 +81,8 @@ class RackController extends Controller
             Rack::class,
             ['warehouse', 'model', 'color'],
             ['code', 'name', 'warehouse.name', 'model.name', 'color.name'],
-            $this->structure()
+            $this->structure(),
+            $this->filterByModel($request)
         );
     }
 
@@ -72,7 +103,7 @@ class RackController extends Controller
             Rack::class,
             [
                 'code' => 'required|string|unique:mdx_racks,code|max:255',
-                'name' => 'required|string|max:255',
+                'name' => 'required|string|unique:mdx_racks,name|max:255',
                 'warehouse_id' => [
                     'required',
                     Rule::exists('mdx_warehouses', 'id')->whereNull('deleted_at'),
@@ -103,7 +134,12 @@ class RackController extends Controller
                     'max:255',
                     Rule::unique('mdx_racks', 'code')->ignore($id)
                 ],
-                'name' => 'required|string|max:255',
+                'name' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('mdx_racks', 'name')->ignore($id)
+                ],
                 'warehouse_id' => [
                     'required',
                     Rule::exists('mdx_warehouses', 'id')->whereNull('deleted_at'),
@@ -156,5 +192,38 @@ class RackController extends Controller
             Rack::class,
             $request->all()
         );
+    }
+
+    public function downloadTemplate()
+    {
+        return Excel::download(new RackTemplateExport(), 'template-rak.xlsx');
+    }
+
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv',
+        ]);
+
+        $import = new RackImport();
+
+        try {
+            Excel::import($import, $request->file('file'));
+        } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+            return $this->errorResponse(
+                422,
+                'Gagal impor: ada kode atau nama rak yang sudah dipakai oleh rak lain.'
+            );
+        }
+
+        if ($import->failures()->isNotEmpty()) {
+            $first = $import->failures()->first();
+            return $this->errorResponse(
+                422,
+                "Baris {$first->row()}: " . implode(', ', $first->errors())
+            );
+        }
+
+        return $this->successResponse(null);
     }
 }

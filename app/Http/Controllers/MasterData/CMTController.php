@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers\MasterData;
 
+use App\Exports\CMTTemplateExport;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
+use App\Imports\CMTImport;
 use App\Models\MasterData\CMT;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
 
 class CMTController extends Controller
 {
@@ -20,7 +23,8 @@ class CMTController extends Controller
             'name' => $data->name,
             'contact_person' => $data->contact_person,
             'phone' => $data->phone,
-            'address' => $data->address
+            'address' => $data->address,
+            'kategori' => $data->kategori
         ];
     }
 
@@ -66,7 +70,8 @@ class CMTController extends Controller
                 'name' => 'required|string|max:255',
                 'contact_person' => 'required|string|max:255',
                 'phone' => 'required|string|max:255',
-                'address' => 'required|string|max:255'
+                'address' => 'required|string|max:255',
+                'kategori' => 'required|in:DALAM_KOTA,LUAR_KOTA'
             ],
             null
         );
@@ -88,7 +93,8 @@ class CMTController extends Controller
                 'name' => 'required|string|max:255',
                 'contact_person' => 'required|string|max:255',
                 'phone' => 'required|string|max:255',
-                'address' => 'required|string|max:255'
+                'address' => 'required|string|max:255',
+                'kategori' => 'required|in:DALAM_KOTA,LUAR_KOTA'
             ],
             null
         );
@@ -129,5 +135,30 @@ class CMTController extends Controller
             CMT::class,
             $request->all()
         );
+    }
+
+    public function downloadTemplate()
+    {
+        return Excel::download(new CMTTemplateExport(), 'template-cmt.xlsx');
+    }
+
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv',
+        ]);
+
+        $import = new CMTImport();
+        Excel::import($import, $request->file('file'));
+
+        if ($import->failures()->isNotEmpty()) {
+            $first = $import->failures()->first();
+            return $this->errorResponse(
+                422,
+                "Baris {$first->row()}: " . implode(', ', $first->errors())
+            );
+        }
+
+        return $this->successResponse(null);
     }
 }

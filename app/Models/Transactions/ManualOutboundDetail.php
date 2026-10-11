@@ -26,6 +26,7 @@ class ManualOutboundDetail extends Model
         'model_id',
         'color_id',
         'size_id',
+        'sell_price',
     ];
 
     public function manualOutbound()

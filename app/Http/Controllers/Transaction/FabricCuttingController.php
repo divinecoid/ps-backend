@@ -233,7 +233,7 @@ class FabricCuttingController extends Controller
             ->whereHas('fabric_cutting_request_detail', function ($q) use ($modelId, $sizeId) {
                 $q->where('model_id', $modelId)
                     ->where('size_id', $sizeId)
-                    ->having('req_qty', '>', 0);
+                    ->where('req_qty', '>', 0);
             })
             ->whereHas('fabric_detail.cloth', function ($q) use ($colorId) {
                 $q->where('color_id', $colorId);
@@ -365,11 +365,26 @@ class FabricCuttingController extends Controller
                             );
                         }
 
+                        // Per-roll (FIFO) cost snapshot: the user selects a specific Cloth
+                        // roll to consume, so we freeze that roll's unit cost (fabric price
+                        // + its allocated shipping share) at the moment of consumption
+                        // rather than averaging across rolls. Historical/untracked rolls
+                        // (no unit_price recorded) snapshot as 0 and get flagged
+                        // `is_estimated` downstream in ProductCostingService.
+                        $unitCostSnapshot = ($cloth->unit_price ?? 0) + ($cloth->shipping_cost_allocated ?? 0);
+
+                        if ($cloth->remaining_quantity !== null) {
+                            Cloth::whereKey($cloth->id)
+                                ->where('remaining_quantity', '>=', $fabric['quantity'])
+                                ->decrement('remaining_quantity', $fabric['quantity']);
+                        }
+
                         $fabricDetails[] = [
                             'id' => (string) Str::uuid(),
                             'fabric_cutting_id' => $requestModel->id,
                             'fabric_id' => $fabric['fabric_id'],
                             'quantity' => $fabric['quantity'],
+                            'unit_cost_snapshot' => $unitCostSnapshot,
                         ];
                     }
 

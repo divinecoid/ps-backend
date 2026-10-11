@@ -259,14 +259,14 @@ class InboundController extends Controller
                                     ['prefix' => $prefix] = $this->parseBarcode($barcodesDozen[0]);
                                     if ($rd = $this->findRequestDetail($prefix)) {
                                         $recRack = \App\Models\MasterData\Rack::whereHas('warehouse', function ($q) {
-                                            $q->where('type', 'BIG');
+                                            $q->where('type', 'BESAR');
                                         })
                                             ->where('model_id', $rd->model_id)
                                             ->where('color_id', $rd->color_id)
                                             ->first();
                                         if (!$recRack) {
                                             $recRack = \App\Models\MasterData\Rack::whereHas('warehouse', function ($q) {
-                                                $q->where('type', 'BIG');
+                                                $q->where('type', 'BESAR');
                                             })
                                                 ->where('model_id', $rd->model_id)
                                                 ->whereNull('color_id')
@@ -274,7 +274,7 @@ class InboundController extends Controller
                                         }
                                         if (!$recRack) {
                                             $recRack = \App\Models\MasterData\Rack::whereHas('warehouse', function ($q) {
-                                                $q->where('type', 'BIG');
+                                                $q->where('type', 'BESAR');
                                             })
                                                 ->whereNull('model_id')
                                                 ->whereNull('color_id')
@@ -341,7 +341,7 @@ class InboundController extends Controller
                                         $barcode,
                                         1
                                     );
-                                    Product::create([
+                                    $createdProduct = Product::create([
                                         'rack_id' => $items['rack_id'],
                                         'model_id' => $rd->model_id,
                                         'color_id' => $rd->cutting->clothes->color_id,
@@ -349,6 +349,9 @@ class InboundController extends Controller
                                         'series' => $series,
                                         'barcode' => $barcode
                                     ]);
+
+                                    (new \App\Services\ProductCostingService())
+                                        ->calculateForProduct($createdProduct, $rd);
                                 }
                             }
 
@@ -458,7 +461,7 @@ class InboundController extends Controller
 
                     $recommendedRack = \App\Models\MasterData\Rack::with('warehouse')
                         ->whereHas('warehouse', function ($q) {
-                            $q->where('type', 'SMALL');
+                            $q->where('type', 'KECIL');
                         })
                         ->where('model_id', $modelId)
                         ->where('color_id', $colorId)
@@ -467,7 +470,7 @@ class InboundController extends Controller
                     if (!$recommendedRack) {
                         $recommendedRack = \App\Models\MasterData\Rack::with('warehouse')
                             ->whereHas('warehouse', function ($q) {
-                                $q->where('type', 'SMALL');
+                                $q->where('type', 'KECIL');
                             })
                             ->where('model_id', $modelId)
                             ->whereNull('color_id')
@@ -477,7 +480,7 @@ class InboundController extends Controller
                     if (!$recommendedRack) {
                         $recommendedRack = \App\Models\MasterData\Rack::with('warehouse')
                             ->whereHas('warehouse', function ($q) {
-                                $q->where('type', 'SMALL');
+                                $q->where('type', 'KECIL');
                             })
                             ->whereNull('model_id')
                             ->whereNull('color_id')
@@ -489,7 +492,7 @@ class InboundController extends Controller
 
                     $recommendedRack = \App\Models\MasterData\Rack::with('warehouse')
                         ->whereHas('warehouse', function ($q) {
-                            $q->where('type', 'BIG');
+                            $q->where('type', 'BESAR');
                         })
                         ->where('model_id', $modelId)
                         ->where('color_id', $colorId)
@@ -498,7 +501,7 @@ class InboundController extends Controller
                     if (!$recommendedRack) {
                         $recommendedRack = \App\Models\MasterData\Rack::with('warehouse')
                             ->whereHas('warehouse', function ($q) {
-                                $q->where('type', 'BIG');
+                                $q->where('type', 'BESAR');
                             })
                             ->where('model_id', $modelId)
                             ->whereNull('color_id')
@@ -508,7 +511,7 @@ class InboundController extends Controller
                     if (!$recommendedRack) {
                         $recommendedRack = \App\Models\MasterData\Rack::with('warehouse')
                             ->whereHas('warehouse', function ($q) {
-                                $q->where('type', 'BIG');
+                                $q->where('type', 'BESAR');
                             })
                             ->whereNull('model_id')
                             ->whereNull('color_id')
@@ -586,14 +589,14 @@ class InboundController extends Controller
             ]);
             if ($inventory->rack_id === null) {
                 $recRack = \App\Models\MasterData\Rack::whereHas('warehouse', function ($q) {
-                    $q->where('type', 'BIG');
+                    $q->where('type', 'BESAR');
                 })
                     ->where('model_id', $requestDetail->model_id)
                     ->where('color_id', $requestDetail->cutting->clothes->color_id)
                     ->first();
                 if (!$recRack) {
                     $recRack = \App\Models\MasterData\Rack::whereHas('warehouse', function ($q) {
-                        $q->where('type', 'BIG');
+                        $q->where('type', 'BESAR');
                     })
                         ->where('model_id', $requestDetail->model_id)
                         ->whereNull('color_id')
@@ -601,7 +604,7 @@ class InboundController extends Controller
                 }
                 if (!$recRack) {
                     $recRack = \App\Models\MasterData\Rack::whereHas('warehouse', function ($q) {
-                        $q->where('type', 'BIG');
+                        $q->where('type', 'BESAR');
                     })
                         ->whereNull('model_id')
                         ->whereNull('color_id')

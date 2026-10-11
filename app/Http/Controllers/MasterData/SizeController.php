@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers\MasterData;
 
+use App\Exports\SizeTemplateExport;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
+use App\Imports\SizeImport;
 use App\Models\MasterData\Size;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
 
 class SizeController extends Controller
 {
@@ -120,5 +123,30 @@ class SizeController extends Controller
             Size::class,
             $request->all()
         );
+    }
+
+    public function downloadTemplate()
+    {
+        return Excel::download(new SizeTemplateExport(), 'template-ukuran.xlsx');
+    }
+
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv',
+        ]);
+
+        $import = new SizeImport();
+        Excel::import($import, $request->file('file'));
+
+        if ($import->failures()->isNotEmpty()) {
+            $first = $import->failures()->first();
+            return $this->errorResponse(
+                422,
+                "Baris {$first->row()}: " . implode(', ', $first->errors())
+            );
+        }
+
+        return $this->successResponse(null);
     }
 }

@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers\MasterData;
 
+use App\Exports\WarehouseTemplateExport;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
+use App\Imports\WarehouseImport;
 use App\Models\MasterData\Warehouse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
 
 class WarehouseController extends Controller
 {
@@ -61,9 +64,9 @@ class WarehouseController extends Controller
             Warehouse::class,
             [
                 'code' => 'required|string|unique:mdx_warehouses,code|max:255',
-                'name' => 'required|string|max:255',
+                'name' => 'required|string|unique:mdx_warehouses,name|max:255',
                 'priority' => 'required|integer',
-                'type' => 'nullable|string|in:BIG,SMALL',
+                'type' => 'nullable|string|in:BESAR,KECIL',
             ],
             null
         );
@@ -82,9 +85,14 @@ class WarehouseController extends Controller
                     'max:255',
                     Rule::unique('mdx_warehouses', 'code')->ignore($id)
                 ],
-                'name' => 'required|string|max:255',
+                'name' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('mdx_warehouses', 'name')->ignore($id)
+                ],
                 'priority' => 'required|integer',
-                'type' => 'nullable|string|in:BIG,SMALL',
+                'type' => 'nullable|string|in:BESAR,KECIL',
             ],
             null
         );
@@ -125,5 +133,30 @@ class WarehouseController extends Controller
             Warehouse::class,
             $request->all()
         );
+    }
+
+    public function downloadTemplate()
+    {
+        return Excel::download(new WarehouseTemplateExport(), 'template-gudang.xlsx');
+    }
+
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv',
+        ]);
+
+        $import = new WarehouseImport();
+        Excel::import($import, $request->file('file'));
+
+        if ($import->failures()->isNotEmpty()) {
+            $first = $import->failures()->first();
+            return $this->errorResponse(
+                422,
+                "Baris {$first->row()}: " . implode(', ', $first->errors())
+            );
+        }
+
+        return $this->successResponse(null);
     }
 }

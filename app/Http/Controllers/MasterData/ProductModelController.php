@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers\MasterData;
 
+use App\Exports\ProductModelTemplateExport;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
+use App\Imports\ProductModelImport;
 use App\Models\MasterData\ProductModel;
 use App\Models\Transactions\FabricCutting;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ProductModelController extends Controller
 {
@@ -19,6 +22,10 @@ class ProductModelController extends Controller
             'id' => $data->id,
             'sku' => $data->sku,
             'name' => $data->name,
+            'cmt_rate_group_id' => $data->cmt_rate_group_id,
+            'cmt_rate_group' => $data->cmtRateGroup ? [
+                'name' => $data->cmtRateGroup->name
+            ] : null,
             'color_id' => $data->colors->pluck('id'),
             'size_id' => $data->sizes->pluck('id'),
             'colors' => $data->colors->map(fn($c) => [
@@ -37,7 +44,7 @@ class ProductModelController extends Controller
         return $this->baseIndex(
             $request,
             ProductModel::class,
-            ['colors', 'sizes'],
+            ['colors', 'sizes', 'cmtRateGroup'],
             ['sku', 'name'],
             $this->structure()
         );
@@ -47,7 +54,7 @@ class ProductModelController extends Controller
         return $this->baseMaster(
             $request,
             ProductModel::class,
-            ['colors', 'sizes'],
+            ['colors', 'sizes', 'cmtRateGroup'],
             ['sku', 'name'],
             $this->structure()
         );
@@ -58,7 +65,7 @@ class ProductModelController extends Controller
         return $this->baseShow(
             ProductModel::class,
             $id,
-            ['colors', 'sizes'],
+            ['colors', 'sizes', 'cmtRateGroup'],
             $this->structure()
         );
     }
@@ -71,6 +78,10 @@ class ProductModelController extends Controller
             [
                 'sku' => 'required|string|unique:mdx_models,sku|max:255',
                 'name' => 'required|string|max:255',
+                'cmt_rate_group_id' => [
+                    'nullable',
+                    Rule::exists('mdx_cmt_rate_groups', 'id')->whereNull('deleted_at'),
+                ],
                 'size_id' => [
                     'required',
                     Rule::exists('mdx_sizes', 'id')->whereNull('deleted_at'),
@@ -101,6 +112,10 @@ class ProductModelController extends Controller
                     Rule::unique('mdx_models', 'sku')->ignore($id)
                 ],
                 'name' => 'required|string|max:255',
+                'cmt_rate_group_id' => [
+                    'nullable',
+                    Rule::exists('mdx_cmt_rate_groups', 'id')->whereNull('deleted_at'),
+                ],
                 'size_id' => [
                     'sometimes',
                     'required',
@@ -154,6 +169,31 @@ class ProductModelController extends Controller
             ProductModel::class,
             $request->all()
         );
+    }
+
+    public function downloadTemplate()
+    {
+        return Excel::download(new ProductModelTemplateExport(), 'template-model-produk.xlsx');
+    }
+
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv',
+        ]);
+
+        $import = new ProductModelImport();
+        Excel::import($import, $request->file('file'));
+
+        if ($import->failures()->isNotEmpty()) {
+            $first = $import->failures()->first();
+            return $this->errorResponse(
+                422,
+                "Baris {$first->row()}: " . implode(', ', $first->errors())
+            );
+        }
+
+        return $this->successResponse(null);
     }
 
     public function modelColor(Request $request, $id)
