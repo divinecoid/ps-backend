@@ -68,6 +68,7 @@ class InboundController extends Controller
                 ]
             ],
             'details' => $data->details->filter(fn($detail) => !$detail->is_rejected)->map(fn($detail) => [
+                'category' => $detail->category ?? 'sewn',
                 'barcode' => $detail->barcode,
                 'model' => $detail->model?->name,
                 'color' => $detail->color?->name,
@@ -77,6 +78,7 @@ class InboundController extends Controller
                 'rack' => $detail->product?->rack?->code
             ]),
             'rejected_details' => $data->details->filter(fn($detail) => $detail->is_rejected)->map(fn($detail) => [
+                'category' => $detail->category ?? 'sewn',
                 'barcode' => $detail->barcode,
                 'model' => $detail->model?->name,
                 'color' => $detail->color?->name,
@@ -90,6 +92,7 @@ class InboundController extends Controller
                     $detail->color?->name . '|' .
                     $detail->size?->name . '|' .
                     $detail->requestDetail?->request?->serial_number . '|' .
+                    ($detail->category ?? 'sewn') . '|' .
                     ($detail->is_rejected ? '1' : '0');
             })->map(function ($group) {
                 $first = $group->first();
@@ -99,6 +102,7 @@ class InboundController extends Controller
                     'size' => $first->size?->name,
                     'serial_number' => $first->requestDetail?->request?->serial_number,
                     'total_qty' => $group->sum('qty'),
+                    'category' => $first->category ?? 'sewn',
                     'is_reject' => !!$first->is_rejected
                 ];
             })->values()
@@ -110,13 +114,18 @@ class InboundController extends Controller
             $request,
             [
                 'warehouse_id' => ['nullable', Rule::exists('mdx_warehouses', 'id')->whereNull('deleted_at')],
-                'barcodes_dozen' => 'required_without_all:barcodes_piece,barcodes_rejected|array|min:1',
+                'barcodes_dozen' => 'required_without_all:barcodes_piece,barcodes_rejected,manual_items|array|min:1',
                 'barcodes_dozen.*' => 'required|string|distinct',
-                'barcodes_piece' => 'required_without_all:barcodes_dozen,barcodes_rejected|array|min:1',
+                'barcodes_piece' => 'required_without_all:barcodes_dozen,barcodes_rejected,manual_items|array|min:1',
                 'barcodes_piece.*.barcode' => 'required|string|distinct',
                 'barcodes_piece.*.rack_id' => ['required', Rule::exists('mdx_racks', 'id')->whereNull('deleted_at')],
-                'barcodes_rejected' => 'required_without_all:barcodes_dozen,barcodes_piece|array|min:1',
+                'barcodes_rejected' => 'required_without_all:barcodes_dozen,barcodes_piece,manual_items|array|min:1',
                 'barcodes_rejected.*' => 'required|string|distinct',
+                // Items without a QR code, entered by quantity against a request line.
+                'manual_items' => 'required_without_all:barcodes_dozen,barcodes_piece,barcodes_rejected|array|min:1',
+                'manual_items.*.request_detail_id' => ['required', 'uuid', Rule::exists('trx_request_details', 'id')],
+                'manual_items.*.category' => 'required|in:returned_good,returned_defect,extra',
+                'manual_items.*.qty' => 'required|integer|min:1|max:100000',
                 'notes' => 'nullable|string|max:1000',
             ],
             function ($data) {
@@ -129,6 +138,7 @@ class InboundController extends Controller
                 $scannedRejectedBarcodes = [];
 
                 $conflictBarcodes = [];
+                $invalidManualItems = [];
                 try {
 
                     $barcodesDozen = $data['barcodes_dozen'] ?? [];
@@ -246,10 +256,30 @@ class InboundController extends Controller
                             }
                         }
                     }
-                    $totalInvalid = count($invalidDozenBarcodes) + count($invalidPieceBarcodes) + count($scannedDozenBarcodes) + count($scannedPieceBarcodes) + count($invalidRejectedBarcodes) + count($scannedRejectedBarcodes);
+                    // Manual items (no QR): the request line must exist, and returned
+                    // goods can't exceed what is still outstanding on that line.
+                    $manualItems = $data['manual_items'] ?? [];
+                    $returnedPerLine = [];
+                    foreach ($manualItems as $i => $item) {
+                        $line = RequestDetail::find($item['request_detail_id']);
+                        if (!$line) {
+                            $invalidManualItems[] = 'Baris ' . ($i + 1) . ': baris permintaan tidak ditemukan';
+                            continue;
+                        }
+                        $requestsFound = true;
+                        if ($item['category'] !== 'extra') {
+                            $returnedPerLine[$line->id] = ($returnedPerLine[$line->id] ?? 0) + (int) $item['qty'];
+                            $outstanding = $line->req_qty - $line->rec_qty - $line->rec_bs_qty;
+                            if ($returnedPerLine[$line->id] > $outstanding) {
+                                $invalidManualItems[] = 'Baris ' . ($i + 1) . ": jumlah kembali ({$returnedPerLine[$line->id]}) melebihi sisa permintaan ({$outstanding})";
+                            }
+                        }
+                    }
+
+                    $totalInvalid = count($invalidDozenBarcodes) + count($invalidPieceBarcodes) + count($scannedDozenBarcodes) + count($scannedPieceBarcodes) + count($invalidRejectedBarcodes) + count($scannedRejectedBarcodes) + count($invalidManualItems);
                     $totalConflict = count($conflictBarcodes);
                     if ($totalInvalid == 0 && $requestsFound && $totalConflict == 0) {//jika semuanya lolos validasi
-                        DB::transaction(function () use ($data, $barcodesDozen, $barcodesPiece, $barcodesRejected) {
+                        DB::transaction(function () use ($data, $barcodesDozen, $barcodesPiece, $barcodesRejected, $manualItems) {
                             $groupedReceivedLogs = [];
                             $requestsToComplete = [];
 
@@ -303,7 +333,7 @@ class InboundController extends Controller
                                             'warehouse_id' => $warehouseId,
                                             'user_id' => Auth::id(),
                                             'received_date' => now(),
-                                            'notes' => $data['notes']
+                                            'notes' => $data['notes'] ?? null
                                         ]);
                                     }
 
@@ -331,7 +361,7 @@ class InboundController extends Controller
                                             'warehouse_id' => $warehouseId,
                                             'user_id' => Auth::id(),
                                             'received_date' => now(),
-                                            'notes' => $data['notes']
+                                            'notes' => $data['notes'] ?? null
                                         ]);
                                     }
 
@@ -368,7 +398,7 @@ class InboundController extends Controller
                                             'warehouse_id' => $warehouseId,
                                             'user_id' => Auth::id(),
                                             'received_date' => now(),
-                                            'notes' => $data['notes']
+                                            'notes' => $data['notes'] ?? null
                                         ]);
                                     }
 
@@ -382,23 +412,48 @@ class InboundController extends Controller
                                 }
                             }
 
+                            foreach ($manualItems as $item) {
+                                $rd = RequestDetail::with(['request.cmt', 'model', 'cutting.clothes.color', 'size'])->find($item['request_detail_id']);
+                                $req = $rd->request;
+                                $cmtId = $req->cmt_id;
+                                $requestsToComplete[$req->id] = $req;
+
+                                if (!isset($groupedReceivedLogs[$cmtId])) {
+                                    $groupedReceivedLogs[$cmtId] = Receivedlog::create([
+                                        'cmt_id' => $cmtId,
+                                        'warehouse_id' => $warehouseId,
+                                        'user_id' => Auth::id(),
+                                        'received_date' => now(),
+                                        'notes' => $data['notes'] ?? null
+                                    ]);
+                                }
+
+                                $this->createManualReceivedDetail(
+                                    $groupedReceivedLogs[$cmtId],
+                                    $rd,
+                                    $item['category'],
+                                    (int) $item['qty']
+                                );
+                            }
+
                             foreach ($requestsToComplete as $reqId => $req) {
                                 if ($req->isCompleted()) {
                                     $req->update(['status' => 'CLOSED']);
                                 }
                             }
                         });
-                        $totalScanned = count($barcodesDozen) + count($barcodesPiece) + count($barcodesRejected);
+                        $totalScanned = count($barcodesDozen) + count($barcodesPiece) + count($barcodesRejected) + count($manualItems);
 
                         return $this->successResponse([
                             'total_scanned' => $totalScanned,
                         ], "Successfully processed {$totalScanned} items");
                     } else {
-                        return $this->errorResponse(422, $totalInvalid . ' barcode tidak valid, ' . $totalConflict . ' barcode konflik', [
+                        return $this->errorResponse(422, $totalInvalid . ' barcode/item tidak valid, ' . $totalConflict . ' barcode konflik' . ($invalidManualItems ? ' — ' . implode('; ', $invalidManualItems) : ''), [
                             'invalid' => [
                                 'barcodes_dozen' => $invalidDozenBarcodes,
                                 'barcodes_piece' => $invalidPieceBarcodes,
                                 'barcodes_rejected' => $invalidRejectedBarcodes,
+                                'manual_items' => $invalidManualItems,
                             ],
                             'scanned' => [
                                 'barcodes_dozen' => $scannedDozenBarcodes,
@@ -582,44 +637,124 @@ class InboundController extends Controller
         ]);
         $requestDetail->increment('rec_qty', $qty);
         if (!$is_rejected && $group == 'D') {
-            $inventory = Inventory::firstOrCreate([
-                'model_id' => $requestDetail->model_id,
-                'color_id' => $requestDetail->cutting->clothes->color_id,
-                'size_id' => $requestDetail->size_id,
-            ]);
-            if ($inventory->rack_id === null) {
+            $this->addToBigInventory($requestDetail, $series, $qty);
+        }
+    }
+
+    /**
+     * Adds sewn pieces to the big-warehouse inventory (model/color/size, per
+     * series), assigning the default BESAR rack on first use.
+     */
+    private function addToBigInventory($requestDetail, ?string $series, int $qty): void
+    {
+        $inventory = Inventory::firstOrCreate([
+            'model_id' => $requestDetail->model_id,
+            'color_id' => $requestDetail->cutting->clothes->color_id,
+            'size_id' => $requestDetail->size_id,
+        ]);
+        if ($inventory->rack_id === null) {
+            $recRack = \App\Models\MasterData\Rack::whereHas('warehouse', function ($q) {
+                $q->where('type', 'BESAR');
+            })
+                ->where('model_id', $requestDetail->model_id)
+                ->where('color_id', $requestDetail->cutting->clothes->color_id)
+                ->first();
+            if (!$recRack) {
                 $recRack = \App\Models\MasterData\Rack::whereHas('warehouse', function ($q) {
                     $q->where('type', 'BESAR');
                 })
                     ->where('model_id', $requestDetail->model_id)
-                    ->where('color_id', $requestDetail->cutting->clothes->color_id)
+                    ->whereNull('color_id')
                     ->first();
-                if (!$recRack) {
-                    $recRack = \App\Models\MasterData\Rack::whereHas('warehouse', function ($q) {
-                        $q->where('type', 'BESAR');
-                    })
-                        ->where('model_id', $requestDetail->model_id)
-                        ->whereNull('color_id')
-                        ->first();
-                }
-                if (!$recRack) {
-                    $recRack = \App\Models\MasterData\Rack::whereHas('warehouse', function ($q) {
-                        $q->where('type', 'BESAR');
-                    })
-                        ->whereNull('model_id')
-                        ->whereNull('color_id')
-                        ->first();
-                }
-                if ($recRack) {
-                    $inventory->update(['rack_id' => $recRack->id]);
-                }
             }
-            $detail = $inventory->detail()->firstOrCreate(
-                ['series' => $series],
-                ['quantity' => 0]
-            );
-            $detail->increment('quantity', $qty);
+            if (!$recRack) {
+                $recRack = \App\Models\MasterData\Rack::whereHas('warehouse', function ($q) {
+                    $q->where('type', 'BESAR');
+                })
+                    ->whereNull('model_id')
+                    ->whereNull('color_id')
+                    ->first();
+            }
+            if ($recRack) {
+                $inventory->update(['rack_id' => $recRack->id]);
+            }
         }
+        $detail = $inventory->detail()->firstOrCreate(
+            ['series' => $series],
+            ['quantity' => 0]
+        );
+        $detail->increment('quantity', $qty);
+    }
+
+    /**
+     * Records an item that has no QR code, by quantity.
+     *  - returned_good / returned_defect: goods returned UNSEWN. They close out
+     *    the request line (rec_bs_qty) but are not finished goods: no stock and
+     *    no payroll. Defective ones are flagged is_rejected.
+     *  - extra ("barang lebih"): sewn pieces beyond / without QR. They count as
+     *    received (rec_qty), go into big-warehouse stock and are paid in payroll.
+     */
+    private function createManualReceivedDetail($receivedLog, $requestDetail, string $category, int $qty): void
+    {
+        ReceivedlogDetail::create([
+            'receivedlog_id' => $receivedLog->id,
+            'request_detail_id' => $requestDetail->id,
+            'model_id' => $requestDetail->model_id,
+            'color_id' => $requestDetail->cutting->clothes->color_id,
+            'size_id' => $requestDetail->size_id,
+            'qty' => $qty,
+            'barcode' => null,
+            'is_rejected' => $category === 'returned_defect',
+            'category' => $category,
+        ]);
+
+        if ($category === 'extra') {
+            $requestDetail->increment('rec_qty', $qty);
+            $this->addToBigInventory($requestDetail, $this->getSeries((string) $requestDetail->barcode), $qty);
+        } else {
+            $requestDetail->increment('rec_bs_qty', $qty);
+        }
+    }
+
+    /** Open request lines to pick from when receiving goods without a QR code. */
+    public function requestDetails(HttpRequest $request)
+    {
+        $perPage = (int) $request->input('per_page', 50);
+        $search = trim((string) $request->input('search', ''));
+
+        $query = RequestDetail::with(['request.cmt', 'model', 'size', 'cutting.clothes.color'])
+            ->whereHas('request', fn($r) => $r->where(fn($s) => $s->whereNull('status')->orWhere('status', '!=', 'CLOSED')))
+            ->orderByDesc('created_at');
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('request', fn($r) => $r->where('serial_number', 'like', "%{$search}%"))
+                    ->orWhereHas('request.cmt', fn($r) => $r->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
+                    ->orWhereHas('model', fn($r) => $r->where('name', 'like', "%{$search}%")->orWhere('sku', 'like', "%{$search}%"));
+            });
+        }
+
+        $data = $query->paginate($perPage);
+        $items = collect($data->items())->map(function ($d) {
+            $serial = $d->request?->serial_number;
+            $color = $d->cutting?->clothes?->color?->name;
+
+            return [
+                'id' => $d->id,
+                'label' => collect([$serial, $d->request?->cmt?->name, $d->model?->name, $color, $d->size?->name])->filter()->implode(' · '),
+                'serial_number' => $serial,
+                'cmt' => $d->request?->cmt?->name,
+                'model' => $d->model?->name,
+                'color' => $color,
+                'size' => $d->size?->name,
+                'req_qty' => (int) $d->req_qty,
+                'rec_qty' => (int) $d->rec_qty,
+                'rec_bs_qty' => (int) $d->rec_bs_qty,
+                'outstanding_qty' => (int) ($d->req_qty - $d->rec_qty - $d->rec_bs_qty),
+            ];
+        });
+
+        return response()->json($this->paginateResponse($data, $items));
     }
     public function index(HttpRequest $request)
     {

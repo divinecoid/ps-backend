@@ -597,6 +597,7 @@ Route::prefix('fabric-purchase')->middleware(['checkrole', 'acm:pembelian_kain,d
 // Inbound Receiving (Penerimaan CMT)
 Route::prefix('inbound')->middleware(['checkrole', 'acm:penerimaan,read'])->group(function () {
     Route::get('/', [InboundController::class, 'index']);
+    Route::get('/request-details', [InboundController::class, 'requestDetails']);
     Route::get('/{id}', [InboundController::class, 'show']);
 });
 Route::prefix('inbound')->middleware(['checkrole', 'acm:penerimaan,create'])->group(function () {

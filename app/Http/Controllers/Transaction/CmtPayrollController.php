@@ -113,6 +113,8 @@ class CmtPayrollController extends Controller
 
                 $receivedDetails = ReceivedlogDetail::with(['requestDetail.request', 'model.cmtRateGroup'])
                     ->where('is_rejected', false)
+                    // Goods returned unsewn (returned_good / returned_defect) are not paid.
+                    ->whereIn('category', ['sewn', 'extra'])
                     ->whereHas('requestDetail.request', fn($q) => $q->where('cmt_id', $cmt->id))
                     ->whereBetween('created_at', [
                         $data['period_start'] . ' 00:00:00',
