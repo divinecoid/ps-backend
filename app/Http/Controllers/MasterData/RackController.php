@@ -92,6 +92,28 @@ class RackController extends Controller
         );
     }
 
+    /**
+     * Rack picker for the mobile app (Mutasi / Terima Barang): every ACTIVE rack
+     * with just the fields needed to match a scanned QR and show where it is.
+     * Not paginated (a scan has to find any rack) and open to any logged-in
+     * user, unlike the admin-only master-data endpoints.
+     */
+    public function options()
+    {
+        $racks = Rack::with('warehouse:id,name')
+            ->orderBy('code')
+            ->get()
+            ->map(fn(Rack $r) => [
+                'id' => $r->id,
+                'code' => $r->code,
+                'name' => $r->name,
+                'warehouse_id' => $r->warehouse_id,
+                'warehouse' => (object) ['name' => $r->warehouse?->name],
+            ]);
+
+        return $this->successResponse($racks);
+    }
+
     public function show($id)
     {
         return $this->baseShow(

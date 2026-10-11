@@ -28,6 +28,15 @@ class CmtPayrollCalculatorTest extends TestCase
         $this->assertSame(2.5, CmtPayrollCalculator::pcsToLusin(30));
     }
 
+    public function test_every_leftover_is_n_over_12_rounded_to_two_decimals(): void
+    {
+        foreach (range(1, 11) as $pcs) {
+            $this->assertEqualsWithDelta(round($pcs / 12, 2), CmtPayrollCalculator::pcsToLusin($pcs), 0.0001, "{$pcs} pcs");
+        }
+        $this->assertSame(0.67, CmtPayrollCalculator::pcsToLusin(8));
+        $this->assertSame(0.92, CmtPayrollCalculator::pcsToLusin(11));
+    }
+
     public function test_split_dozen(): void
     {
         $this->assertSame([2, 4], CmtPayrollCalculator::splitDozen(28));

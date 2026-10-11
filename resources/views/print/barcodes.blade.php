@@ -17,7 +17,7 @@
         table.grid {
             width: 100%;
             border-collapse: separate;
-            border-spacing: {{ ($style ?? 'hangtag') === 'rack' ? '0' : '4px' }};
+            border-spacing: {{ in_array(($style ?? 'hangtag'), ['rack', 'rack-bulk']) ? '0' : '4px' }};
             table-layout: fixed;
         }
         table.grid td {
@@ -97,9 +97,10 @@
         }
         /* Rack shelf labels — deliberately plain/high-contrast (not the
          * rounded colorful hangtag card): a sharp-cornered tag meant to be
-         * read at a glance from across an aisle. Two variants: a single big
-         * tag ("rack") for one-off printing, and a dense A4 grid
-         * ("rack-bulk", ~20 tags/page) for printing many racks at once. */
+         * read at a glance from across an aisle. Both variants use the same
+         * 50 x 40mm card: a single one-off label ("rack", the PDF page IS the
+         * label) and an A4 sheet of them ("rack-bulk": 4 columns x 7 rows =
+         * 28 labels/page, ~0.5mm between columns, none between rows). */
         /* Single rack label = exactly 50 x 40mm INCLUDING the border. dompdf
          * sizes boxes as content-box, so content = total - border - padding:
          * width 50 - 2*0.3 - 2*2 = 45.4mm, height 40 - 2*0.3 - 2 = 37.4mm
@@ -147,35 +148,6 @@
             font-weight: bold;
             color: #000;
         }
-        .cell-rack-bulk {
-            background-color: #fff;
-            border: 1px solid #111;
-            border-radius: 2mm;
-            padding: 3mm 2mm;
-        }
-        .cell-rack-bulk .qr {
-            width: 36mm;
-            height: 36mm;
-        }
-        .cell-rack-bulk .rack-label {
-            font-size: 10px;
-            font-weight: bold;
-            letter-spacing: 0.2px;
-            margin-top: 2mm;
-            white-space: normal;
-            word-break: break-word;
-            line-height: 1.2;
-            max-height: 8.5mm;
-            overflow: hidden;
-        }
-        .cell-rack-bulk .rack-sublabel {
-            font-size: 7px;
-            color: #555;
-            margin-top: 0.5mm;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
     </style>
 </head>
 <body>
@@ -200,7 +172,7 @@
             $isRackSingle = $styleName === 'rack';
             $isRackBulk = $styleName === 'rack-bulk';
             $cols = $isRackSingle ? 1 : ($isRackBulk ? 4 : 5);
-            $cellClass = $isRackSingle ? 'cell-rack-single' : ($isRackBulk ? 'cell-rack-bulk' : ($styleName === 'compact' ? 'cell-piece-compact' : 'cell-piece'));
+            $cellClass = ($isRackSingle || $isRackBulk) ? 'cell-rack-single' : ($styleName === 'compact' ? 'cell-piece-compact' : 'cell-piece');
         @endphp
         @foreach ($barcodes->chunk($cols) as $row)
             <tr>

@@ -12,8 +12,8 @@ class CmtPayrollCalculator
     /**
      * Maps leftover pieces (1-11, not making a full dozen) to their paid
      * lusin-equivalent fraction, per the CMT's "HITUNGAN PCS" convention
-     * (e.g. 5 pcs is paid as 0.42, not 5/12 = 0.4167). Sourced from
-     * Rincian Penggajian CMT.
+     * (e.g. 5 pcs is paid as 0.42, not 5/12 = 0.4167). Every entry is n/12
+     * rounded to 2 decimals (8 => 0.67, 11 => 0.92; confirmed by the client).
      */
     public const PIECE_TO_LUSIN = [
         1 => 0.08,
@@ -23,10 +23,10 @@ class CmtPayrollCalculator
         5 => 0.42,
         6 => 0.5,
         7 => 0.58,
-        8 => 0.66,
+        8 => 0.67,
         9 => 0.75,
         10 => 0.83,
-        11 => 0.93,
+        11 => 0.92,
     ];
 
     /**
