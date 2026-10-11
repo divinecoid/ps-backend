@@ -1,0 +1,64 @@
+# Dokploy "Docker Compose" service for ps-backend (https://ps-be.divine.co.id).
+# Env vars (APP_KEY, DB_*, JWT_SECRET, ...) are set in Dokploy → Environment,
+# NOT in this repo. Required: APP_ENV, APP_KEY, APP_URL, DB_HOST, DB_PORT,
+# DB_DATABASE, DB_USERNAME, DB_PASSWORD, JWT_SECRET (+ the marketplace/mail keys
+# the current server .env has).
+x-app: &app
+  build:
+    context: .
+  image: ps-backend:latest
+  restart: unless-stopped
+  env_file: []
+  environment: &env
+    APP_ENV: ${APP_ENV:-production}
+    APP_DEBUG: ${APP_DEBUG:-false}
+    APP_KEY: ${APP_KEY}
+    APP_URL: ${APP_URL:-https://ps-be.divine.co.id}
+    DB_CONNECTION: mysql
+    DB_HOST: ${DB_HOST:-host.docker.internal}
+    DB_PORT: ${DB_PORT:-3306}
+    DB_DATABASE: ${DB_DATABASE}
+    DB_USERNAME: ${DB_USERNAME}
+    DB_PASSWORD: ${DB_PASSWORD}
+    JWT_SECRET: ${JWT_SECRET}
+    SESSION_DRIVER: database
+    QUEUE_CONNECTION: database
+    CACHE_STORE: database
+    FILESYSTEM_DISK: local
+    LOG_CHANNEL: stderr
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  volumes:
+    - ps-backend-storage:/var/www/html/storage/app
+
+services:
+  ps-backend:
+    <<: *app
+    container_name: ps-backend
+    environment:
+      <<: *env
+      PHP_OPCACHE_ENABLE: "1"
+    # Temporary port for testing next to the live nginx/php-fpm backend.
+    # Once verified, route ps-be.divine.co.id to this service in Dokploy
+    # (Domains tab, container port 8080) and drop this mapping.
+    ports:
+      - "8098:8080"
+
+  # Replaces the missing `queue:work` process (QUEUE_CONNECTION=database).
+  ps-backend-queue:
+    <<: *app
+    container_name: ps-backend-queue
+    command: ["php", "/var/www/html/artisan", "queue:work", "--sleep=3", "--tries=3", "--max-time=3600"]
+    healthcheck:
+      disable: true
+
+  # Replaces the root crontab `schedule:run` every minute.
+  ps-backend-scheduler:
+    <<: *app
+    container_name: ps-backend-scheduler
+    command: ["php", "/var/www/html/artisan", "schedule:work"]
+    healthcheck:
+      disable: true
+
+volumes:
+  ps-backend-storage:
