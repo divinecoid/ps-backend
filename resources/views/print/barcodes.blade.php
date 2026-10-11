@@ -60,12 +60,14 @@
             width: 30mm;
             height: 30mm;
         }
-        /* Hangtag dozen cards: 5 columns x exactly 5 rows on A4. The natural card
-         * is ~47.1mm tall, which left ~5cm blank under the 5th row; the extra
-         * vertical padding stretches each card to ~56.5mm so 5 rows + spacing
-         * fill the 289mm printable height (~0.2mm slack, measured on dompdf; re-render if you change it). */
+        /* Hangtag dozen cards: 5 columns x exactly 6 rows (30/page) on A4. The
+         * default card (3mm vertical padding) is ~47.1mm tall; 6 of them just
+         * overflow the 289mm printable height, so dompdf pushed the 6th row to
+         * the next page and left ~5cm blank under row 5. 2.8mm padding makes the
+         * card ~46.5mm so 6 rows + spacing fit (measured on dompdf: 2.9mm still
+         * fits, 2.95mm doesn't; 2.8 leaves ~1.5mm slack). Re-render if changed. */
         .cell-dozen-hangtag {
-            padding: 7.72mm 2mm;
+            padding: 2.8mm 2mm;
         }
         .cell-dozen-compact {
             padding: 3mm 2mm;
