@@ -12,6 +12,7 @@ use App\Models\MasterData\ProductModel;
 use App\Models\MasterData\Rack;
 use App\Models\MasterData\Size;
 use App\Models\Transactions\RequestDetail;
+use App\Services\LegacyStockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use DB;
@@ -386,15 +387,15 @@ class ProductController extends Controller
                         $line['number'] + $i,
                     ]);
 
-                    Product::create([
-                        'id' => (string) Str::uuid(),
+                    app(LegacyStockService::class)->register([
                         'model_id' => $line['model_id'],
-                        'rack_id' => $line['rack_id'],
                         'color_id' => $line['color_id'],
                         'size_id' => $line['size_id'],
+                        'rack_id' => $line['rack_id'],
                         'series' => $series,
                         'barcode' => $barcode,
-                        'stock_batch_id' => $batchId,
+                        'type' => $line['type'],
+                        'batch_id' => $batchId,
                     ]);
 
                     $count++;

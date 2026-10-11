@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Transaction;
 
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
+use App\Models\MasterData\CMT;
 use App\Models\MasterData\InventoryDetail;
 use App\Models\MasterData\Product;
 use App\Models\Transactions\Receivedlog;
 use App\Models\Transactions\ReceivedlogDetail;
 use App\Models\Transactions\RequestDetail;
+use App\Services\LegacyStockService;
 use Illuminate\Support\Facades\Auth;
 use DB;
 use Illuminate\Http\Request as HttpRequest;
@@ -88,6 +90,10 @@ class MutationController extends Controller
 
                     $invalidBarcodes = [];
                     $scannedBarcodes = [];
+                    // Old-stock ("stok lama") barcodes have no CMT request: they are
+                    // moved out of the big warehouse using their Product row instead.
+                    $legacyProducts = [];
+                    $currentRequest = null;
 
                     $seen = [];
 
@@ -106,8 +112,15 @@ class MutationController extends Controller
                             ['prefix' => $prefix, 'group' => $group, 'sequence' => $sequence] = $this->parseBarcode($barcode);
                             if ($group == 'P') {
                                 $requestDetail = $this->findRequestDetail($prefix);
-                                if (!$requestDetail) {//cek jika barcode ditemukan di database
-                                    $invalidBarcodes[] = $barcode;
+                                if (!$requestDetail) {
+                                    $legacy = $this->findLegacyProduct($barcode);
+                                    if (!$legacy) {//cek jika barcode ditemukan di database
+                                        $invalidBarcodes[] = $barcode;
+                                    } elseif ($legacy->rack_id !== null) {//stok lama yang sudah dipindah / sudah punya rak
+                                        $scannedBarcodes[] = $barcode;
+                                    } else {
+                                        $legacyProducts[$barcode] = $legacy;
+                                    }
                                     continue;
                                 }
 
@@ -137,11 +150,14 @@ class MutationController extends Controller
                     }
 
                     $totalInvalid = count($invalidBarcodes) + count($scannedBarcodes);
-                    if ($totalInvalid == 0 && $currentRequest !== null) {//jika semuanya lolos validasi
-                        DB::transaction(function () use ($data, $currentRequest) {
+                    if ($totalInvalid == 0 && ($currentRequest !== null || !empty($legacyProducts))) {//jika semuanya lolos validasi
+                        DB::transaction(function () use ($data, $currentRequest, $legacyProducts) {
+                            $cmtId = $currentRequest?->cmt_id
+                                ?? CMT::where('code', explode('|', array_key_first($legacyProducts))[0])->value('id')
+                                ?? CMT::value('id');
                             $log = Receivedlog::create([
-                                'cmt_id' => $currentRequest->cmt_id,
-                                'request_id' => $currentRequest->id,
+                                'cmt_id' => $cmtId,
+                                'request_id' => $currentRequest?->id,
                                 'user_id' => Auth::id(),
                                 'received_date' => now(),
                                 'notes' => '[MUTATION] ' . ($data['notes'] ?? '')
@@ -151,6 +167,13 @@ class MutationController extends Controller
                                 foreach ($item['barcodes'] as $barcode) {
                                     ['prefix' => $prefix] = $this->parseBarcode($barcode);
                                     $series = $this->getSeries($prefix);
+                                    if (isset($legacyProducts[$barcode])) {
+                                        // Old stock: move the existing Product into the chosen
+                                        // small-warehouse rack and take 1 pc out of the big warehouse.
+                                        $legacyProducts[$barcode]->update(['rack_id' => $item['rack_id']]);
+                                        app(LegacyStockService::class)->deductOnePiece($legacyProducts[$barcode]);
+                                        continue;
+                                    }
                                     if ($rd = $this->findRequestDetail($prefix)) {
                                         ReceivedlogDetail::create([
                                             'receivedlog_id' => $log->id,
@@ -216,6 +239,15 @@ class MutationController extends Controller
         ])->where('barcode', $prefix)->first();
     }
 
+    /** Old-stock Product (has a stock_batch_id) still sitting in the big warehouse (no rack yet). */
+    private function findLegacyProduct(string $barcode): ?Product
+    {
+        return Product::with(['model', 'color', 'size'])
+            ->where('barcode', $barcode)
+            ->whereNotNull('stock_batch_id')
+            ->first();
+    }
+
     private function parseBarcode(string $barcode)
     {
         $parts = explode('|', $barcode);
@@ -238,8 +270,31 @@ class MutationController extends Controller
                 ['prefix' => $prefix, 'group' => $group, 'sequence' => $sequence] = $this->parseBarcode($barcode);
 
                 $requestDetail = $this->findRequestDetail($prefix);
-                if (!$requestDetail) {//cek jika barcode ditemukan di database
-                    return $this->errorResponse(422, 'Barcode tidak valid');
+                if (!$requestDetail) {
+                    // Old-stock barcode (Input Stok Lama): no CMT request, identified by its Product row.
+                    $legacy = $this->findLegacyProduct($barcode);
+                    if (!$legacy) {//cek jika barcode ditemukan di database
+                        return $this->errorResponse(422, 'Barcode tidak valid');
+                    }
+                    if ($group !== 'P') {
+                        return $this->errorResponse(422, 'Barcode bukan merupakan barcode piece');
+                    }
+                    if ($legacy->rack_id !== null) {
+                        return $this->errorResponse(422, 'Barcode sudah discan');
+                    }
+                    $cmt = CMT::where('code', explode('|', $barcode)[0])->first();
+                    return $this->successResponse([
+                        'cmt' => (object) [
+                            'code' => $cmt?->code,
+                            'name' => $cmt?->name,
+                            'contact_person' => $cmt?->contact_person,
+                            'phone' => $cmt?->phone,
+                            'address' => $cmt?->address,
+                        ],
+                        'model' => (object) ['sku' => $legacy->model?->sku, 'name' => $legacy->model?->name],
+                        'color' => (object) ['code' => $legacy->color?->code, 'name' => $legacy->color?->name],
+                        'size' => (object) ['code' => $legacy->size?->code, 'name' => $legacy->size?->name],
+                    ]);
                 }
                 //jika group dan total item dalam group lebih besar daripada yang diterima atau sequence lebih besar daripada 12
                 //cek jika barcode group diluar jangkauan, jika group sekarang dikali 12 -> menjadi total piece, lebih besar dari kuantitas yang diminta atau sequence per group lebih dari 12
