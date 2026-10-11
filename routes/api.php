@@ -376,6 +376,8 @@ Route::prefix('inventory')->middleware(['checkrole', 'acm:gudang_besar,force_del
 Route::get('/rack-stock', [RackStockController::class, 'byCode'])->middleware('checkrole');
 
 //Rack
+// Light-weight picker for the mobile app; must be registered before the {id} routes below.
+Route::get('/rack/options', [RackController::class, 'options'])->middleware('checkrole');
 Route::prefix('rack')->middleware(['checkrole:admin', 'acm:master_rak,read'])->group(function () {
     Route::get('/', [RackController::class, 'index']);
     Route::get('/master', [RackController::class, 'master']);
