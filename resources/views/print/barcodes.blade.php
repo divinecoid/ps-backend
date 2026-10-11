@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <style>
         @page {
-            margin: 4mm;
+            margin: {{ ($style ?? 'hangtag') === 'rack' ? '0' : '4mm' }};
         }
         * {
             box-sizing: border-box;
@@ -17,7 +17,7 @@
         table.grid {
             width: 100%;
             border-collapse: separate;
-            border-spacing: 4px;
+            border-spacing: {{ ($style ?? 'hangtag') === 'rack' ? '0' : '4px' }};
             table-layout: fixed;
         }
         table.grid td {
@@ -93,32 +93,52 @@
          * read at a glance from across an aisle. Two variants: a single big
          * tag ("rack") for one-off printing, and a dense A4 grid
          * ("rack-bulk", ~20 tags/page) for printing many racks at once. */
+        /* Single rack label = exactly 50 x 40mm INCLUDING the border. dompdf
+         * sizes boxes as content-box, so content = total - border - padding:
+         * width 50 - 2*0.3 - 2*2 = 45.4mm, height 40 - 2*0.3 - 2 = 37.4mm
+         * (minus a hair of slack so it never spills onto a 2nd page). */
         .cell-rack-single {
-            border: 1.5px solid #111;
-            border-radius: 4px;
-            padding: 10mm 8mm;
-            max-width: 80mm;
-            margin: 0 auto;
+            box-sizing: content-box;
+            width: 45.4mm;
+            height: 37.1mm;
+            border: 0.3mm solid #111;
+            border-radius: 0;
+            padding: 2mm 2mm 0;
+            margin: 0;
+            overflow: hidden;
         }
         .cell-rack-single .qr {
-            width: 45mm;
-            height: 45mm;
+            width: 17.5mm;
+            height: 17.5mm;
         }
         .cell-rack-single .rack-label {
-            font-size: 16px;
+            font-size: 9px;
             font-weight: bold;
-            letter-spacing: 0.3px;
-            margin-top: 3mm;
+            margin-top: 1mm;
             white-space: normal;
             word-break: break-word;
-            line-height: 1.25;
+            line-height: 1.15;
+            max-height: 6mm;
+            overflow: hidden;
         }
-        .cell-rack-single .rack-sublabel {
-            font-size: 10px;
-            color: #555;
-            margin-top: 1.5mm;
+        /* Every text block is height-capped (2 lines max, rest is clipped):
+         * dompdf won't clip the card itself, so unbounded text would push
+         * the label onto a 2nd page. Budget: 2 + 17.5 + 1 + 6 + 2*(0.5+4.4)
+         * = 36.3mm of the 37.1mm available. */
+        .cell-rack-single .rack-sublabel,
+        .cell-rack-single .rack-detail {
+            font-size: 6.5px;
+            color: #333;
+            margin-top: 0.5mm;
             white-space: normal;
             word-break: break-word;
+            line-height: 1.15;
+            max-height: 4.4mm;
+            overflow: hidden;
+        }
+        .cell-rack-single .rack-detail {
+            font-weight: bold;
+            color: #000;
         }
         .cell-rack-bulk {
             background-color: #fff;
@@ -185,6 +205,9 @@
                                 <div class="rack-label">{{ $code['label'] ?? $code['code'] }}</div>
                                 @if (!empty($code['sublabel']))
                                     <div class="rack-sublabel">{{ $code['sublabel'] }}</div>
+                                @endif
+                                @if (!empty($code['detail']))
+                                    <div class="rack-detail">{{ $code['detail'] }}</div>
                                 @endif
                             @else
                                 <div class="label">{{ $code['serial_number'] }}{{ !empty($code['model']) ? ' - ' . $code['model'] : '' }} - {{ $code['cutting'] }}{{ !empty($code['color']) ? ' - ' . $code['color'] : '' }} - {{ $code['sizes'] }}</div>

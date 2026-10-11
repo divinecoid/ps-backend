@@ -9,6 +9,7 @@ use App\Models\MasterData\CmtModelRate;
 use App\Models\Transactions\CmtPayroll;
 use App\Models\Transactions\CmtPayrollDetail;
 use App\Models\Transactions\ReceivedlogDetail;
+use App\Services\CmtPayrollCalculator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -17,37 +18,12 @@ class CmtPayrollController extends Controller
 {
     use CrudTrait;
 
-    /**
-     * Maps leftover pieces (1-11, not making a full dozen) to their paid
-     * lusin-equivalent fraction, per the CMT's "HITUNGAN PCS" convention
-     * (e.g. 3 loose pcs is paid as 0.25 lusin, not 3/12 = 0.25... but 5 pcs
-     * is paid as 0.42, not 0.4167). Sourced from Rincian Penggajian CMT.
-     */
-    private const PIECE_TO_LUSIN = [
-        1 => 0.08,
-        2 => 0.17,
-        3 => 0.25,
-        4 => 0.33,
-        5 => 0.42,
-        6 => 0.5,
-        7 => 0.58,
-        8 => 0.66,
-        9 => 0.75,
-        10 => 0.83,
-        11 => 0.93,
-    ];
+    /** Relations needed to render a payroll via structure(). */
+    private const RELATIONS = ['cmt', 'details.model', 'details.requestDetail.request'];
 
-    /**
-     * Converts a piece quantity into its paid lusin (dozen) equivalent:
-     * full dozens count as 1.0 lusin each, and any leftover pieces are
-     * converted via the fixed CMT piece-to-lusin table above.
-     */
     private function pcsToLusin(int $pcs): float
     {
-        $dozens = intdiv($pcs, 12);
-        $remainder = $pcs % 12;
-
-        return $dozens + (self::PIECE_TO_LUSIN[$remainder] ?? 0);
+        return CmtPayrollCalculator::pcsToLusin($pcs);
     }
 
     private function structure()
@@ -69,8 +45,11 @@ class CmtPayrollController extends Controller
             'created_at' => $data->created_at,
             'details' => $data->details->map(fn(CmtPayrollDetail $d) => [
                 'id' => $d->id,
+                'serial_number' => $d->requestDetail?->request?->serial_number,
                 'model' => $d->model?->name,
                 'qty' => $d->qty,
+                'qty_dozen' => CmtPayrollCalculator::splitDozen((int) $d->qty)[0],
+                'qty_piece' => CmtPayrollCalculator::splitDozen((int) $d->qty)[1],
                 'qty_lusin' => $d->qty_lusin,
                 'unit_fee' => $d->unit_fee,
                 'amount' => $d->amount,
@@ -83,7 +62,7 @@ class CmtPayrollController extends Controller
         return $this->baseIndex(
             $request,
             CmtPayroll::class,
-            ['cmt', 'details.model'],
+            self::RELATIONS,
             ['cmt.code', 'cmt.name', 'status'],
             $this->structure(),
             null,
@@ -96,7 +75,7 @@ class CmtPayrollController extends Controller
         return $this->baseShow(
             CmtPayroll::class,
             $id,
-            ['cmt', 'details.model'],
+            self::RELATIONS,
             $this->structure()
         );
     }
@@ -125,8 +104,12 @@ class CmtPayrollController extends Controller
             function ($data) {
                 $cmt = CMT::findOrFail($data['cmt_id']);
 
+                // Scans already paid: legacy one-row-per-scan details store the id
+                // on the detail itself; grouped details record each scan in the
+                // detail_items table.
                 $alreadyPaidDetailIds = CmtPayrollDetail::whereNotNull('received_log_detail_id')
-                    ->pluck('received_log_detail_id');
+                    ->pluck('received_log_detail_id')
+                    ->merge(DB::table('trx_cmt_payroll_detail_items')->pluck('received_log_detail_id'));
 
                 $receivedDetails = ReceivedlogDetail::with(['requestDetail.request', 'model.cmtRateGroup'])
                     ->where('is_rejected', false)
@@ -155,46 +138,53 @@ class CmtPayrollController extends Controller
                     $rateMap = CmtModelRate::where('kategori', $cmt->kategori)
                         ->pluck('rate', 'group_id');
 
-                    $rows = [];
+                    // One payroll row per seri + model (not per scanned barcode):
+                    // quantities are summed first, THEN converted to lusin.
+                    $groups = CmtPayrollCalculator::group(
+                        $receivedDetails->map(function ($rd) use ($rateMap) {
+                            $groupId = $rd->model?->cmt_rate_group_id;
+
+                            return [
+                                'id' => $rd->id,
+                                'request_id' => $rd->requestDetail?->request_id,
+                                'request_detail_id' => $rd->request_detail_id,
+                                'model_id' => $rd->model_id,
+                                'qty' => (int) $rd->qty,
+                                'rate' => $groupId ? $rateMap->get($groupId) : null,
+                                // Fallback: legacy manual per-piece fee (no master rate configured yet).
+                                'fallback_unit_fee' => (float) ($rd->requestDetail?->unit_fee ?? 0),
+                            ];
+                        })
+                    );
+
                     $totalPcs = 0;
                     $totalAmount = 0;
+                    $now = now();
 
-                    foreach ($receivedDetails as $rd) {
-                        $requestDetail = $rd->requestDetail;
-                        $groupId = $rd->model?->cmt_rate_group_id;
-                        $modelRate = $groupId ? $rateMap->get($groupId) : null;
-                        $qty = (int) $rd->qty;
-
-                        if ($modelRate !== null) {
-                            $qtyLusin = $this->pcsToLusin($qty);
-                            $unitFee = (float) $modelRate;
-                            $amount = round($unitFee * $qtyLusin, 2);
-                        } else {
-                            // Fallback: legacy manual per-piece fee (no master rate configured yet).
-                            $qtyLusin = null;
-                            $unitFee = (float) ($requestDetail?->unit_fee ?? 0);
-                            $amount = round($unitFee * $qty, 2);
-                        }
-
-                        $rows[] = [
-                            'id' => (string) Str::uuid(),
+                    foreach ($groups as $g) {
+                        $detail = CmtPayrollDetail::create([
                             'cmt_payroll_id' => $payroll->id,
-                            'request_detail_id' => $requestDetail?->id,
-                            'received_log_detail_id' => $rd->id,
-                            'model_id' => $rd->model_id,
-                            'qty' => $qty,
-                            'qty_lusin' => $qtyLusin,
-                            'unit_fee' => $unitFee,
-                            'amount' => $amount,
-                            'created_at' => now(),
-                            'updated_at' => now(),
-                        ];
+                            'request_detail_id' => $g['request_detail_id'],
+                            'model_id' => $g['model_id'],
+                            'qty' => $g['qty'],
+                            'qty_lusin' => $g['qty_lusin'],
+                            'unit_fee' => $g['unit_fee'],
+                            'amount' => $g['amount'],
+                        ]);
 
-                        $totalPcs += $qty;
-                        $totalAmount += $amount;
+                        DB::table('trx_cmt_payroll_detail_items')->insert(
+                            array_map(fn($rdId) => [
+                                'id' => (string) Str::uuid(),
+                                'cmt_payroll_detail_id' => $detail->id,
+                                'received_log_detail_id' => $rdId,
+                                'created_at' => $now,
+                                'updated_at' => $now,
+                            ], $g['received_log_detail_ids'])
+                        );
+
+                        $totalPcs += $g['qty'];
+                        $totalAmount += $g['amount'];
                     }
-
-                    CmtPayrollDetail::insert($rows);
 
                     $payroll->update([
                         'total_pcs' => $totalPcs,
@@ -202,7 +192,7 @@ class CmtPayrollController extends Controller
                     ]);
 
                     return $this->successResponse(
-                        ($this->structure())($payroll->fresh(['cmt', 'details.model']))
+                        ($this->structure())($payroll->fresh(self::RELATIONS))
                     );
                 });
             }
@@ -249,7 +239,7 @@ class CmtPayrollController extends Controller
                     'total_amount' => $payroll->details()->sum('amount'),
                 ]);
 
-                return $this->successResponse(($this->structure())($payroll->fresh(['cmt', 'details.model'])));
+                return $this->successResponse(($this->structure())($payroll->fresh(self::RELATIONS)));
             }
         );
     }
@@ -261,7 +251,7 @@ class CmtPayrollController extends Controller
             return $this->errorResponse(422, 'Hanya payroll berstatus draft yang bisa disetujui.');
         }
         $payroll->update(['status' => 'approved']);
-        return $this->successResponse(($this->structure())($payroll->fresh(['cmt', 'details.model'])));
+        return $this->successResponse(($this->structure())($payroll->fresh(self::RELATIONS)));
     }
 
     public function markPaid($id)
@@ -271,7 +261,7 @@ class CmtPayrollController extends Controller
             return $this->errorResponse(422, 'Hanya payroll berstatus approved yang bisa ditandai lunas.');
         }
         $payroll->update(['status' => 'paid', 'is_paid' => true, 'paid_at' => now()]);
-        return $this->successResponse(($this->structure())($payroll->fresh(['cmt', 'details.model'])));
+        return $this->successResponse(($this->structure())($payroll->fresh(self::RELATIONS)));
     }
 
     /**
@@ -285,7 +275,7 @@ class CmtPayrollController extends Controller
             return $this->errorResponse(422, 'Payroll ini belum ditandai lunas.');
         }
         $payroll->update(['status' => 'approved', 'is_paid' => false, 'paid_at' => null]);
-        return $this->successResponse(($this->structure())($payroll->fresh(['cmt', 'details.model'])));
+        return $this->successResponse(($this->structure())($payroll->fresh(self::RELATIONS)));
     }
 
     public function destroy($id)

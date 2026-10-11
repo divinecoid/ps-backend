@@ -21,6 +21,7 @@ class PrintController extends Controller
             'barcodes.*.model' => 'nullable|string',
             'barcodes.*.label' => 'nullable|string',
             'barcodes.*.sublabel' => 'nullable|string',
+            'barcodes.*.detail' => 'nullable|string',
             'dozenBarcodes' => 'nullable|array',
             'dozenBarcodes.*.code' => 'required_with:dozenBarcodes|string',
             'dozenBarcodes.*.serial_number' => 'nullable|string',
@@ -60,7 +61,12 @@ class PrintController extends Controller
         $paperWidthMm = $data['paper']['width'];
         $paperHeightMm = $data['paper']['height'];
 
-        if ($style !== 'rack') {
+        if ($style === 'rack') {
+            // Single rack label: the PDF page IS the label, 5cm wide x 4cm
+            // tall including its border (client spec for the shelf stickers).
+            $paperWidthMm = 50;
+            $paperHeightMm = 40;
+        } else {
             // Real A4 paper — printed on an actual printer, not a giant
             // continuous roll. Cards use fixed mm sizing (see
             // barcodes.blade.php) so dompdf's page-break math lines up
