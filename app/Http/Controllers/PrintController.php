@@ -60,7 +60,7 @@ class PrintController extends Controller
         $paperWidthMm = $data['paper']['width'];
         $paperHeightMm = $data['paper']['height'];
 
-        if ($style === 'compact' || $style === 'rack-bulk') {
+        if ($style !== 'rack') {
             // Real A4 paper — printed on an actual printer, not a giant
             // continuous roll. Cards use fixed mm sizing (see
             // barcodes.blade.php) so dompdf's page-break math lines up
