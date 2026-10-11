@@ -8,6 +8,7 @@ use App\Models\MasterData\Product;
 use App\Models\MasterData\ProductModel;
 use App\Models\MasterData\Rack;
 use App\Models\MasterData\Size;
+use App\Services\LegacyStockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -47,6 +48,8 @@ class ProductSeederController extends Controller
         $baseTime = now();
         $batchId = (string) Str::uuid();
 
+        // Product rows + big-warehouse stock must be saved together.
+        \Illuminate\Support\Facades\DB::transaction(function () use ($request, $model, $color, $size, $cmt, &$barcodes, $baseTime, $batchId) {
         for ($i = 0; $i < $request->qty; $i++) {
             $series = $baseTime->copy()->addSeconds($i)->format('YmdHis');
             $barcode = implode('|', [
@@ -59,19 +62,20 @@ class ProductSeederController extends Controller
                 $request->number + $i // Increment piece/dozen number for multiple items
             ]);
 
-            Product::create([
-                'id' => (string) Str::uuid(),
+            app(LegacyStockService::class)->register([
                 'model_id' => $request->model_id,
-                'rack_id' => $request->rack_id,
                 'color_id' => $request->color_id,
                 'size_id' => $request->size_id,
+                'rack_id' => $request->rack_id,
                 'series' => $series,
                 'barcode' => $barcode,
-                'stock_batch_id' => $batchId,
+                'type' => $request->type,
+                'batch_id' => $batchId,
             ]);
 
             $barcodes[] = $barcode;
         }
+        });
 
         $models = ProductModel::orderBy('name')->get();
         $colors = Color::orderBy('name')->get();
@@ -271,15 +275,15 @@ HTML;
                     $request->number + $i
                 ]);
 
-                Product::create([
-                    'id' => (string) Str::uuid(),
+                app(LegacyStockService::class)->register([
                     'model_id' => $request->model_id,
-                    'rack_id' => $request->rack_id,
                     'color_id' => $request->color_id,
                     'size_id' => $request->size_id,
+                    'rack_id' => $request->rack_id,
                     'series' => $series,
                     'barcode' => $barcode,
-                    'stock_batch_id' => $batchId,
+                    'type' => $request->type,
+                    'batch_id' => $batchId,
                 ]);
 
                 $barcodes[] = $barcode;
