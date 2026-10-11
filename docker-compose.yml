@@ -15,7 +15,8 @@ x-app: &app
     APP_KEY: ${APP_KEY}
     APP_URL: ${APP_URL:-https://ps-be.divine.co.id}
     DB_CONNECTION: mysql
-    DB_HOST: ${DB_HOST:-host.docker.internal}
+    # Internal hostname of the Dokploy MariaDB service (shown on its page).
+    DB_HOST: ${DB_HOST}
     DB_PORT: ${DB_PORT:-3306}
     DB_DATABASE: ${DB_DATABASE}
     DB_USERNAME: ${DB_USERNAME}
@@ -26,8 +27,8 @@ x-app: &app
     CACHE_STORE: database
     FILESYSTEM_DISK: local
     LOG_CHANNEL: stderr
-  extra_hosts:
-    - "host.docker.internal:host-gateway"
+  networks:
+    - dokploy-network
   volumes:
     - ps-backend-storage:/var/www/html/storage/app
 
@@ -62,3 +63,8 @@ services:
 
 volumes:
   ps-backend-storage:
+
+# Dokploy databases live on this network; joining it lets DB_HOST resolve.
+networks:
+  dokploy-network:
+    external: true
