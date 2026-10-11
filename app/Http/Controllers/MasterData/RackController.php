@@ -42,6 +42,12 @@ class RackController extends Controller
     private function filterByModel(Request $request)
     {
         return function ($query) use ($request) {
+            if ($request->filled('code')) {
+                $query->where('code', 'like', '%' . trim($request->input('code')) . '%');
+            }
+            if ($request->filled('name')) {
+                $query->where('name', 'like', '%' . trim($request->input('name')) . '%');
+            }
             if ($request->filled('warehouse_id')) {
                 $query->where('warehouse_id', $request->input('warehouse_id'));
             }
