@@ -60,6 +60,13 @@
             width: 30mm;
             height: 30mm;
         }
+        /* Hangtag dozen cards: 5 columns x exactly 5 rows on A4. The natural card
+         * is ~47.1mm tall, which left ~5cm blank under the 5th row; the extra
+         * vertical padding stretches each card to ~56.5mm so 5 rows + spacing
+         * fill the 289mm printable height (~0.2mm slack, measured on dompdf; re-render if you change it). */
+        .cell-dozen-hangtag {
+            padding: 7.72mm 2mm;
+        }
         .cell-dozen-compact {
             padding: 3mm 2mm;
         }
@@ -177,7 +184,7 @@
             <tr>
                 @foreach ($row as $code)
                     <td>
-                        <div class="cell cell-dozen {{ ($style ?? 'hangtag') === 'compact' ? 'cell-dozen-compact' : '' }}">
+                        <div class="cell cell-dozen {{ ($style ?? 'hangtag') === 'compact' ? 'cell-dozen-compact' : 'cell-dozen-hangtag' }}">
                             <img class="qr" src="{{ $code['qr'] }}">
                             <div class="label">{{ $code['serial_number'] }}{{ !empty($code['model']) ? ' - ' . $code['model'] : '' }} - {{ $code['cutting'] }}{{ !empty($code['color']) ? ' - ' . $code['color'] : '' }} - {{ $code['sizes'] }}</div>
                         </div>
