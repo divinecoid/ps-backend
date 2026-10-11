@@ -25,7 +25,8 @@ class ReceivedlogDetail extends Model
         'size_id',
         'qty',
         'barcode',
-        'is_rejected'
+        'is_rejected',
+        'category',
     ];
 
     // Relationships
