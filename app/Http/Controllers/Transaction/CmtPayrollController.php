@@ -115,6 +115,12 @@ class CmtPayrollController extends Controller
                     ->where('is_rejected', false)
                     // Goods returned unsewn (returned_good / returned_defect) are not paid.
                     ->whereIn('category', ['sewn', 'extra'])
+                    // Mutasi (warehouse moves) log one qty-1 row per piece against the
+                    // request they came from; the goods were already paid when received.
+                    // MutationController marks its logs with a "[MUTATION]" note prefix.
+                    ->whereHas('receivedlog', fn($q) => $q->where(
+                        fn($n) => $n->whereNull('notes')->orWhere('notes', 'not like', '[MUTATION]%')
+                    ))
                     ->whereHas('requestDetail.request', fn($q) => $q->where('cmt_id', $cmt->id))
                     ->whereBetween('created_at', [
                         $data['period_start'] . ' 00:00:00',
