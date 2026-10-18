@@ -117,9 +117,11 @@
             margin: 0;
             overflow: hidden;
         }
+        /* QR fills the space the text doesn't use: with one-line label/sublabel/
+         * detail (~10mm of text) 23mm leaves ~2mm slack in the 37.1mm card. */
         .cell-rack-single .qr {
-            width: 17.5mm;
-            height: 17.5mm;
+            width: 23mm;
+            height: 23mm;
         }
         .cell-rack-single .rack-label {
             font-size: 9px;
@@ -133,7 +135,7 @@
         }
         /* Every text block is height-capped (2 lines max, rest is clipped):
          * dompdf won't clip the card itself, so unbounded text would push
-         * the label onto a 2nd page. Budget: 2 + 17.5 + 1 + 6 + 2*(0.5+4.4)
+         * the label onto a 2nd page. Budget (worst case, 2-line texts, clipped by the card's overflow): 2 + 17.5 + 1 + 6 + 2*(0.5+4.4)
          * = 36.3mm of the 37.1mm available. */
         .cell-rack-single .rack-sublabel,
         .cell-rack-single .rack-detail {
