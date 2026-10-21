@@ -36,7 +36,7 @@ class ProductSeederController extends Controller
             'rack_id' => 'nullable|exists:mdx_racks,id',
             'type' => 'required|in:D,P',
             'number' => 'required|integer|min:1',
-            'qty' => 'required|integer|min:1|max:100',
+            'qty' => 'required|integer|min:1',
         ]);
 
         $model = ProductModel::find($request->model_id);
@@ -213,7 +213,7 @@ class ProductSeederController extends Controller
 
             <div class="form-group">
                 <label>Jumlah Product yang Dibuat (Qty)</label>
-                <input type="number" name="qty" value="1" min="1" max="100" required>
+                <input type="number" name="qty" value="1" min="1" required>
             </div>
 
             <button type="submit" class="btn">Generate & Seed Product</button>
@@ -250,7 +250,7 @@ HTML;
             'rack_id' => 'nullable|exists:mdx_racks,id',
             'type' => 'required|in:D,P',
             'number' => 'required|integer|min:1',
-            'qty' => 'required|integer|min:1|max:100',
+            'qty' => 'required|integer|min:1',
         ]);
 
         $model = ProductModel::find($request->model_id);
