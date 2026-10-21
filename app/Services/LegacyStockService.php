@@ -52,9 +52,46 @@ class LegacyStockService
 
         if ($toBig) {
             $this->addToBigWarehouse($line, $rack);
+
+            if ($line['type'] === 'D') {
+                $this->registerDozenPieces($line);
+            }
         }
 
         return $product;
+    }
+
+    /**
+     * A dozen (D) barcode also gets its 12 piece (P) barcodes, so each piece
+     * can be scanned later when it moves to the small warehouse (Mutasi only
+     * accepts P barcodes). They are registry rows only: no rack and no
+     * stock of their own — the dozen barcode already added the 12 pcs.
+     * Piece numbers continue across dozens: dozen n owns pieces
+     * (n-1)*12+1 .. n*12.
+     */
+    private function registerDozenPieces(array $line): void
+    {
+        $parts = explode('|', $line['barcode']);
+        $dozenNumber = (int) array_pop($parts);
+        array_pop($parts); // the "D" group
+        $now = now();
+
+        $rows = [];
+        for ($j = 1; $j <= self::DOZEN_QTY; $j++) {
+            $rows[] = [
+                'id' => (string) Str::uuid(),
+                'model_id' => $line['model_id'],
+                'rack_id' => null,
+                'color_id' => $line['color_id'],
+                'size_id' => $line['size_id'],
+                'series' => $line['series'],
+                'barcode' => implode('|', [...$parts, 'P', ($dozenNumber - 1) * self::DOZEN_QTY + $j]),
+                'stock_batch_id' => $line['batch_id'],
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+        Product::insert($rows);
     }
 
     private function addToBigWarehouse(array $line, ?Rack $rack): void

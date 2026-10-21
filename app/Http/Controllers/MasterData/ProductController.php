@@ -112,6 +112,7 @@ class ProductController extends Controller
                 DB::raw('MAX(model_id) as sample_model_id'),
                 DB::raw('COUNT(DISTINCT model_id) as distinct_model_count'),
                 DB::raw("SUM(CASE WHEN barcode LIKE '%|D|%' THEN 1 ELSE 0 END) as dozen_count"),
+                DB::raw("SUM(CASE WHEN barcode LIKE '%|P|%' THEN 1 ELSE 0 END) as piece_count"),
             ])
             ->groupBy('stock_batch_id')
             ->orderByRaw('MIN(created_at) DESC');
@@ -130,8 +131,11 @@ class ProductController extends Controller
                 'is_ungrouped' => $isUngrouped,
                 'label' => $isUngrouped ? 'Tanpa Batch (Produksi Normal)' : 'Batch Input Stok Lama',
                 'total' => (int) $row->total,
-                // Old-stock dozen batches: every row is one dozen (D) barcode.
-                'is_dozen' => !$isUngrouped && (int) $row->dozen_count === (int) $row->total,
+                // Old-stock dozen batches hold D barcodes (one per dozen) plus
+                // their 12 P barcodes each.
+                'dozen_count' => (int) $row->dozen_count,
+                'piece_count' => (int) $row->piece_count,
+                'is_dozen' => !$isUngrouped && (int) $row->dozen_count > 0,
                 'created_at' => $row->created_at,
                 'model_summary' => $row->distinct_model_count == 1 ? $sampleModel?->name : "{$row->distinct_model_count} model",
             ];
@@ -150,7 +154,7 @@ class ProductController extends Controller
 
         $query = Product::with(['rack', 'model', 'color', 'size'])
             ->orderByDesc('created_at')
-            ->limit(1000);
+            ->limit(50000);
 
         if ($batchId === 'none') {
             $query->whereNull('stock_batch_id');
