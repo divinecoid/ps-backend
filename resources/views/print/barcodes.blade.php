@@ -120,17 +120,17 @@
         /* QR fills the space the text doesn't use: with one-line label/sublabel/
          * detail (~10mm of text) 23mm leaves ~2mm slack in the 37.1mm card. */
         .cell-rack-single .qr {
-            width: 23mm;
-            height: 23mm;
+            width: 21mm;
+            height: 21mm;
         }
         .cell-rack-single .rack-label {
-            font-size: 9px;
+            font-size: 12px;
             font-weight: bold;
             margin-top: 1mm;
             white-space: normal;
             word-break: break-word;
             line-height: 1.15;
-            max-height: 6mm;
+            max-height: 12mm;
             overflow: hidden;
         }
         /* Every text block is height-capped (2 lines max, rest is clipped):
@@ -186,12 +186,6 @@
                             <img class="qr" src="{{ $code['qr'] }}">
                             @if ($isRackSingle || $isRackBulk)
                                 <div class="rack-label">{{ $code['label'] ?? $code['code'] }}</div>
-                                @if (!empty($code['sublabel']))
-                                    <div class="rack-sublabel">{{ $code['sublabel'] }}</div>
-                                @endif
-                                @if (!empty($code['detail']))
-                                    <div class="rack-detail">{{ $code['detail'] }}</div>
-                                @endif
                             @else
                                 <div class="label">{{ $code['serial_number'] }}{{ !empty($code['model']) ? ' - ' . $code['model'] : '' }} - {{ $code['cutting'] }}{{ !empty($code['color']) ? ' - ' . $code['color'] : '' }} - {{ $code['sizes'] }}</div>
                             @endif
