@@ -32,9 +32,9 @@ class ProductController extends Controller
             'model' => (object) [
                 'name' => $data->model->name
             ],
-            'rack' => (object) [
+            'rack' => $data->rack ? (object) [
                 'name' => $data->rack->name
-            ],
+            ] : null,
             'color' => $data->color ? (object) [
                 'name' => $data->color->name
             ] : null,
