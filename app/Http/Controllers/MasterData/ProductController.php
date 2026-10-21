@@ -111,6 +111,7 @@ class ProductController extends Controller
                 DB::raw('MIN(created_at) as created_at'),
                 DB::raw('MAX(model_id) as sample_model_id'),
                 DB::raw('COUNT(DISTINCT model_id) as distinct_model_count'),
+                DB::raw("SUM(CASE WHEN barcode LIKE '%|D|%' THEN 1 ELSE 0 END) as dozen_count"),
             ])
             ->groupBy('stock_batch_id')
             ->orderByRaw('MIN(created_at) DESC');
@@ -129,6 +130,8 @@ class ProductController extends Controller
                 'is_ungrouped' => $isUngrouped,
                 'label' => $isUngrouped ? 'Tanpa Batch (Produksi Normal)' : 'Batch Input Stok Lama',
                 'total' => (int) $row->total,
+                // Old-stock dozen batches: every row is one dozen (D) barcode.
+                'is_dozen' => !$isUngrouped && (int) $row->dozen_count === (int) $row->total,
                 'created_at' => $row->created_at,
                 'model_summary' => $row->distinct_model_count == 1 ? $sampleModel?->name : "{$row->distinct_model_count} model",
             ];
