@@ -26,11 +26,14 @@ x-app: &app
     QUEUE_CONNECTION: database
     CACHE_STORE: database
     FILESYSTEM_DISK: local
-    LOG_CHANNEL: stderr
+    # Write storage/logs/laravel.log (read by /logs) and keep stderr for `docker logs`.
+    LOG_CHANNEL: stack
+    LOG_STACK: single,stderr
   networks:
     - dokploy-network
   volumes:
     - ps-backend-storage:/var/www/html/storage/app
+    - ps-backend-logs:/var/www/html/storage/logs
 
 services:
   ps-backend:
@@ -63,6 +66,7 @@ services:
 
 volumes:
   ps-backend-storage:
+  ps-backend-logs:
 
 # Dokploy databases live on this network; joining it lets DB_HOST resolve.
 networks:
