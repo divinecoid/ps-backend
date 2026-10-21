@@ -248,10 +248,13 @@ Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,cre
     Route::post('{id}/restore', [ProductController::class, 'restore']);
 });
 Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,update'])->group(function () {
+    Route::patch('batch/{batchId}', [ProductController::class, 'updateBatch']);
+    Route::patch('batch-item/{id}', [ProductController::class, 'updateBatchItem']);
     Route::patch('{id}', [ProductController::class, 'update']);
 });
 Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,delete'])->group(function () {
     Route::delete('/', [ProductController::class, 'multiDestroy']);
+    Route::delete('batch/{batchId}', [ProductController::class, 'destroyBatch']);
     Route::delete('{id}', [ProductController::class, 'destroy']);
 });
 Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,force_delete'])->group(function () {

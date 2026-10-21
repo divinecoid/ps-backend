@@ -2,7 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\MasterData\Color;
 use App\Models\MasterData\Inventory;
+use App\Models\MasterData\ProductModel;
+use App\Models\MasterData\Size;
 use App\Models\MasterData\Product;
 use App\Models\MasterData\Rack;
 use Illuminate\Support\Str;
@@ -148,5 +151,123 @@ class LegacyStockService
             ?? $inventory->detail()->where('quantity', '>', 0)->orderBy('series')->first();
 
         $detail?->decrement('quantity');
+    }
+
+    /** Barcode group letter (D / P) of an old-stock barcode: cmt|series|sku|color|size|GROUP|number. */
+    public function group(Product $product): ?string
+    {
+        $parts = explode('|', (string) $product->barcode);
+
+        return $parts[count($parts) - 2] ?? null;
+    }
+
+    /**
+     * Pieces this row accounts for in the big warehouse: a dozen barcode 12,
+     * a lone piece barcode 1, and 0 for the registry-only piece barcodes of
+     * a dozen (their stock is already inside the dozen) or for rows that
+     * already sit in a small-warehouse rack.
+     */
+    public function stockUnits(Product $product): int
+    {
+        if ($product->stock_batch_id === null || $product->rack_id !== null) {
+            return 0;
+        }
+        if ($this->group($product) === 'D') {
+            return self::DOZEN_QTY;
+        }
+
+        $belongsToDozen = Product::withTrashed()
+            ->where('stock_batch_id', $product->stock_batch_id)
+            ->where('series', $product->series)
+            ->where('barcode', 'like', '%|D|%')
+            ->exists();
+
+        return $belongsToDozen ? 0 : 1;
+    }
+
+    /** Takes the row's stock back out of the big warehouse (delete / before an attribute change). */
+    public function release(Product $product): void
+    {
+        $units = $this->stockUnits($product);
+        if ($units === 0) {
+            return;
+        }
+
+        $inventory = Inventory::where([
+            'model_id' => $product->model_id,
+            'color_id' => $product->color_id,
+            'size_id' => $product->size_id,
+        ])->first();
+        $detail = $inventory?->detail()->where('series', $product->series)->first();
+
+        if ($detail) {
+            $detail->update(['quantity' => max(0, $detail->quantity - $units)]);
+        }
+    }
+
+    /** Puts the row's stock (back) into the big warehouse (restore / after an attribute change). */
+    public function reclaim(Product $product): void
+    {
+        $units = $this->stockUnits($product);
+        if ($units === 0) {
+            return;
+        }
+
+        $inventory = Inventory::firstOrCreate([
+            'model_id' => $product->model_id,
+            'color_id' => $product->color_id,
+            'size_id' => $product->size_id,
+        ]);
+        $detail = $inventory->detail()->firstOrCreate(['series' => $product->series], ['quantity' => 0]);
+        $detail->increment('quantity', $units);
+    }
+
+    /**
+     * Applies new model / color / size to old-stock rows. Stock moves with
+     * them and the barcodes are rewritten so their sku / color / size parts
+     * match (labels printed earlier must be reprinted). `$rackId` becomes
+     * the big-warehouse rack of the affected stock.
+     *
+     * @param \Illuminate\Support\Collection<int,Product> $products
+     * @param array{model_id?:?string,color_id?:?string,size_id?:?string} $attributes
+     */
+    public function updateRows($products, array $attributes, ?string $rackId = null): void
+    {
+        $attributes = array_filter($attributes);
+        $model = isset($attributes['model_id']) ? ProductModel::find($attributes['model_id']) : null;
+        $color = isset($attributes['color_id']) ? Color::find($attributes['color_id']) : null;
+        $size = isset($attributes['size_id']) ? Size::find($attributes['size_id']) : null;
+
+        foreach ($products as $product) {
+            if ($attributes) {
+                $this->release($product);
+
+                $changes = $attributes;
+                $parts = explode('|', (string) $product->barcode);
+                if (count($parts) === 7) {
+                    $parts[2] = $model?->sku ?? $parts[2];
+                    $parts[3] = $color?->code ?? $parts[3];
+                    $parts[4] = $size?->code ?? $parts[4];
+                    $changes['barcode'] = implode('|', $parts);
+                }
+                $product->update($changes);
+            }
+
+            if ($rackId !== null) {
+                if ($product->rack_id !== null) {
+                    $product->update(['rack_id' => $rackId]);
+                } elseif ($this->stockUnits($product) > 0) {
+                    Inventory::firstOrCreate([
+                        'model_id' => $product->model_id,
+                        'color_id' => $product->color_id,
+                        'size_id' => $product->size_id,
+                    ])->update(['rack_id' => $rackId]);
+                }
+            }
+
+            if ($attributes) {
+                $this->reclaim($product);
+            }
+        }
     }
 }

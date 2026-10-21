@@ -246,6 +246,11 @@ class ProductController extends Controller
 
     public function destroy($id)
     {
+        $product = Product::find($id);
+        if ($product?->stock_batch_id !== null) {
+            return $this->deleteLegacyProducts(collect([$product]));
+        }
+
         return $this->baseDelete(
             Product::class,
             $id
@@ -254,15 +259,168 @@ class ProductController extends Controller
 
     public function restore($id)
     {
+        $product = Product::onlyTrashed()->find($id);
+        if ($product?->stock_batch_id !== null) {
+            return $this->restoreLegacyProducts(collect([$product]));
+        }
+
         return $this->baseRestore(Product::class, $id);
     }
 
     public function multiDestroy(Request $request)
     {
-        return $this->baseDelete(
-            Product::class,
-            $request->all()
+        $ids = $request->all();
+        $products = Product::whereIn('id', $ids)->get();
+        $legacy = $products->whereNotNull('stock_batch_id');
+        if ($legacy->isEmpty()) {
+            return $this->baseDelete(Product::class, $ids);
+        }
+
+        $others = $products->whereNull('stock_batch_id')->pluck('id')->all();
+        if ($others) {
+            $this->baseDelete(Product::class, $others);
+        }
+
+        return $this->deleteLegacyProducts($legacy);
+    }
+
+    /**
+     * Old-stock rows: a dozen (D) barcode takes its piece (P) barcodes with
+     * it, big-warehouse stock is taken back out, and barcodes that already
+     * moved to a small-warehouse rack (Mutasi) cannot be deleted.
+     */
+    private function deleteLegacyProducts($products)
+    {
+        $rows = $this->withDozenPieces($products);
+        $moved = $rows->first(fn($p) => $p->rack_id !== null);
+        if ($moved) {
+            return $this->errorResponse(422, "Barcode {$moved->barcode} sudah berada di rak gudang kecil (sudah dimutasi), tidak bisa dihapus.");
+        }
+
+        $stock = app(LegacyStockService::class);
+        DB::transaction(function () use ($rows, $stock) {
+            foreach ($rows as $row) {
+                $stock->release($row);
+                $row->delete();
+            }
+        });
+        \App\Support\AuditLogger::log(
+            \App\Support\AuditLogger::mapModelToModule(Product::class),
+            'DELETE',
+            'Menghapus stok lama dengan ID: ' . $rows->pluck('id')->implode(', ')
         );
+
+        return $this->successResponse($rows->values(), 'Success delete data');
+    }
+
+    private function restoreLegacyProducts($products)
+    {
+        $rows = $this->withDozenPieces($products, true);
+
+        $stock = app(LegacyStockService::class);
+        DB::transaction(function () use ($rows, $stock) {
+            foreach ($rows as $row) {
+                $row->restore();
+                $stock->reclaim($row);
+            }
+        });
+        \App\Support\AuditLogger::log(
+            \App\Support\AuditLogger::mapModelToModule(Product::class),
+            'RESTORE',
+            'Mengembalikan stok lama dengan ID: ' . $rows->pluck('id')->implode(', ')
+        );
+
+        return $this->successResponse($rows->values());
+    }
+
+    /**
+     * Adds every sibling that shares a dozen's series (same batch) for each
+     * dozen (D) barcode in the list; piece barcodes alone stay alone.
+     */
+    private function withDozenPieces($products, bool $trashed = false)
+    {
+        $stock = app(LegacyStockService::class);
+        $siblings = $products
+            ->filter(fn($p) => $stock->group($p) === 'D')
+            ->flatMap(fn($d) => Product::query()
+                ->when($trashed, fn($q) => $q->onlyTrashed())
+                ->where('stock_batch_id', $d->stock_batch_id)
+                ->where('series', $d->series)
+                ->get());
+
+        return $products->concat($siblings)->unique('id')->values();
+    }
+
+    /** Edit every active product of an old-stock batch (model / color / size / rack). */
+    public function updateBatch(Request $request, $batchId)
+    {
+        $products = Product::where('stock_batch_id', $batchId)->get();
+        if ($products->isEmpty()) {
+            return $this->errorResponse(404, 'Batch tidak ditemukan');
+        }
+
+        return $this->updateLegacyProducts($request, $products);
+    }
+
+    /** Edit one old-stock product; its dozen's other barcodes follow. */
+    public function updateBatchItem(Request $request, $id)
+    {
+        $product = Product::whereNotNull('stock_batch_id')->find($id);
+        if (!$product) {
+            return $this->errorResponse(404, 'Produk stok lama tidak ditemukan');
+        }
+
+        $rows = Product::where('stock_batch_id', $product->stock_batch_id)
+            ->where('series', $product->series)
+            ->get();
+
+        return $this->updateLegacyProducts($request, $rows);
+    }
+
+    private function updateLegacyProducts(Request $request, $products)
+    {
+        $data = $request->validate([
+            'model_id' => ['nullable', Rule::exists('mdx_models', 'id')->whereNull('deleted_at')],
+            'color_id' => ['nullable', Rule::exists('mdx_colors', 'id')->whereNull('deleted_at')],
+            'size_id' => ['nullable', Rule::exists('mdx_sizes', 'id')->whereNull('deleted_at')],
+            'rack_id' => ['nullable', Rule::exists('mdx_racks', 'id')->whereNull('deleted_at')],
+        ]);
+        $attributes = array_filter(\Illuminate\Support\Arr::only($data, ['model_id', 'color_id', 'size_id']));
+        $rackId = $data['rack_id'] ?? null;
+        if (!$attributes && !$rackId) {
+            return $this->errorResponse(422, 'Tidak ada perubahan yang diisi.');
+        }
+
+        $rows = $this->withDozenPieces($products);
+        if ($attributes && ($moved = $rows->first(fn($p) => $p->rack_id !== null))) {
+            return $this->errorResponse(422, "Barcode {$moved->barcode} sudah berada di rak gudang kecil (sudah dimutasi), model/warna/ukuran tidak bisa diubah.");
+        }
+        if ($rackId && $rows->contains(fn($p) => $p->rack_id === null)) {
+            $isBig = \App\Models\MasterData\Rack::whereHas('warehouse', fn($q) => $q->where('type', 'BESAR'))->whereKey($rackId)->exists();
+            if (!$isBig) {
+                return $this->errorResponse(422, 'Rak untuk stok gudang besar harus berada di gudang besar.');
+            }
+        }
+
+        DB::transaction(fn() => app(LegacyStockService::class)->updateRows($rows, $attributes, $rackId));
+        \App\Support\AuditLogger::log(
+            \App\Support\AuditLogger::mapModelToModule(Product::class),
+            'UPDATE',
+            'Mengubah stok lama dengan ID: ' . $rows->pluck('id')->implode(', ')
+        );
+
+        return $this->successResponse($rows->count(), 'Berhasil mengubah ' . $rows->count() . ' barcode.');
+    }
+
+    /** Delete every active product of an old-stock batch. */
+    public function destroyBatch($batchId)
+    {
+        $products = Product::where('stock_batch_id', $batchId)->get();
+        if ($products->isEmpty()) {
+            return $this->errorResponse(404, 'Batch tidak ditemukan');
+        }
+
+        return $this->deleteLegacyProducts($products);
     }
 
     public function forceDestroy($id)
