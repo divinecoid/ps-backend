@@ -124,13 +124,13 @@
             height: 21mm;
         }
         .cell-rack-single .rack-label {
-            font-size: 12px;
+            font-size: 10px;
             font-weight: bold;
             margin-top: 1mm;
             white-space: normal;
             word-break: break-word;
             line-height: 1.15;
-            max-height: 12mm;
+            max-height: 12.4mm;
             overflow: hidden;
         }
         /* Every text block is height-capped (2 lines max, rest is clipped):
