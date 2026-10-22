@@ -72,7 +72,7 @@ class LegacyStockService
      * Piece numbers continue across dozens: dozen n owns pieces
      * (n-1)*12+1 .. n*12.
      */
-    private function registerDozenPieces(array $line): void
+    private function registerDozenPieces(array $line, array $existingNumbers = []): void
     {
         $parts = explode('|', $line['barcode']);
         $dozenNumber = (int) array_pop($parts);
@@ -81,6 +81,10 @@ class LegacyStockService
 
         $rows = [];
         for ($j = 1; $j <= self::DOZEN_QTY; $j++) {
+            $number = ($dozenNumber - 1) * self::DOZEN_QTY + $j;
+            if (in_array($number, $existingNumbers, true)) {
+                continue;
+            }
             $rows[] = [
                 'id' => (string) Str::uuid(),
                 'model_id' => $line['model_id'],
@@ -88,13 +92,52 @@ class LegacyStockService
                 'color_id' => $line['color_id'],
                 'size_id' => $line['size_id'],
                 'series' => $line['series'],
-                'barcode' => implode('|', [...$parts, 'P', ($dozenNumber - 1) * self::DOZEN_QTY + $j]),
+                'barcode' => implode('|', [...$parts, 'P', $number]),
                 'stock_batch_id' => $line['batch_id'],
                 'created_at' => $now,
                 'updated_at' => $now,
             ];
         }
-        Product::insert($rows);
+        if ($rows) {
+            Product::insert($rows);
+        }
+    }
+
+    /**
+     * Gives every dozen (D) barcode of a big-warehouse batch its 12 piece
+     * barcodes. Batches entered before pieces were registered per dozen only
+     * hold the D rows; without this, printing "Satuan" is short and growing
+     * the batch leaves the older dozens without pieces. Idempotent.
+     */
+    public function backfillDozenPieces(string $batchId): int
+    {
+        $created = 0;
+        $dozens = Product::where('stock_batch_id', $batchId)->whereNull('rack_id')->where('barcode', 'like', '%|D|%')->get();
+        foreach ($dozens as $dozen) {
+            if ($this->group($dozen) !== 'D') {
+                continue;
+            }
+            $existing = Product::where('stock_batch_id', $batchId)
+                ->where('series', $dozen->series)
+                ->where('barcode', 'like', '%|P|%')
+                ->pluck('barcode')
+                ->map(fn($b) => (int) substr((string) strrchr($b, '|'), 1))
+                ->all();
+            if (count($existing) >= self::DOZEN_QTY) {
+                continue;
+            }
+            $this->registerDozenPieces([
+                'model_id' => $dozen->model_id,
+                'color_id' => $dozen->color_id,
+                'size_id' => $dozen->size_id,
+                'series' => $dozen->series,
+                'barcode' => $dozen->barcode,
+                'batch_id' => $batchId,
+            ], $existing);
+            $created += self::DOZEN_QTY - count($existing);
+        }
+
+        return $created;
     }
 
     private function addToBigWarehouse(array $line, ?Rack $rack): void
@@ -303,6 +346,10 @@ class LegacyStockService
         }
         if (!$isDozen && $groups->count() > 1) {
             throw new \InvalidArgumentException('Jumlah tidak bisa diubah: format barcode batch tidak dikenali.');
+        }
+
+        if ($isDozen) {
+            $this->backfillDozenPieces($batchId);
         }
 
         $main = $rows->filter(fn($p) => $this->group($p) === ($isDozen ? 'D' : 'P'))
