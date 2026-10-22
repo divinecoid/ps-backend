@@ -124,7 +124,7 @@
             height: 21mm;
         }
         .cell-rack-single .rack-label {
-            font-size: 10px;
+            font-size: 12px;
             font-weight: bold;
             margin-top: 1mm;
             white-space: normal;
