@@ -270,4 +270,105 @@ class LegacyStockService
             }
         }
     }
+
+    /**
+     * Sets how many barcodes an old-stock batch holds: dozens for a dozen
+     * batch, pieces otherwise. Growing registers new barcodes (numbering
+     * continues, stock goes into the big warehouse like the original
+     * input); shrinking deletes the highest-numbered ones and takes their
+     * stock back out.
+     *
+     * Only a batch of a single model / color / size and a single barcode
+     * group that still sits entirely in the big warehouse can be resized.
+     *
+     * @throws \InvalidArgumentException when the batch can't be resized
+     */
+    public function resizeBatch(string $batchId, int $qty): void
+    {
+        $rows = Product::where('stock_batch_id', $batchId)->get();
+        if ($rows->isEmpty()) {
+            throw new \InvalidArgumentException('Batch tidak ditemukan.');
+        }
+        if ($rows->contains(fn($p) => $p->rack_id !== null)) {
+            throw new \InvalidArgumentException('Jumlah tidak bisa diubah: batch ini sudah ada yang berada di rak gudang kecil (sudah dimutasi).');
+        }
+        $combos = $rows->map(fn($p) => "{$p->model_id}|{$p->color_id}|{$p->size_id}")->unique();
+        if ($combos->count() > 1) {
+            throw new \InvalidArgumentException('Jumlah tidak bisa diubah: batch ini berisi lebih dari satu model/warna/ukuran.');
+        }
+        $groups = $rows->map(fn($p) => $this->group($p))->unique();
+        $isDozen = $groups->contains('D');
+        if ($isDozen && $groups->contains(fn($g) => $g !== 'D' && $g !== 'P')) {
+            throw new \InvalidArgumentException('Jumlah tidak bisa diubah: format barcode batch tidak dikenali.');
+        }
+        if (!$isDozen && $groups->count() > 1) {
+            throw new \InvalidArgumentException('Jumlah tidak bisa diubah: format barcode batch tidak dikenali.');
+        }
+
+        $main = $rows->filter(fn($p) => $this->group($p) === ($isDozen ? 'D' : 'P'))
+            ->sortBy(fn($p) => (int) substr((string) strrchr($p->barcode, '|'), 1))
+            ->values();
+        $current = $main->count();
+        if ($qty === $current) {
+            return;
+        }
+
+        if ($qty > $current) {
+            $this->growBatch($main->last(), $rows, $qty - $current, $isDozen ? 'D' : 'P');
+
+            return;
+        }
+
+        $victims = $this->withDozenPiecesOf($main->slice($qty)->values());
+        foreach ($victims as $row) {
+            $this->release($row);
+            $row->delete();
+        }
+    }
+
+    /** Registers `$count` more barcodes after `$last`, the batch's highest-numbered one. */
+    private function growBatch(Product $last, $rows, int $count, string $type): void
+    {
+        $parts = explode('|', (string) $last->barcode);
+        if (count($parts) !== 7) {
+            throw new \InvalidArgumentException('Jumlah tidak bisa diubah: format barcode batch tidak dikenali.');
+        }
+        $number = (int) $parts[6];
+        $usedSeries = $rows->pluck('series')->all();
+        $base = now();
+        $offset = 0;
+
+        for ($i = 1; $i <= $count; $i++) {
+            do {
+                $series = $base->copy()->addSeconds($offset++)->format('YmdHis');
+            } while (in_array($series, $usedSeries, true));
+            $usedSeries[] = $series;
+
+            $line = $parts;
+            $line[1] = $series;
+            $line[5] = $type;
+            $line[6] = $number + $i;
+
+            $this->register([
+                'model_id' => $last->model_id,
+                'color_id' => $last->color_id,
+                'size_id' => $last->size_id,
+                'rack_id' => null,
+                'series' => $series,
+                'barcode' => implode('|', $line),
+                'type' => $type,
+                'batch_id' => $last->stock_batch_id,
+            ]);
+        }
+    }
+
+    /** The given rows plus, for each dozen (D) barcode, the piece barcodes that share its series. */
+    private function withDozenPiecesOf($products)
+    {
+        $siblings = $products
+            ->filter(fn($p) => $this->group($p) === 'D')
+            ->flatMap(fn($d) => Product::where('stock_batch_id', $d->stock_batch_id)->where('series', $d->series)->get());
+
+        return $products->concat($siblings)->unique('id')->values();
+    }
 }

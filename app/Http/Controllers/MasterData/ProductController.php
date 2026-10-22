@@ -136,6 +136,9 @@ class ProductController extends Controller
                 'dozen_count' => (int) $row->dozen_count,
                 'piece_count' => (int) $row->piece_count,
                 'is_dozen' => !$isUngrouped && (int) $row->dozen_count > 0,
+                // Number of barcodes the batch was entered with (dozens for a
+                // dozen batch, pieces otherwise) — what "Jumlah" edits.
+                'qty' => (int) ($row->dozen_count > 0 ? $row->dozen_count : $row->piece_count),
                 'created_at' => $row->created_at,
                 'model_summary' => $row->distinct_model_count == 1 ? $sampleModel?->name : "{$row->distinct_model_count} model",
             ];
@@ -359,7 +362,7 @@ class ProductController extends Controller
             return $this->errorResponse(404, 'Batch tidak ditemukan');
         }
 
-        return $this->updateLegacyProducts($request, $products);
+        return $this->updateLegacyProducts($request, $products, true);
     }
 
     /** Edit one old-stock product; its dozen's other barcodes follow. */
@@ -377,17 +380,19 @@ class ProductController extends Controller
         return $this->updateLegacyProducts($request, $rows);
     }
 
-    private function updateLegacyProducts(Request $request, $products)
+    private function updateLegacyProducts(Request $request, $products, bool $withQty = false)
     {
         $data = $request->validate([
             'model_id' => ['nullable', Rule::exists('mdx_models', 'id')->whereNull('deleted_at')],
             'color_id' => ['nullable', Rule::exists('mdx_colors', 'id')->whereNull('deleted_at')],
             'size_id' => ['nullable', Rule::exists('mdx_sizes', 'id')->whereNull('deleted_at')],
             'rack_id' => ['nullable', Rule::exists('mdx_racks', 'id')->whereNull('deleted_at')],
+            'qty' => $withQty ? ['nullable', 'integer', 'min:1'] : ['prohibited'],
         ]);
         $attributes = array_filter(\Illuminate\Support\Arr::only($data, ['model_id', 'color_id', 'size_id']));
         $rackId = $data['rack_id'] ?? null;
-        if (!$attributes && !$rackId) {
+        $qty = $withQty ? ($data['qty'] ?? null) : null;
+        if (!$attributes && !$rackId && $qty === null) {
             return $this->errorResponse(422, 'Tidak ada perubahan yang diisi.');
         }
 
@@ -402,11 +407,24 @@ class ProductController extends Controller
             }
         }
 
-        DB::transaction(fn() => app(LegacyStockService::class)->updateRows($rows, $attributes, $rackId));
+        $stock = app(LegacyStockService::class);
+        try {
+            DB::transaction(function () use ($stock, $rows, $attributes, $rackId, $qty, $products) {
+                if ($attributes || $rackId) {
+                    $stock->updateRows($rows, $attributes, $rackId);
+                }
+                if ($qty !== null) {
+                    $stock->resizeBatch($products->first()->stock_batch_id, $qty);
+                }
+            });
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse(422, $e->getMessage());
+        }
         \App\Support\AuditLogger::log(
             \App\Support\AuditLogger::mapModelToModule(Product::class),
             'UPDATE',
             'Mengubah stok lama dengan ID: ' . $rows->pluck('id')->implode(', ')
+                . ($qty !== null ? " (jumlah menjadi {$qty})" : '')
         );
 
         return $this->successResponse($rows->count(), 'Berhasil mengubah ' . $rows->count() . ' barcode.');
@@ -509,8 +527,8 @@ class ProductController extends Controller
             if (!ctype_digit((string) $number) || (int) $number < 1) {
                 return $this->errorResponse(422, "Baris {$rowNumber}: nomor urut tidak valid.");
             }
-            if (!ctype_digit((string) $qty) || (int) $qty < 1 || (int) $qty > 100) {
-                return $this->errorResponse(422, "Baris {$rowNumber}: qty harus antara 1 dan 100.");
+            if (!ctype_digit((string) $qty) || (int) $qty < 1) {
+                return $this->errorResponse(422, "Baris {$rowNumber}: qty harus bilangan bulat minimal 1.");
             }
 
             $parsed[] = [
