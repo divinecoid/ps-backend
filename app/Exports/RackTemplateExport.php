@@ -10,12 +10,12 @@ class RackTemplateExport implements FromArray, WithHeadings
     public function array(): array
     {
         return [
-            ['RAK-01', 'Rak A1', 'GDG-01', '', ''],
+            ['RAK-01', 'Rak A1', 'GDG-01', '', '', ''],
         ];
     }
 
     public function headings(): array
     {
-        return ['code', 'name', 'warehouse_code', 'model_sku', 'color_code'];
+        return ['code', 'name', 'warehouse_code', 'model_sku', 'color_code', 'size_code'];
     }
 }

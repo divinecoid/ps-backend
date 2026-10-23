@@ -5,6 +5,7 @@ namespace App\Imports;
 use App\Models\MasterData\Color;
 use App\Models\MasterData\ProductModel;
 use App\Models\MasterData\Rack;
+use App\Models\MasterData\Size;
 use App\Models\MasterData\Warehouse;
 use Illuminate\Database\Eloquent\Model;
 use Maatwebsite\Excel\Concerns\ToModel;
@@ -29,6 +30,10 @@ class RackImport implements ToModel, WithHeadingRow, WithValidation, SkipsOnFail
             ? Color::where('code', $row['color_code'])->value('id')
             : null;
 
+        $sizeId = !empty($row['size_code'])
+            ? Size::where('code', $row['size_code'])->value('id')
+            : null;
+
         return Rack::updateOrCreate(
             ['code' => $row['code']],
             [
@@ -36,6 +41,7 @@ class RackImport implements ToModel, WithHeadingRow, WithValidation, SkipsOnFail
                 'warehouse_id' => $warehouseId,
                 'model_id' => $modelId,
                 'color_id' => $colorId,
+                'size_id' => $sizeId,
             ]
         );
     }
@@ -48,6 +54,7 @@ class RackImport implements ToModel, WithHeadingRow, WithValidation, SkipsOnFail
             'warehouse_code' => 'required|string|exists:mdx_warehouses,code',
             'model_sku' => 'nullable|string|exists:mdx_models,sku',
             'color_code' => 'nullable|string|exists:mdx_colors,code',
+            'size_code' => 'nullable|string|exists:mdx_sizes,code',
         ];
     }
 }

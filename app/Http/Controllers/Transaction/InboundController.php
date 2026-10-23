@@ -211,6 +211,11 @@ class InboundController extends Controller
 
                                 $requestsFound = true;
 
+                                if ($this->rackSizeMismatch($items['rack_id'], $requestDetail->size_id)) {
+                                    $invalidPieceBarcodes[] = $barcode;
+                                    continue;
+                                }
+
                                 if ($sequence > $requestDetail->req_qty) {//jika (request tidak memiliki sisa piece) atau (request memiliki sisa piece dan sequence di luar dari range request piece)
                                     $invalidPieceBarcodes[] = $barcode;
                                     continue;
@@ -511,36 +516,11 @@ class InboundController extends Controller
 
                 $recommendedRack = null;
                 if ($group === 'P') {
-                    $modelId = $requestDetail->model_id;
-                    $colorId = $requestDetail->cutting->clothes->color_id;
-
-                    $recommendedRack = \App\Models\MasterData\Rack::with('warehouse')
-                        ->whereHas('warehouse', function ($q) {
-                            $q->where('type', 'KECIL');
-                        })
-                        ->where('model_id', $modelId)
-                        ->where('color_id', $colorId)
-                        ->first();
-
-                    if (!$recommendedRack) {
-                        $recommendedRack = \App\Models\MasterData\Rack::with('warehouse')
-                            ->whereHas('warehouse', function ($q) {
-                                $q->where('type', 'KECIL');
-                            })
-                            ->where('model_id', $modelId)
-                            ->whereNull('color_id')
-                            ->first();
-                    }
-
-                    if (!$recommendedRack) {
-                        $recommendedRack = \App\Models\MasterData\Rack::with('warehouse')
-                            ->whereHas('warehouse', function ($q) {
-                                $q->where('type', 'KECIL');
-                            })
-                            ->whereNull('model_id')
-                            ->whereNull('color_id')
-                            ->first();
-                    }
+                    $recommendedRack = $this->findSmallRack(
+                        $requestDetail->model_id,
+                        $requestDetail->cutting->clothes->color_id,
+                        $requestDetail->size_id
+                    );
                 } else if ($group === 'D') {
                     $modelId = $requestDetail->model_id;
                     $colorId = $requestDetail->cutting->clothes->color_id;
@@ -608,6 +588,34 @@ class InboundController extends Controller
             }
         );
     }
+    /**
+     * Recommended rack in the small (KECIL) warehouse. Racks there are per size:
+     * a piece may only go to a rack of its own size, or to a rack that is not
+     * tied to any size. Most specific model/color match wins.
+     */
+    private function findSmallRack($modelId, $colorId, $sizeId)
+    {
+        $base = fn() => \App\Models\MasterData\Rack::with('warehouse')
+            ->whereHas('warehouse', fn($q) => $q->where('type', 'KECIL'))
+            ->where(fn($q) => $q->where('size_id', $sizeId)->orWhereNull('size_id'))
+            // exact size first, size-less racks only as fallback
+            ->orderByRaw('size_id IS NULL');
+
+        return $base()->where('model_id', $modelId)->where('color_id', $colorId)->first()
+            ?? $base()->where('model_id', $modelId)->whereNull('color_id')->first()
+            ?? $base()->whereNull('model_id')->whereNull('color_id')->first();
+    }
+
+    /** A piece can't be stored in a small-warehouse rack of a different size. */
+    private function rackSizeMismatch($rackId, $sizeId): bool
+    {
+        $rack = \App\Models\MasterData\Rack::with('warehouse')->find($rackId);
+        return $rack
+            && $rack->warehouse?->type === 'KECIL'
+            && $rack->size_id !== null
+            && $rack->size_id !== $sizeId;
+    }
+
     private function parseBarcode(string $barcode)
     {
         $parts = explode('|', $barcode);

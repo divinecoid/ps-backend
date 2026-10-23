@@ -23,7 +23,8 @@ class RackController extends Controller
             'name' => $data->name,
             'display_name' => $data->name
                 . ($data->model ? ' - ' . $data->model->name : '')
-                . ($data->color ? ' - ' . $data->color->name : ''),
+                . ($data->color ? ' - ' . $data->color->name : '')
+                . ($data->size ? ' - ' . $data->size->name : ''),
             'warehouse_id' => $data->warehouse_id,
             'warehouse' => (object) [
                 'name' => $data->warehouse?->name
@@ -35,6 +36,10 @@ class RackController extends Controller
             'color_id' => $data->color_id,
             'color' => $data->color ? (object) [
                 'name' => $data->color->name
+            ] : null,
+            'size_id' => $data->size_id,
+            'size' => $data->size ? (object) [
+                'name' => $data->size->name
             ] : null,
         ];
     }
@@ -57,6 +62,9 @@ class RackController extends Controller
             if ($request->filled('color_id')) {
                 $query->where('color_id', $request->input('color_id'));
             }
+            if ($request->filled('size_id')) {
+                $query->where('size_id', $request->input('size_id'));
+            }
             if ($request->filled('status')) {
                 if ($request->input('status') === 'active') {
                     $query->whereNull('deleted_at');
@@ -72,8 +80,8 @@ class RackController extends Controller
         return $this->baseIndex(
             $request,
             Rack::class,
-            ['warehouse', 'model', 'color'],
-            ['id', 'code', 'name', 'warehouse.name', 'model.name', 'color.name'],
+            ['warehouse', 'model', 'color', 'size'],
+            ['id', 'code', 'name', 'warehouse.name', 'model.name', 'color.name', 'size.name'],
             $this->structure(),
             $this->filterByModel($request),
             ['id' => 'asc']
@@ -85,8 +93,8 @@ class RackController extends Controller
         return $this->baseMaster(
             $request,
             Rack::class,
-            ['warehouse', 'model', 'color'],
-            ['code', 'name', 'warehouse.name', 'model.name', 'color.name'],
+            ['warehouse', 'model', 'color', 'size'],
+            ['code', 'name', 'warehouse.name', 'model.name', 'color.name', 'size.name'],
             $this->structure(),
             $this->filterByModel($request)
         );
@@ -109,6 +117,7 @@ class RackController extends Controller
                 'name' => $r->name,
                 'warehouse_id' => $r->warehouse_id,
                 'warehouse' => (object) ['name' => $r->warehouse?->name],
+                'size_id' => $r->size_id,
             ]);
 
         return $this->successResponse($racks);
@@ -119,7 +128,7 @@ class RackController extends Controller
         return $this->baseShow(
             Rack::class,
             $id,
-            ['warehouse', 'model', 'color'],
+            ['warehouse', 'model', 'color', 'size'],
             $this->structure()
         );
     }
@@ -143,6 +152,10 @@ class RackController extends Controller
                 'color_id' => [
                     'nullable',
                     Rule::exists('mdx_colors', 'id')->whereNull('deleted_at'),
+                ],
+                'size_id' => [
+                    'nullable',
+                    Rule::exists('mdx_sizes', 'id')->whereNull('deleted_at'),
                 ],
             ],
             null
@@ -179,6 +192,10 @@ class RackController extends Controller
                 'color_id' => [
                     'nullable',
                     Rule::exists('mdx_colors', 'id')->whereNull('deleted_at'),
+                ],
+                'size_id' => [
+                    'nullable',
+                    Rule::exists('mdx_sizes', 'id')->whereNull('deleted_at'),
                 ],
             ],
             null
