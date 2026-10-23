@@ -39,6 +39,7 @@ class RackController extends Controller
             ] : null,
             'size_id' => $data->size_id,
             'size' => $data->size ? (object) [
+                'code' => $data->size->code,
                 'name' => $data->size->name
             ] : null,
         ];
@@ -108,7 +109,7 @@ class RackController extends Controller
      */
     public function options()
     {
-        $racks = Rack::with('warehouse:id,name')
+        $racks = Rack::with(['warehouse:id,name', 'size:id,code,name'])
             ->orderBy('code')
             ->get()
             ->map(fn(Rack $r) => [
@@ -118,6 +119,7 @@ class RackController extends Controller
                 'warehouse_id' => $r->warehouse_id,
                 'warehouse' => (object) ['name' => $r->warehouse?->name],
                 'size_id' => $r->size_id,
+                'size' => $r->size ? (object) ['code' => $r->size->code, 'name' => $r->size->name] : null,
             ]);
 
         return $this->successResponse($racks);
