@@ -194,8 +194,50 @@ class OrderItemController extends Controller
                     'barcode' => $product->barcode,
                     'model_id' => $product->model_id,
                     'rack_id' => $product->rack_id,
-                ]
+                    'series' => $product->series,
+                ],
+                // Saran FIFO: seri yang lebih lama dari barcode ini dan masih ada stok.
+                // Hanya informasi, tidak memblokir pengambilan.
+                'older_series' => $this->olderSeriesInStock($product),
             ]
         ], 200);
+    }
+
+    /**
+     * Seri yang lebih lama (untuk model + warna + size yang sama) dan masih ada stok,
+     * diurutkan dari yang paling lama.
+     */
+    private function olderSeriesInStock(\App\Models\MasterData\Product $product): array
+    {
+        if ($product->series === null || $product->series === '') {
+            return [];
+        }
+
+        $rows = \App\Models\MasterData\Product::query()
+            ->with('rack:id,code')
+            ->where('model_id', $product->model_id)
+            ->where('color_id', $product->color_id)
+            ->where('size_id', $product->size_id)
+            ->whereNotNull('series')
+            ->where('series', '<>', $product->series)
+            ->selectRaw('series, rack_id, COUNT(*) as qty')
+            ->groupBy('series', 'rack_id')
+            ->get();
+
+        $isOlder = fn($series) => is_numeric($series) && is_numeric($product->series)
+            ? (float) $series < (float) $product->series
+            : strcmp((string) $series, (string) $product->series) < 0;
+
+        return $rows
+            ->filter(fn($row) => $isOlder($row->series))
+            ->groupBy('series')
+            ->map(fn($group, $series) => [
+                'series' => (string) $series,
+                'qty' => (int) $group->sum('qty'),
+                'racks' => $group->map(fn($r) => $r->rack?->code)->filter()->unique()->values()->all(),
+            ])
+            ->sortBy(fn($item) => is_numeric($item['series']) ? (float) $item['series'] : $item['series'])
+            ->values()
+            ->all();
     }
 }
