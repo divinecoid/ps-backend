@@ -21,7 +21,7 @@ class RackStockController extends Controller
     {
         $request->validate(['code' => 'required|string']);
 
-        $rack = Rack::with('warehouse')->where('code', $request->input('code'))->first();
+        $rack = Rack::with(['warehouse', 'color'])->where('code', $request->input('code'))->first();
         if (!$rack) {
             return $this->errorResponse(404, 'Rak tidak ditemukan');
         }
@@ -60,6 +60,7 @@ class RackStockController extends Controller
                 'code' => $rack->code,
                 'name' => $rack->name,
                 'warehouse' => $rack->warehouse?->name,
+                'color' => $rack->color?->name,
             ],
             'items' => $items,
             'total' => $items->sum('quantity'),
