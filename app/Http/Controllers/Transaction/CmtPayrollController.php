@@ -33,6 +33,7 @@ class CmtPayrollController extends Controller
     private function serialNumbers(CmtPayrollDetail $d): ?string
     {
         $serials = $d->receivedItems
+            ->toBase()
             ->map(fn($i) => $i->requestDetail?->request?->serial_number)
             ->push($d->requestDetail?->request?->serial_number)
             ->filter()
