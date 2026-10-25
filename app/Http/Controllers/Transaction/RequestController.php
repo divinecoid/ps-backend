@@ -417,6 +417,24 @@ class RequestController extends Controller
 
                         $cuttingDetail->decrement('avl_qty', $item['req_qty']);
                     }
+                    // Barcode = cmt|seri|sku|warna|ukuran. Barcode kembar membuat
+                    // penerimaan (lookup per barcode) ambigu, jadi tolak jika CMT yang
+                    // sama sudah memegang seri+model+ukuran yang sama.
+                    $barcodes = array_column($details, 'barcode');
+                    if (count($barcodes) !== count(array_unique($barcodes))) {
+                        throw new \Illuminate\Http\Exceptions\HttpResponseException(
+                            $this->errorResponse(422, 'Terdapat model/ukuran duplikat dalam permintaan.')
+                        );
+                    }
+                    $existing = RequestDetail::whereIn('barcode', $barcodes)->pluck('barcode');
+                    if ($existing->isNotEmpty()) {
+                        throw new \Illuminate\Http\Exceptions\HttpResponseException(
+                            $this->errorResponse(
+                                422,
+                                "CMT {$cmt->name} sudah memiliki permintaan untuk seri, model, dan ukuran yang sama (" . $existing->first() . "). Tambahkan qty pada permintaan yang ada atau pilih CMT lain."
+                            )
+                        );
+                    }
                     RequestDetail::insert($details);
                     return $this->successResponse($requestModel);
                 });
