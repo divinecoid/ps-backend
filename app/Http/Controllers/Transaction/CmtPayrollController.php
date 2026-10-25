@@ -19,11 +19,28 @@ class CmtPayrollController extends Controller
     use CrudTrait;
 
     /** Relations needed to render a payroll via structure(). */
-    private const RELATIONS = ['cmt', 'details.model', 'details.requestDetail.request'];
+    private const RELATIONS = ['cmt', 'details.model', 'details.requestDetail.request', 'details.receivedItems.requestDetail.request'];
 
     private function pcsToLusin(int $pcs): float
     {
         return CmtPayrollCalculator::pcsToLusin($pcs);
+    }
+
+    /**
+     * Seri of a payroll row, comma-joined: a grouped row spans every seri its
+     * scans came from; legacy rows fall back to their own request detail.
+     */
+    private function serialNumbers(CmtPayrollDetail $d): ?string
+    {
+        $serials = $d->receivedItems
+            ->map(fn($i) => $i->requestDetail?->request?->serial_number)
+            ->push($d->requestDetail?->request?->serial_number)
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values();
+
+        return $serials->isEmpty() ? null : $serials->implode(', ');
     }
 
     private function structure()
@@ -45,7 +62,7 @@ class CmtPayrollController extends Controller
             'created_at' => $data->created_at,
             'details' => $data->details->map(fn(CmtPayrollDetail $d) => [
                 'id' => $d->id,
-                'serial_number' => $d->requestDetail?->request?->serial_number,
+                'serial_number' => $this->serialNumbers($d),
                 'model' => $d->model?->name,
                 'qty' => $d->qty,
                 'qty_dozen' => CmtPayrollCalculator::splitDozen((int) $d->qty)[0],
@@ -146,7 +163,7 @@ class CmtPayrollController extends Controller
                     $rateMap = CmtModelRate::where('kategori', $cmt->kategori)
                         ->pluck('rate', 'group_id');
 
-                    // One payroll row per seri + model (not per scanned barcode):
+                    // One payroll row per model (not per scanned barcode):
                     // quantities are summed first, THEN converted to lusin.
                     $groups = CmtPayrollCalculator::group(
                         $receivedDetails->map(function ($rd) use ($rateMap) {
@@ -154,7 +171,6 @@ class CmtPayrollController extends Controller
 
                             return [
                                 'id' => $rd->id,
-                                'request_id' => $rd->requestDetail?->request_id,
                                 'request_detail_id' => $rd->request_detail_id,
                                 'model_id' => $rd->model_id,
                                 'qty' => (int) $rd->qty,

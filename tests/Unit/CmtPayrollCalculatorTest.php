@@ -70,7 +70,7 @@ class CmtPayrollCalculatorTest extends TestCase
         $this->assertSame(250000.0, $rows[0]['amount']);
     }
 
-    public function test_different_seri_or_model_stay_separate_rows(): void
+    public function test_same_model_across_seri_is_one_row_but_different_models_stay_separate(): void
     {
         $rows = CmtPayrollCalculator::group([
             $this->row('a', 12, 'R1', 'M1'),
@@ -78,7 +78,8 @@ class CmtPayrollCalculatorTest extends TestCase
             $this->row('c', 12, 'R1', 'M2'),
         ]);
 
-        $this->assertCount(3, $rows);
+        $this->assertCount(2, $rows);
+        $this->assertSame(24, $rows[0]['qty']);
     }
 
     public function test_model_without_rate_falls_back_to_per_piece_fee(): void

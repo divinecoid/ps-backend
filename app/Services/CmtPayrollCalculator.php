@@ -5,7 +5,7 @@ namespace App\Services;
 /**
  * Pure payroll math for CMT penggajian (no DB access), so it can be unit
  * tested on its own: piece -> lusin conversion and grouping of received
- * pieces into one payroll row per seri + model.
+ * pieces into one payroll row per model.
  */
 class CmtPayrollCalculator
 {
@@ -54,15 +54,14 @@ class CmtPayrollCalculator
     }
 
     /**
-     * Groups received-log rows into payroll rows: ONE row per
-     * (request/seri, model, fee) instead of one per scanned barcode, so e.g.
-     * 12 + 12 + 4 pcs of the same model on the same seri becomes a single
-     * 28-pcs row. Grouping happens BEFORE the lusin conversion — converting
+     * Groups received-log rows into payroll rows: ONE row per (model, fee)
+     * across all seri, instead of one per scanned barcode, so e.g.
+     * 12 + 12 + 4 pcs of the same model becomes a single 28-pcs row. Grouping happens BEFORE the lusin conversion — converting
      * each scan separately would pay every loose piece as 0.08 lusin
      * (30 single scans = 2.4 lusin) instead of the true 30 pcs = 2 lusin +
      * 6 pcs = 2.5 lusin.
      *
-     * Each input row: [id, request_id, request_detail_id, model_id, qty,
+     * Each input row: [id, request_detail_id, model_id, qty,
      * rate (per lusin, or null when the model has no configured rate),
      * fallback_unit_fee (per piece, used only when rate is null)].
      *
@@ -79,7 +78,6 @@ class CmtPayrollCalculator
             $perLusin = $row['rate'] !== null;
             $unitFee = $perLusin ? (float) $row['rate'] : (float) ($row['fallback_unit_fee'] ?? 0);
             $key = implode('|', [
-                $row['request_id'] ?? '',
                 $row['model_id'] ?? '',
                 $perLusin ? 'lusin' : 'pcs',
                 number_format($unitFee, 2, '.', ''),

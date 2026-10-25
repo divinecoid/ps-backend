@@ -41,6 +41,17 @@ class CmtPayrollDetail extends Model
         return $this->belongsTo(ReceivedlogDetail::class, 'received_log_detail_id');
     }
 
+    /** The scanned received-log rows this (grouped) row was built from. */
+    public function receivedItems()
+    {
+        return $this->belongsToMany(
+            ReceivedlogDetail::class,
+            'trx_cmt_payroll_detail_items',
+            'cmt_payroll_detail_id',
+            'received_log_detail_id'
+        );
+    }
+
     public function model()
     {
         return $this->belongsTo(ProductModel::class, 'model_id');
