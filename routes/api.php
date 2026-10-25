@@ -635,6 +635,24 @@ Route::prefix('finance')->middleware(['checkrole', 'acm:finance,read'])->group(f
     Route::get('/cmt-payroll-summary', [\App\Http\Controllers\Transaction\FinanceReportController::class, 'cmtPayrollSummary']);
 });
 
+// Marketplace settlement reconciliation
+Route::prefix('finance/settlement')->middleware(['checkrole', 'acm:finance,read'])->group(function () {
+    $c = \App\Http\Controllers\Transaction\SettlementController::class;
+    Route::get('/summary', [$c, 'summary']);
+    Route::get('/entries', [$c, 'entries']);
+    Route::get('/entries/{id}', [$c, 'showEntry']);
+    Route::get('/payouts', [$c, 'payouts']);
+    Route::get('/imports', [$c, 'imports']);
+    Route::get('/export', [$c, 'export']);
+});
+Route::prefix('finance/settlement')->middleware(['checkrole', 'acm:finance,create'])->group(function () {
+    Route::post('/import', [\App\Http\Controllers\Transaction\SettlementController::class, 'import']);
+    Route::post('/reconcile-bank', [\App\Http\Controllers\Transaction\SettlementController::class, 'reconcileBank']);
+});
+Route::prefix('finance/settlement')->middleware(['checkrole', 'acm:finance,delete'])->group(function () {
+    Route::delete('/imports/{id}', [\App\Http\Controllers\Transaction\SettlementController::class, 'destroyImport']);
+});
+
 Route::prefix('model_color')->middleware(['checkrole:admin', 'acm:master_model,read'])->group(function () {
     Route::get('/{id}', [ProductModelController::class, 'modelColor']);
 });
