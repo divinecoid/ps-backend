@@ -56,6 +56,12 @@ class SmallInventoryController extends Controller
             'warehouse' => (object) [
                 'name' => $data->warehouse->name
             ],
+            'size' => (object) [
+                'name' => $data->size?->name
+            ],
+            'color' => (object) [
+                'name' => $data->color?->name
+            ],
             'total' => (int) ($data->product_count ?? 0)
         ];
     }
@@ -65,7 +71,7 @@ class SmallInventoryController extends Controller
         return $this->baseIndex(
             $request,
             Rack::class,
-            ['product'],
+            ['product', 'size', 'color'],
             ['id', 'code', 'name'],
             $this->overviewStructure(),
             function (Builder $query) {
@@ -79,7 +85,7 @@ class SmallInventoryController extends Controller
         return $this->baseMaster(
             $request,
             Rack::class,
-            ['product'],
+            ['product', 'size', 'color'],
             ['id', 'code', 'name'],
             $this->overviewStructure(),
             function (Builder $query) {
