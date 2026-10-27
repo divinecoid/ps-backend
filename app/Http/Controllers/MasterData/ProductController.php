@@ -480,7 +480,9 @@ class ProductController extends Controller
 
         $header = array_map(fn($h) => strtolower(trim((string) $h)), array_shift($rows));
         $expected = ['kode_cmt', 'sku_model', 'kode_warna', 'kode_ukuran', 'kode_rak', 'tipe', 'nomor_urut', 'qty'];
-        if ($header !== $expected) {
+        // 'seri' is optional so older templates without it still import.
+        $header = array_slice($header, 0, count($expected) + (($header[count($expected)] ?? null) === 'seri' ? 1 : 0));
+        if ($header !== $expected && $header !== [...$expected, 'seri']) {
             return $this->errorResponse(422, 'Format kolom template tidak sesuai.');
         }
 
@@ -497,7 +499,8 @@ class ProductController extends Controller
                 continue;
             }
 
-            [$cmtCode, $sku, $colorCode, $sizeCode, $rackCode, $type, $number, $qty] = array_pad($row, 8, null);
+            [$cmtCode, $sku, $colorCode, $sizeCode, $rackCode, $type, $number, $qty, $seri] = array_pad($row, 9, null);
+            $seri = trim((string) $seri);
 
             $cmtId = $cmts[trim((string) $cmtCode)] ?? null;
             $modelId = $models[trim((string) $sku)] ?? null;
@@ -530,6 +533,9 @@ class ProductController extends Controller
             if (!ctype_digit((string) $qty) || (int) $qty < 1) {
                 return $this->errorResponse(422, "Baris {$rowNumber}: qty harus bilangan bulat minimal 1.");
             }
+            if (strlen($seri) > 50 || str_contains($seri, '|')) {
+                return $this->errorResponse(422, "Baris {$rowNumber}: seri maksimal 50 karakter dan tidak boleh mengandung '|'.");
+            }
 
             $parsed[] = [
                 'cmt_id' => $cmtId,
@@ -540,6 +546,7 @@ class ProductController extends Controller
                 'type' => $type,
                 'number' => (int) $number,
                 'qty' => (int) $qty,
+                'series' => $seri,
             ];
         }
 
@@ -559,7 +566,7 @@ class ProductController extends Controller
                 $size = Size::find($line['size_id']);
 
                 for ($i = 0; $i < $line['qty']; $i++) {
-                    $series = $baseTime->copy()->addSeconds($count)->format('YmdHis');
+                    $series = $line['series'] !== '' ? $line['series'] : $baseTime->copy()->addSeconds($count)->format('YmdHis');
                     $barcode = implode('|', [
                         $cmt->code,
                         $series,

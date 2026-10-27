@@ -251,6 +251,7 @@ HTML;
             'type' => 'required|in:D,P',
             'number' => 'required|integer|min:1',
             'qty' => 'required|integer|min:1',
+            'series' => ['nullable', 'string', 'max:50', 'not_regex:/[|]/'],
         ]);
 
         $model = ProductModel::find($request->model_id);
@@ -263,8 +264,10 @@ HTML;
         $batchId = (string) Str::uuid();
 
         \Illuminate\Support\Facades\DB::transaction(function () use ($request, $model, $color, $size, $cmt, &$barcodes, $baseTime, $batchId) {
+            // A series typed by the user is shared by the whole batch; blank = auto timestamp per item.
+            $customSeries = trim((string) $request->series);
             for ($i = 0; $i < $request->qty; $i++) {
-                $series = $baseTime->copy()->addSeconds($i)->format('YmdHis');
+                $series = $customSeries !== '' ? $customSeries : $baseTime->copy()->addSeconds($i)->format('YmdHis');
                 $barcode = implode('|', [
                     $cmt->code,
                     $series,
