@@ -77,7 +77,7 @@ class ProductModelController extends Controller
             ProductModel::class,
             [
                 'sku' => 'required|string|unique:mdx_models,sku|max:255',
-                'name' => 'required|string|max:255',
+                'name' => 'required|string|unique:mdx_models,name|max:255',
                 'cmt_rate_group_id' => [
                     'nullable',
                     Rule::exists('mdx_cmt_rate_groups', 'id')->whereNull('deleted_at'),
@@ -111,7 +111,12 @@ class ProductModelController extends Controller
                     'max:255',
                     Rule::unique('mdx_models', 'sku')->ignore($id)
                 ],
-                'name' => 'required|string|max:255',
+                'name' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('mdx_models', 'name')->ignore($id)
+                ],
                 'cmt_rate_group_id' => [
                     'nullable',
                     Rule::exists('mdx_cmt_rate_groups', 'id')->whereNull('deleted_at'),
