@@ -66,6 +66,16 @@ class SmallInventoryController extends Controller
         ];
     }
 
+    /** Filter model_id / color_id: hanya rak yang berisi produk dengan model/warna tersebut. */
+    private function applyProductFilters(Builder $query, Request $request): void
+    {
+        foreach (['model_id', 'color_id'] as $column) {
+            if ($request->filled($column)) {
+                $query->whereHas('product', fn($q) => $q->where($column, $request->input($column)));
+            }
+        }
+    }
+
     public function index(Request $request)
     {
         return $this->baseIndex(
@@ -74,8 +84,9 @@ class SmallInventoryController extends Controller
             ['product', 'size', 'color'],
             ['id', 'code', 'name'],
             $this->overviewStructure(),
-            function (Builder $query) {
+            function (Builder $query) use ($request) {
                 $query->withCount('product')->has('product');
+                $this->applyProductFilters($query, $request);
             }
         );
     }
@@ -88,8 +99,9 @@ class SmallInventoryController extends Controller
             ['product', 'size', 'color'],
             ['id', 'code', 'name'],
             $this->overviewStructure(),
-            function (Builder $query) {
+            function (Builder $query) use ($request) {
                 $query->withCount('product')->has('product');
+                $this->applyProductFilters($query, $request);
             }
         );
     }
