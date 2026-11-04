@@ -21,7 +21,8 @@ class Receivedlog extends Model
         'warehouse_id',
         'user_id',
         'received_date',
-        'notes'
+        'notes',
+        'source_rack_id'
     ];
 
     protected $casts = [
@@ -37,6 +38,16 @@ class Receivedlog extends Model
     public function warehouse()
     {
         return $this->belongsTo(Warehouse::class, 'warehouse_id');
+    }
+
+    public function histories()
+    {
+        return $this->hasMany(MutationHistory::class, 'receivedlog_id');
+    }
+
+    public function sourceRack()
+    {
+        return $this->belongsTo(\App\Models\MasterData\Rack::class, 'source_rack_id');
     }
 
     public function user()

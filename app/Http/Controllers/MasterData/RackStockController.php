@@ -30,9 +30,10 @@ class RackStockController extends Controller
         $add = function ($model, $color, $size, int $qty) use (&$items) {
             $key = "{$model?->id}|{$color?->id}|{$size?->id}";
             $items[$key] ??= [
-                'model' => $model?->name,
-                'color' => $color?->name,
-                'size' => $size?->name,
+                // name kadang kosong (hanya code yang terisi) -> fallback agar tidak tampil '-'
+                'model' => $model?->name ?: $model?->sku,
+                'color' => $color?->name ?: $color?->code,
+                'size' => $size?->name ?: $size?->code,
                 'quantity' => 0,
             ];
             $items[$key]['quantity'] += $qty;

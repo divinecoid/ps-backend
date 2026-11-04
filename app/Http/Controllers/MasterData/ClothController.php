@@ -49,10 +49,22 @@ class ClothController extends Controller
             ['factory', 'color', 'roll_size'],
             ['id', 'factory', 'gram', 'color', 'quantity', 'sequence'],
             $this->structure(),
-            queryCallback: function ($query) {
+            queryCallback: function ($query) use ($request) {
                 $query->where('quantity', '>', 0);
+                $this->applyFilters($query, $request);
             }
         );
+    }
+
+    /** Filter pabrik (factory_id) dan warna (color_id) untuk Gudang Kain. */
+    private function applyFilters($query, Request $request): void
+    {
+        if ($request->filled('factory_id')) {
+            $query->where('factory_id', $request->input('factory_id'));
+        }
+        if ($request->filled('color_id')) {
+            $query->where('color_id', $request->input('color_id'));
+        }
     }
 
     public function master(Request $request)
@@ -63,8 +75,9 @@ class ClothController extends Controller
             ['factory', 'color', 'roll_size'],
             ['id', 'factory', 'gram', 'color', 'quantity', 'sequence'],
             $this->structure(),
-            queryCallback: function ($query) {
+            queryCallback: function ($query) use ($request) {
                 $query->where('quantity', '>', 0);
+                $this->applyFilters($query, $request);
             }
         );
     }

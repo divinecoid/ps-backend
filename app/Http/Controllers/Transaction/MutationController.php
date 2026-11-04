@@ -5,8 +5,14 @@ namespace App\Http\Controllers\Transaction;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
 use App\Models\MasterData\CMT;
+use App\Models\MasterData\Inventory;
 use App\Models\MasterData\InventoryDetail;
+use App\Models\MasterData\Rack;
 use App\Models\MasterData\Product;
+use App\Models\MasterData\Notification;
+use App\Models\MasterData\NotificationRecipient;
+use App\Models\MasterData\User;
+use App\Models\Transactions\MutationHistory;
 use App\Models\Transactions\Receivedlog;
 use App\Models\Transactions\ReceivedlogDetail;
 use App\Models\Transactions\RequestDetail;
@@ -28,13 +34,23 @@ class MutationController extends Controller
             ],
             'created_at' => $data->created_at,
             'notes' => str_replace('[MUTATION] ', '', $data->notes),
-            'details' => $data->details->map(fn($detail) => [
-                'barcode' => $detail->barcode,
-                'rack_id' => $detail->product?->rack_id,
-                'rack' => (object) [
-                    'name' => $detail->product?->rack?->name ?? '-'
-                ]
-            ])
+            'source_rack' => $data->sourceRack ? (object) ['id' => $data->sourceRack->id, 'name' => $data->sourceRack->name] : null,
+            'details' => $data->histories->isNotEmpty()
+                ? $data->histories->map(fn($h) => [
+                    'barcode' => $h->barcode,
+                    'rack_id' => $h->to_rack_id,
+                    'rack' => (object) ['name' => $h->toRack?->name ?? '-'],
+                    'from_rack' => $h->fromRack ? (object) ['name' => $h->fromRack->name] : null,
+                    'from_warehouse' => $h->fromWarehouse?->name,
+                    'to_warehouse' => $h->toWarehouse?->name,
+                ])
+                : $data->details->map(fn($detail) => [
+                    'barcode' => $detail->barcode,
+                    'rack_id' => $detail->product?->rack_id,
+                    'rack' => (object) [
+                        'name' => $detail->product?->rack?->name ?? '-'
+                    ]
+                ])
         ];
     }
 
@@ -43,7 +59,7 @@ class MutationController extends Controller
         return $this->baseIndex(
             $request,
             Receivedlog::class,
-            ['user', 'details.product.rack'],
+            ['user', 'sourceRack', 'details.product.rack', 'histories.fromRack', 'histories.toRack', 'histories.fromWarehouse', 'histories.toWarehouse'],
             ['notes' => 'like'],
             $this->structure(),
             function ($query) {
@@ -83,16 +99,25 @@ class MutationController extends Controller
                 'items.*.rack_id' => ['required', 'distinct', Rule::exists('mdx_racks', 'id')->whereNull('deleted_at')],
                 'items.*.barcodes' => 'required|array|min:1',
                 'items.*.barcodes.*' => 'required|string',
+                'source_rack_id' => ['nullable', Rule::exists('mdx_racks', 'id')->whereNull('deleted_at')],
                 'notes' => 'nullable|string|max:1000'
             ],
             function ($data) {
                 try {
+                    // Opsi 1: barang diambil dari rak asal yang discan (gudang besar / kecil).
+                    // Tanpa source_rack_id = Opsi 2 (rak tujuan saja).
+                    $sourceRackId = $data['source_rack_id'] ?? null;
+                    if ($sourceRackId && collect($data['items'])->pluck('rack_id')->contains($sourceRackId)) {
+                        return $this->errorResponse(422, 'Rak tujuan tidak boleh sama dengan rak asal');
+                    }
 
                     $invalidBarcodes = [];
                     $scannedBarcodes = [];
                     // Old-stock ("stok lama") barcodes have no CMT request: they are
                     // moved out of the big warehouse using their Product row instead.
                     $legacyProducts = [];
+                    // Barang yang sudah punya rak: dipindah antar rak (tanpa mengubah stok).
+                    $moves = [];
                     $currentRequest = null;
 
                     $seen = [];
@@ -110,39 +135,53 @@ class MutationController extends Controller
                     foreach ($data['items'] as $items) {
                         foreach ($items['barcodes'] as $barcode) {
                             ['prefix' => $prefix, 'group' => $group, 'sequence' => $sequence] = $this->parseBarcode($barcode);
-                            if ($group == 'P') {
-                                $requestDetail = $this->findRequestDetail($prefix);
-                                if (!$requestDetail) {
-                                    $legacy = $this->findLegacyProduct($barcode);
-                                    if (!$legacy) {//cek jika barcode ditemukan di database
-                                        $invalidBarcodes[] = $barcode;
-                                    } elseif ($legacy->rack_id !== null) {//stok lama yang sudah dipindah / sudah punya rak
-                                        $scannedBarcodes[] = $barcode;
-                                    } else {
-                                        $legacyProducts[$barcode] = $legacy;
-                                    }
-                                    continue;
-                                }
+                            if ($group != 'P') {
+                                //jika bukan piece
+                                $invalidBarcodes[] = $barcode;
+                                continue;
+                            }
 
-                                $request = $requestDetail->request;
-                                $currentRequest ??= $request;//simpan current request pertama
-    
-                                if ($request->id !== $currentRequest->id) {
-                                    $invalidBarcodes[] = $barcode;
-                                    continue;
-                                }
+                            $requestDetail = $this->findRequestDetail($prefix);
+                            $existing = Product::where('barcode', $barcode)->first();
 
-                                if ($sequence > $requestDetail->req_qty) {//jika (request tidak memiliki sisa piece) atau (request memiliki sisa piece dan sequence di luar dari range request piece)
-                                    $invalidBarcodes[] = $barcode;
-                                    continue;
-                                }
+                            // Sudah punya rak -> pindah antar rak.
+                            if ($existing && $existing->rack_id !== null) {
                                 if (
-                                    Product::where('barcode', $barcode)->exists()//jika sudah pernah discan
+                                    $existing->rack_id === $items['rack_id']
+                                    || ($sourceRackId && $existing->rack_id !== $sourceRackId)
                                 ) {
                                     $scannedBarcodes[] = $barcode;
+                                } else {
+                                    $moves[$barcode] = $existing;
                                 }
-                            } else {
-                                //jika bukan piece
+                                continue;
+                            }
+
+                            if (!$requestDetail) {
+                                $legacy = $this->findLegacyProduct($barcode);
+                                if (!$legacy) {//cek jika barcode ditemukan di database
+                                    $invalidBarcodes[] = $barcode;
+                                } elseif ($sourceRackId && !$this->inSourceRack($sourceRackId, $legacy->model_id, $legacy->color_id, $legacy->size_id)) {
+                                    $invalidBarcodes[] = $barcode;
+                                } else {
+                                    $legacyProducts[$barcode] = $legacy;
+                                }
+                                continue;
+                            }
+
+                            $request = $requestDetail->request;
+                            $currentRequest ??= $request;//simpan current request pertama
+
+                            if ($request->id !== $currentRequest->id) {
+                                $invalidBarcodes[] = $barcode;
+                                continue;
+                            }
+
+                            if ($sequence > $requestDetail->req_qty) {//jika (request tidak memiliki sisa piece) atau (request memiliki sisa piece dan sequence di luar dari range request piece)
+                                $invalidBarcodes[] = $barcode;
+                                continue;
+                            }
+                            if ($sourceRackId && !$this->inSourceRack($sourceRackId, $requestDetail->model_id, $requestDetail->cutting->clothes->color_id, $requestDetail->size_id)) {
                                 $invalidBarcodes[] = $barcode;
                                 continue;
                             }
@@ -150,65 +189,113 @@ class MutationController extends Controller
                     }
 
                     $totalInvalid = count($invalidBarcodes) + count($scannedBarcodes);
-                    if ($totalInvalid == 0 && ($currentRequest !== null || !empty($legacyProducts))) {//jika semuanya lolos validasi
-                        DB::transaction(function () use ($data, $currentRequest, $legacyProducts) {
+                    if ($totalInvalid == 0 && ($currentRequest !== null || !empty($legacyProducts) || !empty($moves))) {//jika semuanya lolos validasi
+                        $log = null;
+                        $movements = [];
+                        DB::transaction(function () use ($data, $currentRequest, $legacyProducts, $moves, $sourceRackId, &$log, &$movements) {
+                            $firstKey = array_key_first($legacyProducts) ?? array_key_first($moves);
                             $cmtId = $currentRequest?->cmt_id
-                                ?? CMT::where('code', explode('|', array_key_first($legacyProducts))[0])->value('id')
+                                ?? ($firstKey ? CMT::where('code', explode('|', $firstKey)[0])->value('id') : null)
                                 ?? CMT::value('id');
                             $log = Receivedlog::create([
                                 'cmt_id' => $cmtId,
                                 'request_id' => $currentRequest?->id,
                                 'user_id' => Auth::id(),
                                 'received_date' => now(),
-                                'notes' => '[MUTATION] ' . ($data['notes'] ?? '')
+                                'notes' => '[MUTATION] ' . ($data['notes'] ?? ''),
+                                'source_rack_id' => $sourceRackId
                             ]);
 
+                            $rackIds = collect($data['items'])->pluck('rack_id')->push($sourceRackId)->filter()->unique()->all();
+                            $racks = Rack::with('warehouse')->whereIn('id', $rackIds)->get()->keyBy('id');
+
                             foreach ($data['items'] as $item) {
+                                $toRack = $racks[$item['rack_id']] ?? null;
                                 foreach ($item['barcodes'] as $barcode) {
                                     ['prefix' => $prefix] = $this->parseBarcode($barcode);
                                     $series = $this->getSeries($prefix);
-                                    if (isset($legacyProducts[$barcode])) {
+                                    $product = null;
+                                    $fromRackId = null;
+
+                                    if (isset($moves[$barcode])) {
+                                        // Antar rak: hanya ganti rak, stok tidak berubah.
+                                        $product = $moves[$barcode];
+                                        $fromRackId = $product->rack_id;
+                                        $product->update(['rack_id' => $item['rack_id']]);
+                                    } elseif (isset($legacyProducts[$barcode])) {
                                         // Old stock: move the existing Product into the chosen
                                         // small-warehouse rack and take 1 pc out of the big warehouse.
-                                        $legacyProducts[$barcode]->update(['rack_id' => $item['rack_id']]);
-                                        app(LegacyStockService::class)->deductOnePiece($legacyProducts[$barcode]);
-                                        continue;
-                                    }
-                                    if ($rd = $this->findRequestDetail($prefix)) {
+                                        $product = $legacyProducts[$barcode];
+                                        $fromRackId = $sourceRackId ?? $this->inventoryRackId($product->model_id, $product->color_id, $product->size_id);
+                                        $product->update(['rack_id' => $item['rack_id']]);
+                                        app(LegacyStockService::class)->deductOnePiece($product);
+                                    } elseif ($rd = $this->findRequestDetail($prefix)) {
+                                        $colorId = $rd->cutting->clothes->color_id;
+                                        $fromRackId = $sourceRackId ?? $this->inventoryRackId($rd->model_id, $colorId, $rd->size_id);
                                         ReceivedlogDetail::create([
                                             'receivedlog_id' => $log->id,
                                             'request_detail_id' => $rd->id,
                                             'model_id' => $rd->model_id,
-                                            'color_id' => $rd->cutting->clothes->color_id,
+                                            'color_id' => $colorId,
                                             'size_id' => $rd->size_id,
                                             'qty' => 1,
                                             'barcode' => $barcode
                                         ]);
 
-                                        Product::create([
+                                        $product = Product::create([
                                             'rack_id' => $item['rack_id'],
                                             'model_id' => $rd->model_id,
-                                            'color_id' => $rd->cutting->clothes->color_id,
+                                            'color_id' => $colorId,
                                             'size_id' => $rd->size_id,
                                             'series' => $series,
                                             'barcode' => $barcode
                                         ]);
                                         InventoryDetail::where('series', $series)
-                                            ->whereHas('inventory', function ($q) use ($rd) {
+                                            ->whereHas('inventory', function ($q) use ($rd, $colorId) {
                                                 $q->where([
                                                     'model_id' => $rd->model_id,
-                                                    'color_id' => $rd->cutting->clothes->color_id,
+                                                    'color_id' => $colorId,
                                                     'size_id' => $rd->size_id
                                                 ]);
                                             })
                                             ->where('quantity', '>', 0)
                                             ->decrement('quantity');
+                                    } else {
+                                        continue;
                                     }
+
+                                    $fromRack = $fromRackId ? ($racks[$fromRackId] ?? Rack::with('warehouse')->find($fromRackId)) : null;
+                                    if ($fromRack) {
+                                        $racks[$fromRack->id] = $fromRack;
+                                    }
+                                    MutationHistory::create([
+                                        'receivedlog_id' => $log->id,
+                                        'barcode' => $barcode,
+                                        'model_id' => $product?->model_id,
+                                        'color_id' => $product?->color_id,
+                                        'size_id' => $product?->size_id,
+                                        'from_rack_id' => $fromRack?->id,
+                                        'to_rack_id' => $item['rack_id'],
+                                        'from_warehouse_id' => $fromRack?->warehouse_id,
+                                        'to_warehouse_id' => $toRack?->warehouse_id,
+                                        'user_id' => Auth::id(),
+                                    ]);
+
+                                    $key = ($fromRack?->id ?? '-') . '>' . $item['rack_id'];
+                                    $movements[$key] ??= [
+                                        'from_rack' => $fromRack?->name,
+                                        'from_warehouse' => $fromRack?->warehouse?->name,
+                                        'to_rack' => $toRack?->name,
+                                        'to_warehouse' => $toRack?->warehouse?->name,
+                                        'count' => 0,
+                                    ];
+                                    $movements[$key]['count']++;
                                 }
                             }
 
                         });
                         $totalScanned = collect($data['items'])->pluck('barcodes')->flatten()->count();
+                        $this->notifyMutation($log, $totalScanned, array_values($movements));
 
                         return $this->successResponse([
                             'total_scanned' => $totalScanned,
@@ -227,6 +314,53 @@ class MutationController extends Controller
             }
         );
 
+    }
+
+    /** 1 notifikasi per transaksi mutasi: semua admin + user yang melakukan mutasi. */
+    private function notifyMutation(Receivedlog $log, int $total, array $movements): void
+    {
+        try {
+            $user = Auth::user();
+            $summary = collect($movements)
+                ->map(fn($m) => "{$m['count']} item: " . ($m['from_rack'] ?? 'gudang besar') . ' → ' . ($m['to_rack'] ?? '-'))
+                ->implode('; ');
+
+            $notification = Notification::create([
+                'unique_key' => 'mutation:' . $log->id,
+                'title' => "Mutasi barang: {$total} item",
+                'message' => ($user?->name ?? 'User') . " memutasi {$summary}.",
+                'type' => 'mutasi',
+                'data' => [
+                    'receivedlog_id' => $log->id,
+                    'total' => $total,
+                    'user_name' => $user?->name,
+                    'movements' => $movements,
+                ],
+                'created_by' => Auth::id(),
+                'updated_by' => Auth::id(),
+            ]);
+
+            $userIds = User::whereHas('roles', fn($q) => $q->whereRaw('LOWER(name) = ?', ['admin']))
+                ->pluck('id')
+                ->push(Auth::id())
+                ->filter()
+                ->unique();
+
+            foreach ($userIds as $userId) {
+                NotificationRecipient::create([
+                    'notification_id' => $notification->id,
+                    'user_id' => $userId,
+                    'is_read' => false,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            report($e); // mutasi sudah tersimpan; kegagalan notifikasi tidak boleh menggagalkannya
+        }
+    }
+
+    private function inventoryRackId($modelId, $colorId, $sizeId): ?string
+    {
+        return Inventory::where(['model_id' => $modelId, 'color_id' => $colorId, 'size_id' => $sizeId])->value('rack_id');
     }
 
     private function findRequestDetail(string $prefix)
@@ -248,6 +382,13 @@ class MutationController extends Controller
             ->first();
     }
 
+    /** Stok gudang besar tercatat per model/warna/ukuran di Inventory.rack_id. */
+    private function inSourceRack(string $rackId, $modelId, $colorId, $sizeId): bool
+    {
+        return Inventory::where(['model_id' => $modelId, 'color_id' => $colorId, 'size_id' => $sizeId])
+            ->value('rack_id') === $rackId;
+    }
+
     private function parseBarcode(string $barcode)
     {
         $parts = explode('|', $barcode);
@@ -264,10 +405,32 @@ class MutationController extends Controller
             $request,
             [
                 'barcode' => 'required|string',
+                'source_rack_id' => ['nullable', Rule::exists('mdx_racks', 'id')->whereNull('deleted_at')],
             ],
             function ($data) {
                 $barcode = $data['barcode'];
+                $sourceRackId = $data['source_rack_id'] ?? null;
+
                 ['prefix' => $prefix, 'group' => $group, 'sequence' => $sequence] = $this->parseBarcode($barcode);
+
+                // Barang yang sudah punya rak boleh dipindah ke rak lain (mutasi antar rak).
+                $existing = Product::with(['model', 'color', 'size', 'rack'])->where('barcode', $barcode)->first();
+                if ($existing && $existing->rack_id !== null) {
+                    if ($group !== 'P') {
+                        return $this->errorResponse(422, 'Barcode bukan merupakan barcode piece');
+                    }
+                    if ($sourceRackId && $existing->rack_id !== $sourceRackId) {
+                        return $this->errorResponse(422, 'Barang tidak berada di rak asal yang dipilih');
+                    }
+                    $cmt = CMT::where('code', explode('|', $barcode)[0])->first();
+                    return $this->successResponse([
+                        'cmt' => (object) ['code' => $cmt?->code, 'name' => $cmt?->name, 'contact_person' => $cmt?->contact_person, 'phone' => $cmt?->phone, 'address' => $cmt?->address],
+                        'model' => (object) ['sku' => $existing->model?->sku, 'name' => $existing->model?->name],
+                        'color' => (object) ['code' => $existing->color?->code, 'name' => $existing->color?->name],
+                        'size' => (object) ['code' => $existing->size?->code, 'name' => $existing->size?->name],
+                        'current_rack' => (object) ['id' => $existing->rack_id, 'name' => $existing->rack?->name],
+                    ]);
+                }
 
                 $requestDetail = $this->findRequestDetail($prefix);
                 if (!$requestDetail) {
@@ -281,6 +444,9 @@ class MutationController extends Controller
                     }
                     if ($legacy->rack_id !== null) {
                         return $this->errorResponse(422, 'Barcode sudah discan');
+                    }
+                    if ($sourceRackId && !$this->inSourceRack($sourceRackId, $legacy->model_id, $legacy->color_id, $legacy->size_id)) {
+                        return $this->errorResponse(422, 'Barang tidak berada di rak asal yang dipilih');
                     }
                     $cmt = CMT::where('code', explode('|', $barcode)[0])->first();
                     return $this->successResponse([
@@ -311,6 +477,10 @@ class MutationController extends Controller
                     Product::where('barcode', $barcode)->exists()//jika sudah pernah discan
                 ) {
                     return $this->errorResponse(422, 'Barcode sudah discan');
+                }
+
+                if ($sourceRackId && !$this->inSourceRack($sourceRackId, $requestDetail->model_id, $requestDetail->cutting->clothes->color_id, $requestDetail->size_id)) {
+                    return $this->errorResponse(422, 'Barang tidak berada di rak asal yang dipilih');
                 }
 
                 $cmt = $requestDetail->request->cmt;
