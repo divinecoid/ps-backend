@@ -36,6 +36,7 @@ use App\Http\Controllers\Api\ShopeeController;
 use App\Http\Controllers\Api\TiktokShopController;
 use App\Http\Controllers\Transaction\CheckerController;
 use App\Http\Controllers\Transaction\FabricPurchaseController;
+use App\Http\Controllers\Transaction\FabricReturnController;
 use App\Http\Controllers\Transaction\DashboardController;
 use Illuminate\Http\JsonResponse;
 use App\Http\Controllers\Api\MarketplaceAuthController;
@@ -597,6 +598,15 @@ Route::prefix('fabric-purchase')->middleware(['checkrole', 'acm:pembelian_kain,u
 });
 Route::prefix('fabric-purchase')->middleware(['checkrole', 'acm:pembelian_kain,delete'])->group(function () {
     Route::delete('/{id}', [FabricPurchaseController::class, 'destroy']);
+});
+
+// Retur Kain
+Route::prefix('fabric-return')->middleware(['checkrole', 'acm:retur_kain,read'])->group(function () {
+    Route::get('/', [FabricReturnController::class, 'index']);
+    Route::get('/{id}', [FabricReturnController::class, 'show']);
+});
+Route::prefix('fabric-return')->middleware(['checkrole', 'acm:retur_kain,create'])->group(function () {
+    Route::post('/', [FabricReturnController::class, 'store']);
 });
 
 // Inbound Receiving (Penerimaan CMT)

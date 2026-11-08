@@ -17,6 +17,7 @@ class AcmMenuRegistry
 
             // Transaksi Kain
             'pembelian_kain' => ['label' => 'Pembelian Kain'],
+            'retur_kain'     => ['label' => 'Retur Kain'],
 
             // Transaksi CMT
             'permintaan'         => ['label' => 'Permintaan CMT'],
