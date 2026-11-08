@@ -47,7 +47,16 @@
         .cell-piece {
             background-color: #f7fafd;
             border-color: #d6e8fa;
-            padding: 51.8mm 2mm 2mm;
+            padding: 45.8mm 2mm 2mm;
+        }
+        /* Larger label text (client request): the label box grows by 6mm
+         * (9 -> 15mm) and the top padding shrinks by the same 6mm (51.8 ->
+         * 45.8), so the card keeps its exact height and 3 rows still fit on
+         * A4. Fits up to 3 lines of 11px text; anything longer is clipped. */
+        .cell-piece .label {
+            font-size: 11px;
+            font-weight: bold;
+            height: 15mm;
         }
         /* Fixed mm sizing (not px) so the backend can compute an exact page
          * height for this row count — no leftover blank space at the end. */
