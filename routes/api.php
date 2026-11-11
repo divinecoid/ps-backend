@@ -239,6 +239,7 @@ Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,rea
     Route::get('/master', [ProductController::class, 'master']);
     Route::get('/batches', [ProductController::class, 'batches']);
     Route::get('/batch-items', [ProductController::class, 'batchItems']);
+    Route::get('batch/{batchId}/print/{kind}', [PrintController::class, 'batchPdf']);
     Route::get('/seed-dummy/template', [ProductController::class, 'downloadSeedTemplate']);
     Route::get('{id}', [ProductController::class, 'show']);
 });
@@ -576,6 +577,7 @@ Route::prefix('request')->middleware(['checkrole', 'acm:permintaan,read'])->grou
     Route::get('/', [RequestController::class, 'index']);
     Route::get('/{id}', [RequestController::class, 'show']);
     Route::get('/barcode/{id}', [RequestController::class, 'barcode']);
+    Route::get('/barcode/{id}/pdf/{kind}', [PrintController::class, 'requestPdf']);
 });
 Route::prefix('request')->middleware(['checkrole', 'acm:permintaan,create'])->group(function () {
     Route::post('/', [RequestController::class, 'store']);

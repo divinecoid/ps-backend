@@ -26,6 +26,8 @@ x-app: &app
     JWT_SECRET: ${JWT_SECRET}
     SESSION_DRIVER: database
     QUEUE_CONNECTION: database
+    # Must exceed the longest job timeout (GenerateBarcodePdfJob = 900s) or a slow PDF job gets re-queued mid-run.
+    DB_QUEUE_RETRY_AFTER: 1000
     CACHE_STORE: database
     FILESYSTEM_DISK: local
     # Write storage/logs/laravel.log (read by /logs) and keep stderr for `docker logs`.

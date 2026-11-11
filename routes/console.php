@@ -39,3 +39,10 @@ Schedule::job(new RefreshTiktokTokenJob())
     ->withoutOverlapping()
     ->name('tiktok-refresh-token')
     ->onOneServer();
+
+// Delete pre-generated barcode PDFs past their retention period (default 30 days)
+Schedule::command('barcode:prune')
+    ->dailyAt('02:00')
+    ->withoutOverlapping()
+    ->name('barcode-prune')
+    ->onOneServer();

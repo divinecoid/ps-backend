@@ -313,7 +313,17 @@ class ProductController extends Controller
             'Menghapus stok lama dengan ID: ' . $rows->pluck('id')->implode(', ')
         );
 
+        $this->refreshBatchPdfs($rows);
+
         return $this->successResponse($rows->values(), 'Success delete data');
+    }
+
+    /** Re-queue the pre-generated label PDFs of every batch touched by an edit/delete. */
+    private function refreshBatchPdfs($rows): void
+    {
+        $rows->pluck('stock_batch_id')->filter()->unique()->each(
+            fn($batchId) => \App\Jobs\GenerateBarcodePdfJob::dispatch('batch', (string) $batchId)
+        );
     }
 
     private function restoreLegacyProducts($products)
@@ -332,6 +342,8 @@ class ProductController extends Controller
             'RESTORE',
             'Mengembalikan stok lama dengan ID: ' . $rows->pluck('id')->implode(', ')
         );
+
+        $this->refreshBatchPdfs($rows);
 
         return $this->successResponse($rows->values());
     }
@@ -426,6 +438,8 @@ class ProductController extends Controller
             'Mengubah stok lama dengan ID: ' . $rows->pluck('id')->implode(', ')
                 . ($qty !== null ? " (jumlah menjadi {$qty})" : '')
         );
+
+        $this->refreshBatchPdfs($rows);
 
         return $this->successResponse($rows->count(), 'Berhasil mengubah ' . $rows->count() . ' barcode.');
     }
@@ -554,8 +568,8 @@ class ProductController extends Controller
             return $this->errorResponse(422, 'Tidak ada baris data yang valid untuk diproses.');
         }
 
-        $created = DB::transaction(function () use ($parsed) {
-            $batchId = (string) Str::uuid();
+        $batchId = (string) Str::uuid();
+        $created = DB::transaction(function () use ($parsed, $batchId) {
             $baseTime = now();
             $count = 0;
 
@@ -594,6 +608,8 @@ class ProductController extends Controller
 
             return $count;
         });
+
+        \App\Jobs\GenerateBarcodePdfJob::dispatch('batch', $batchId);
 
         return $this->successResponse(['created' => $created], "Berhasil membuat {$created} produk stok lama.");
     }

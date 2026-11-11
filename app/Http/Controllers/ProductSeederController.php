@@ -77,6 +77,8 @@ class ProductSeederController extends Controller
         }
         });
 
+        \App\Jobs\GenerateBarcodePdfJob::dispatch('batch', $batchId);
+
         $models = ProductModel::orderBy('name')->get();
         $colors = Color::orderBy('name')->get();
         $sizes = Size::orderBy('name')->get();
@@ -292,6 +294,9 @@ HTML;
                 $barcodes[] = $barcode;
             }
         });
+
+        // Pre-generate the label PDFs in the background so printing is instant.
+        \App\Jobs\GenerateBarcodePdfJob::dispatch('batch', $batchId);
 
         return response()->json([
             'success' => true,

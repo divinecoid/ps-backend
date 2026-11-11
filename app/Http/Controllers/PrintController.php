@@ -2,14 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use Barryvdh\DomPDF\Facade\Pdf;
-use Endroid\QrCode\QrCode;
-use Endroid\QrCode\Writer\PngWriter;
+use App\Services\BarcodePdfService;
 use Illuminate\Http\Request;
 
 class PrintController extends Controller
 {
-    public function barcodes(Request $request)
+    public function barcodes(Request $request, BarcodePdfService $service)
     {
         $data = $request->validate([
             'barcodes' => 'present|array',
@@ -42,48 +40,51 @@ class PrintController extends Controller
             ], 422);
         }
 
-        $writer = new PngWriter();
-        $renderQr = function (array $barcode) use ($writer) {
-            $qrCode = new QrCode(
-                data: $barcode['code'],
-                size: 240,
-                margin: 0,
-            );
-            $result = $writer->write($qrCode);
-            $barcode['qr'] = $result->getDataUri();
-            return $barcode;
-        };
+        return response(
+            $service->render(
+                $data['barcodes'] ?? [],
+                $data['dozenBarcodes'] ?? [],
+                $data['style'] ?? 'hangtag',
+                $data['paper'],
+            ),
+            200,
+            ['Content-Type' => 'application/pdf', 'Content-Disposition' => 'inline; filename="barcodes.pdf"']
+        );
+    }
 
-        $barcodes = collect(array_map($renderQr, $data['barcodes'] ?? []));
-        $dozenBarcodes = collect(array_map($renderQr, $data['dozenBarcodes'] ?? []));
-        $style = $data['style'] ?? 'hangtag';
-
-        $paperWidthMm = $data['paper']['width'];
-        $paperHeightMm = $data['paper']['height'];
-
-        if ($style === 'rack') {
-            // Single rack label: the PDF page IS the label, 5cm wide x 4cm
-            // tall including its border (client spec for the shelf stickers).
-            $paperWidthMm = 50;
-            $paperHeightMm = 40;
-        } else {
-            // Real A4 paper — printed on an actual printer, not a giant
-            // continuous roll. Cards use fixed mm sizing (see
-            // barcodes.blade.php) so dompdf's page-break math lines up
-            // cleanly with A4's real height instead of guessing from px,
-            // which is what caused rows to break early and leave a blank
-            // gap before the next page.
-            $paperWidthMm = 210;
-            $paperHeightMm = 297;
+    /** Old-stock batch PDF: served from the pre-generated file, rendered now if missing/expired. */
+    public function batchPdf(BarcodePdfService $service, string $batchId, string $kind)
+    {
+        if ($batchId === 'none') {
+            return $this->noLabels();
         }
 
-        $pdf = Pdf::loadView('print.barcodes', [
-            'barcodes' => $barcodes,
-            'dozenBarcodes' => $dozenBarcodes,
-            'paper' => $data['paper'],
-            'style' => $style,
-        ])->setPaper([0, 0, $paperWidthMm * 2.8346457, $paperHeightMm * 2.8346457]);
+        return $this->cachedPdf($service, BarcodePdfService::TYPE_BATCH, $batchId, $kind);
+    }
 
-        return $pdf->stream('barcodes.pdf');
+    /** CMT request PDF: served from the pre-generated file, rendered now if missing/expired. */
+    public function requestPdf(BarcodePdfService $service, string $id, string $kind)
+    {
+        return $this->cachedPdf($service, BarcodePdfService::TYPE_REQUEST, $id, $kind);
+    }
+
+    private function cachedPdf(BarcodePdfService $service, string $type, string $id, string $kind)
+    {
+        if (!in_array($kind, BarcodePdfService::KINDS, true) || !preg_match('/^[A-Za-z0-9-]+$/', $id)) {
+            return $this->noLabels();
+        }
+
+        $path = $service->ensure($type, $id, $kind);
+
+        return $path ? $service->response($path, "barcode-{$kind}.pdf") : $this->noLabels();
+    }
+
+    private function noLabels()
+    {
+        return response()->json([
+            'success' => false,
+            'message' => 'Tidak ada barcode untuk dicetak',
+            'data' => null,
+        ], 422);
     }
 }

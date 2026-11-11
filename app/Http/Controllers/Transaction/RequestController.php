@@ -436,6 +436,8 @@ class RequestController extends Controller
                         );
                     }
                     RequestDetail::insert($details);
+                    // Pre-generate the hangtag PDFs in the background (runs after commit).
+                    \App\Jobs\GenerateBarcodePdfJob::dispatch('request', (string) $requestModel->id)->afterCommit();
                     return $this->successResponse($requestModel);
                 });
             }
