@@ -298,9 +298,14 @@ HTML;
         // Pre-generate the label PDFs in the background so printing is instant.
         \App\Jobs\GenerateBarcodePdfJob::dispatch('batch', $batchId);
 
+        $rack = $request->rack_id ? Rack::with('warehouse')->find($request->rack_id) : null;
+        $toBig = !$rack || $rack->warehouse?->type === 'BESAR';
+
         return response()->json([
             'success' => true,
-            'message' => 'Berhasil membuat ' . count($barcodes) . ' produk stok lama.',
+            'message' => 'Berhasil membuat ' . count($barcodes) . ' produk stok lama.'
+                . ($toBig ? '' : " PERHATIAN: rak {$rack->name} bukan gudang BESAR, stok TIDAK masuk gudang besar."),
+            'to_big_warehouse' => $toBig,
             'data' => $barcodes
         ]);
     }

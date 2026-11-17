@@ -122,13 +122,26 @@ class ProductController extends Controller
         $modelIds = collect($data->items())->pluck('sample_model_id')->filter()->unique();
         $models = \App\Models\MasterData\ProductModel::whereIn('id', $modelIds)->get()->keyBy('id');
 
-        $items = collect($data->items())->map(function ($row) use ($models) {
+        // Old-stock batches whose products sit directly in a rack did NOT go to
+        // the big warehouse (small-warehouse rack, or warehouse without type).
+        $batchIds = collect($data->items())->pluck('stock_batch_id')->filter()->values();
+        $rackByBatch = Product::whereIn('stock_batch_id', $batchIds)
+            ->whereNotNull('rack_id')
+            ->select('stock_batch_id', DB::raw('MAX(rack_id) as rack_id'))
+            ->groupBy('stock_batch_id')
+            ->pluck('rack_id', 'stock_batch_id');
+        $racks = \App\Models\MasterData\Rack::with('warehouse')->whereIn('id', $rackByBatch->values())->get()->keyBy('id');
+
+        $items = collect($data->items())->map(function ($row) use ($models, $rackByBatch, $racks) {
+            $rack = $racks[$rackByBatch[$row->stock_batch_id] ?? null] ?? null;
             $isUngrouped = $row->stock_batch_id === null;
             $sampleModel = $models[$row->sample_model_id] ?? null;
 
             return [
                 'batch_id' => $isUngrouped ? 'none' : $row->stock_batch_id,
                 'is_ungrouped' => $isUngrouped,
+                // null = big warehouse (or normal flow); otherwise the rack the stock was placed in directly.
+                'direct_rack' => $rack ? trim($rack->name . ' (' . ($rack->warehouse?->name ?? '-') . ')') : null,
                 'label' => $isUngrouped ? 'Tanpa Batch (Produksi Normal)' : 'Batch Input Stok Lama',
                 'total' => (int) $row->total,
                 // Old-stock dozen batches hold D barcodes (one per dozen) plus
