@@ -25,6 +25,8 @@ class BarcodePdfService
     public const KINDS = ['dozen', 'piece'];
 
     private const DIR = 'barcode-pdfs';
+    // Bump when print/barcodes.blade.php changes so cached PDFs are re-rendered.
+    private const TEMPLATE_VERSION = 2;
     private const MM_TO_PT = 2.8346457;
 
     private function disk()
@@ -99,7 +101,7 @@ class BarcodePdfService
             return null;
         }
 
-        $path = "{$dir}/{$kind}-" . sha1(json_encode($payload)) . '.pdf';
+        $path = "{$dir}/{$kind}-" . sha1(self::TEMPLATE_VERSION . json_encode($payload)) . '.pdf';
         if ($this->isFresh($path)) {
             return $path;
         }

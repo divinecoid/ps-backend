@@ -78,6 +78,18 @@
         .cell-dozen-hangtag {
             padding: 2.8mm 2mm;
         }
+        /* Larger label text (client request): QR 30 -> 24mm and label box
+         * 9 -> 13mm (3 lines of 11px bold). Verified on dompdf: 30 cards = 1 A4
+         * page (26mm QR overflowed, 25mm barely fit). Re-render if changed. Longer text is clipped. */
+        .cell-dozen-hangtag .qr {
+            width: 24mm;
+            height: 24mm;
+        }
+        .cell-dozen-hangtag .label {
+            font-size: 11px;
+            font-weight: bold;
+            height: 13mm;
+        }
         .cell-dozen-compact {
             padding: 3mm 2mm;
         }
