@@ -90,11 +90,22 @@
             font-weight: bold;
             height: 13mm;
         }
+        /* Old-stock batches print as "compact": same larger text for dozen
+         * cards (QR 32.5 -> 24mm, label box 6 -> 13mm). Verified on dompdf:
+         * 30 cards = 1 A4 page, 60 = 2 (26mm QR overflowed). Re-render if changed. */
         .cell-dozen-compact {
             padding: 3mm 2mm;
         }
-        .cell-piece-compact .qr,
         .cell-dozen-compact .qr {
+            width: 24mm;
+            height: 24mm;
+        }
+        .cell-dozen-compact .label {
+            font-size: 11px;
+            font-weight: bold;
+            height: 13mm;
+        }
+        .cell-piece-compact .qr {
             width: 32.5mm;
             height: 32.5mm;
         }
@@ -108,8 +119,7 @@
             height: 9mm;
             overflow: hidden;
         }
-        .cell-piece-compact .label,
-        .cell-dozen-compact .label {
+        .cell-piece-compact .label {
             font-size: 7px;
             white-space: normal;
             word-break: break-word;

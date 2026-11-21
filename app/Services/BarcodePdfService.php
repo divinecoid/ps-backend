@@ -26,7 +26,7 @@ class BarcodePdfService
 
     private const DIR = 'barcode-pdfs';
     // Bump when print/barcodes.blade.php changes so cached PDFs are re-rendered.
-    private const TEMPLATE_VERSION = 2;
+    private const TEMPLATE_VERSION = 3;
     private const MM_TO_PT = 2.8346457;
 
     private function disk()
