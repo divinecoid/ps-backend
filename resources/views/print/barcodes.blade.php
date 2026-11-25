@@ -105,9 +105,12 @@
             font-weight: bold;
             height: 13mm;
         }
+        /* Old-stock piece ("satuan") cards: same larger text as dozen compact
+         * (QR 32.5 -> 24mm, label box 6 -> 13mm, 11px bold). Card height is the
+         * same as the dozen compact card, which fits 30/page on A4. Re-render if changed. */
         .cell-piece-compact .qr {
-            width: 32.5mm;
-            height: 32.5mm;
+            width: 24mm;
+            height: 24mm;
         }
         .label {
             font-size: 7px;
@@ -120,12 +123,13 @@
             overflow: hidden;
         }
         .cell-piece-compact .label {
-            font-size: 7px;
+            font-size: 11px;
+            font-weight: bold;
             white-space: normal;
             word-break: break-word;
             line-height: 1.2;
             margin-top: 1mm;
-            height: 6mm;
+            height: 13mm;
             overflow: hidden;
         }
         /* Rack shelf labels — deliberately plain/high-contrast (not the
