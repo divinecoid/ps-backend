@@ -19,6 +19,7 @@ use App\Models\Transactions\RequestDetail;
 use App\Services\LegacyStockService;
 use Illuminate\Support\Facades\Auth;
 use DB;
+use Illuminate\Support\Carbon;
 use Illuminate\Http\Request as HttpRequest;
 use Illuminate\Validation\Rule;
 class MutationController extends Controller
@@ -33,6 +34,7 @@ class MutationController extends Controller
                 'name' => $data->user?->name
             ],
             'created_at' => $data->created_at,
+            'total_items' => $data->histories->isNotEmpty() ? $data->histories->count() : $data->details->count(),
             'notes' => str_replace('[MUTATION] ', '', $data->notes),
             'source_rack' => $data->sourceRack ? (object) ['id' => $data->sourceRack->id, 'name' => $data->sourceRack->name] : null,
             'details' => $data->histories->isNotEmpty()
@@ -68,6 +70,47 @@ class MutationController extends Controller
             }
         );
     }
+    public function show($id)
+    {
+        return $this->baseShow(
+            Receivedlog::class,
+            $id,
+            ['user', 'sourceRack', 'details.product.rack', 'histories.fromRack', 'histories.toRack', 'histories.fromWarehouse', 'histories.toWarehouse'],
+            $this->structure()
+        );
+    }
+
+    /**
+     * Rekap mutasi per hari (zona waktu Asia/Jakarta): berapa barang keluar & berapa transaksi.
+     * Query: from, to (Y-m-d). Default 30 hari terakhir.
+     */
+    public function dailySummary(HttpRequest $request)
+    {
+        $tz = 'Asia/Jakarta';
+        $to = $request->filled('to') ? Carbon::parse($request->input('to'), $tz)->endOfDay() : Carbon::now($tz)->endOfDay();
+        $from = $request->filled('from') ? Carbon::parse($request->input('from'), $tz)->startOfDay() : $to->copy()->subDays(29)->startOfDay();
+
+        $rows = MutationHistory::query()
+            ->whereBetween('created_at', [$from->copy()->utc(), $to->copy()->utc()])
+            ->get(['receivedlog_id', 'created_at']);
+
+        $days = $rows->groupBy(fn($r) => $r->created_at->copy()->setTimezone($tz)->toDateString())
+            ->map(fn($g, $date) => [
+                'date' => $date,
+                'total_items' => $g->count(),
+                'total_transactions' => $g->pluck('receivedlog_id')->unique()->count(),
+            ])
+            ->sortKeysDesc()
+            ->values();
+
+        return $this->successResponse([
+            'from' => $from->toDateString(),
+            'to' => $to->toDateString(),
+            'total_items' => $days->sum('total_items'),
+            'days' => $days,
+        ]);
+    }
+
     /*
         {
             "items": [

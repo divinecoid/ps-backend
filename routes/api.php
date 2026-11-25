@@ -678,6 +678,8 @@ Route::post('/get-fabric-qty', [ProductModelController::class, 'getFabricQty'])-
 //Mutation (Mutasi Gudang)
 Route::prefix('mutation')->middleware(['checkrole', 'acm:mutasi,read'])->group(function () {
     Route::get('/', [MutationController::class, 'index']);
+    Route::get('/daily-summary', [MutationController::class, 'dailySummary']);
+    Route::get('/{id}', [MutationController::class, 'show']);
 });
 Route::prefix('mutation')->middleware(['checkrole', 'acm:mutasi,create'])->group(function () {
     Route::post('/', [MutationController::class, 'store']);
