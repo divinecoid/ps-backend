@@ -24,9 +24,10 @@ class TiktokAuthController extends Controller
 
         // OAuth URL resmi yang dipakai Seller Authorization
         // Note: Scope permissions are configured in TikTok Developer Portal, not in the URL
+        // Seller authorization identifies the app by its Service ID (stored as client_id)
         $authUrl = "https://services.tiktokshop.com/open/authorize?" . http_build_query([
-            "app_key" => $store->api_key ?: $store->client_id,
-            "state"   => $store->id,
+            "service_id" => $store->client_id,
+            "state"      => $store->id,
         ]);
 
         return redirect($authUrl);
@@ -78,6 +79,8 @@ class TiktokAuthController extends Controller
             "refresh_token" => $data["refresh_token"],
             "access_token_expires_at"  => Carbon::createFromTimestamp($data["access_token_expire_in"]),
             "refresh_token_expires_at" => Carbon::createFromTimestamp($data["refresh_token_expire_in"]),
+            // A different shop may have been authorised: drop the cached cipher
+            "shop_cipher" => null,
         ]);
 
         // Return success HTML

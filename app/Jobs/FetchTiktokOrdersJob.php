@@ -23,10 +23,14 @@ class FetchTiktokOrdersJob implements ShouldQueue
     {
         Log::info("[FetchTiktokOrdersJob] Starting fetch for last {$this->days} day(s)...");
 
-        Artisan::call('tiktok:fetch-orders', ['--days' => $this->days]);
+        $exitCode = Artisan::call('tiktok:fetch-orders', ['--days' => $this->days]);
 
         $output = Artisan::output();
         Log::info("[FetchTiktokOrdersJob] Done.\n" . $output);
+
+        if ($exitCode !== 0) {
+            throw new \RuntimeException("tiktok:fetch-orders failed, see log output above.");
+        }
     }
 
     public function failed(\Throwable $e): void

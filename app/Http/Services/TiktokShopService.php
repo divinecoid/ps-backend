@@ -16,12 +16,29 @@ use stdClass;
 
 class TiktokShopService
 {
-    private OnlineStore $store;
+    private const MAX_PAGES = 100;
 
-	public function __construct()
-	{
-		$this->store = OnlineStore::where('api_key', config('marketplace.tiktok_shop.app_key'))->firstOrFail();
-	}
+    private ?OnlineStore $store = null;
+
+    /**
+     * Returns a copy of the service bound to the given store.
+     */
+    public function forStore(OnlineStore $store): static
+    {
+        $service = clone $this;
+        $service->store = $store;
+
+        return $service;
+    }
+
+    /**
+     * The bound store, or else the newest active and authorised TikTok Shop store.
+     */
+    private function store(): OnlineStore
+    {
+        return $this->store ??= OnlineStore::activeTiktok()->latest()->first()
+            ?? throw new RuntimeException('Tidak ada toko TikTok Shop aktif yang sudah terhubung.');
+    }
 
     public function getShops(): array
     {
@@ -66,168 +83,72 @@ class TiktokShopService
         return $this->request('GET', $path, $params, null, $accessToken);
     }
 
-    public function getOrderList(?int $pageSize = null): array
+    /**
+     * Pulls orders updated in the last $days days and saves them page by page.
+     *
+     * @return array{orders: int, pages: int}
+     */
+    public function syncRecentOrders(int $days = 1): array
     {
         $shop = $this->getPrimaryShop();
+        $this->rememberShop($shop);
         $accessToken = $this->getAccessToken();
 
-        $path = '/order/202309/orders/search';
-        $params = [
-            'access_token' => $accessToken,
-            'app_key'      => $this->getAppKey(),
-            'page_size'    => $pageSize ?? $this->getDefaultOrderPageSize(),
-            'sort_field'   => 'create_time',
-            'sort_order'   => 'DESC',
-            'shop_cipher'  => $shop['cipher'],
-            'timestamp'    => time(),
-            'version'      => '202309',
+        $now = time();
+        $body = [
+            'update_time_ge' => $now - max(1, $days) * 86400,
+            'update_time_lt' => $now,
         ];
 
-        $response = $this->requestPaginated('POST', $path, $params, [], $accessToken);
-        $this->syncOrdersToDatabaseFromApiResponse($response);
-
-        return $response;
-    }
-
-    private function requestPaginated(string $method, string $path, array $params, mixed $payload = null, ?string $accessToken = null): array
-    {
-        $accessToken ??= $this->getAccessToken();
-        $allOrders = [];
-        $orderKey = null;
-        $pagination = [];
-        $cursor = null;
-        $page = 0;
-        $response = [];
+        $pageToken = null;
+        $pages = 0;
+        $orders = 0;
 
         do {
-            $page++;
-            if (!empty($cursor)) {
-                $params['cursor'] = $cursor;
-            } elseif (isset($params['cursor'])) {
-                unset($params['cursor']);
+            $params = [
+                'app_key'     => $this->getAppKey(),
+                'page_size'   => min(100, max(1, $this->getDefaultOrderPageSize())),
+                'shop_cipher' => $shop['cipher'],
+                'sort_field'  => 'create_time',
+                'sort_order'  => 'DESC',
+                'timestamp'   => time(),
+                'version'     => '202309',
+            ];
+            if ($pageToken !== null) {
+                $params['page_token'] = $pageToken;
             }
 
-            $response = $this->request($method, $path, $params, $payload, $accessToken);
+            $response = $this->request('POST', '/order/202309/orders/search', $params, $body, $accessToken);
 
-            if ($orderKey === null) {
-                $orderKey = $this->detectOrderDataKey($response);
+            if (($response['code'] ?? -1) !== 0) {
+                throw new RuntimeException('TikTok order search failed: ' . ($response['message'] ?? 'unknown error'));
             }
 
-            $orders = $this->extractOrdersFromApiResponse($response);
-            if (is_array($orders)) {
-                $allOrders = array_merge($allOrders, $orders);
-            }
+            $this->syncOrdersToDatabaseFromApiResponse($response);
 
-            $pagination = $this->extractPaginationFromApiResponse($response);
-            $cursor = $this->extractNextCursorFromApiResponse($response);
-        } while (($this->responseHasMorePages($response) || !empty($cursor)) && $page < 100);
+            $orders += count($response['data']['orders'] ?? []);
+            $pages++;
+            $pageToken = ($response['data']['next_page_token'] ?? '') ?: null;
+        } while ($pageToken !== null && $pages < self::MAX_PAGES);
 
-        if ($orderKey !== null && isset($response['data']) && is_array($response['data'])) {
-            $response['data'][$orderKey] = $allOrders;
-            if (!empty($pagination)) {
-                $response['data']['pagination'] = $pagination;
-            }
-        }
-
-        return $response;
+        return ['orders' => $orders, 'pages' => $pages];
     }
 
-    private function detectOrderDataKey(array $response): ?string
+    /**
+     * Keeps shop_id / shop_cipher in step with the shop that is currently authorised.
+     */
+    private function rememberShop(array $shop): void
     {
-        $data = $response['data'] ?? null;
-        if (!is_array($data)) {
-            return null;
+        $store = $this->store();
+        $store->shop_cipher = (string) $shop['cipher'];
+
+        if (!empty($shop['id'])) {
+            $store->shop_id = (string) $shop['id'];
         }
 
-        foreach (['orders', 'order_list', 'orders_list'] as $key) {
-            if (array_key_exists($key, $data) && is_array($data[$key])) {
-                return $key;
-            }
+        if ($store->isDirty()) {
+            $store->save();
         }
-
-        return null;
-    }
-
-    private function extractOrdersFromApiResponse(array $response): array
-    {
-        $data = $response['data'] ?? null;
-        if (!is_array($data)) {
-            return [];
-        }
-
-        foreach (['orders', 'order_list', 'orders_list'] as $key) {
-            if (isset($data[$key]) && is_array($data[$key])) {
-                return $data[$key];
-            }
-        }
-
-        return [];
-    }
-
-    private function extractPaginationFromApiResponse(array $response): array
-    {
-        $data = $response['data'] ?? null;
-        if (!is_array($data)) {
-            return [];
-        }
-
-        if (isset($data['pagination']) && is_array($data['pagination'])) {
-            return $data['pagination'];
-        }
-
-        return [];
-    }
-
-    private function extractNextCursorFromApiResponse(array $response): ?string
-    {
-        $data = $response['data'] ?? null;
-        if (!is_array($data)) {
-            return null;
-        }
-
-        $cursorKeys = ['next_cursor', 'cursor'];
-        foreach ($cursorKeys as $key) {
-            if (!empty($data[$key]) && is_string($data[$key])) {
-                return trim($data[$key]);
-            }
-        }
-
-        if (isset($data['pagination']) && is_array($data['pagination'])) {
-            foreach ($cursorKeys as $key) {
-                if (!empty($data['pagination'][$key]) && is_string($data['pagination'][$key])) {
-                    return trim($data['pagination'][$key]);
-                }
-            }
-        }
-
-        return null;
-    }
-
-    private function responseHasMorePages(array $response): bool
-    {
-        $data = $response['data'] ?? null;
-        if (!is_array($data)) {
-            return false;
-        }
-
-        if (isset($data['pagination']) && is_array($data['pagination'])) {
-            if (isset($data['pagination']['more'])) {
-                return filter_var($data['pagination']['more'], FILTER_VALIDATE_BOOLEAN);
-            }
-            if (isset($data['pagination']['has_more'])) {
-                return filter_var($data['pagination']['has_more'], FILTER_VALIDATE_BOOLEAN);
-            }
-        }
-
-        if (isset($data['more'])) {
-            return filter_var($data['more'], FILTER_VALIDATE_BOOLEAN);
-        }
-
-        if (isset($data['has_more'])) {
-            return filter_var($data['has_more'], FILTER_VALIDATE_BOOLEAN);
-        }
-
-        return false;
     }
 
     public function getOrder(string $orderId): array
@@ -521,11 +442,18 @@ class TiktokShopService
 
                 $orderModel = Order::firstOrNew(['order_sn' => $orderSn]);
 
-                $orderModel->online_store_id = $this->store->id;
-                $orderModel->marketplace_id = $this->store->marketplace_id;
+                // Unpaid orders cannot be fulfilled yet; they are picked up once paid.
+                if (!$orderModel->exists && strtoupper($marketplaceStatus) === 'UNPAID') {
+                    continue;
+                }
+
+                $orderModel->online_store_id = $this->store()->id;
+                $orderModel->marketplace_id = $this->store()->marketplace_id;
                 $orderModel->item_count = $itemCount;
                 $orderModel->unique_item_count = $uniqueItemCount;
-                $orderModel->status = $internalStatus;
+                $orderModel->status = $orderModel->exists
+                    ? $this->resolveStatus($orderModel->status, $internalStatus)
+                    : $internalStatus;
                 $orderModel->total_price = (string) $totalPrice;
                 $orderModel->total_shipping = (string) $totalShipping;
                 $orderModel->total_amount = (string) $totalAmount;
@@ -710,6 +638,22 @@ class TiktokShopService
         };
     }
 
+    /**
+     * Status for an order we already have. Internal warehouse states are ahead of
+     * what TikTok knows about, so TikTok may only move an order forward.
+     */
+    private function resolveStatus(OrderStatus $current, OrderStatus $incoming): OrderStatus
+    {
+        return match (true) {
+            $current === OrderStatus::RETURNED => $current,
+            $incoming === OrderStatus::PENDING => $current,
+            $incoming === OrderStatus::READY_TO_SHIP && $current !== OrderStatus::PENDING => $current,
+            $incoming === OrderStatus::READY_TO_PICKUP && in_array($current, [OrderStatus::WAIT_COURIER, OrderStatus::SHIPPED, OrderStatus::DELIVERED, OrderStatus::COMPLETED], true) => $current,
+            $incoming === OrderStatus::DELIVERED && $current === OrderStatus::COMPLETED => $current,
+            default => $incoming,
+        };
+    }
+
     private function toInt(mixed $value): int
     {
         if (is_int($value)) {
@@ -745,15 +689,15 @@ class TiktokShopService
         // 1. Stored token is still valid
         if (
             !$forceRefresh
-            && $this->store->access_token
-            && $this->store->access_token_expires_at
-            && Carbon::now()->lt(Carbon::parse($this->store->access_token_expires_at))
+            && $this->store()->access_token
+            && $this->store()->access_token_expires_at
+            && Carbon::now()->lt(Carbon::parse($this->store()->access_token_expires_at))
         ) {
-            return $this->store->access_token;
+            return $this->store()->access_token;
         }
 
         // 2. Refresh token exists — try to use it
-        if ($this->store->refresh_token) {
+        if ($this->store()->refresh_token) {
             return $this->exchangeRefreshToken();
         }
 
@@ -796,7 +740,7 @@ class TiktokShopService
         $params = [
             'app_key'       => $this->getAppKey(),
             'app_secret'    => $this->getAppSecret(),
-            'refresh_token' => $this->store->refresh_token,
+            'refresh_token' => $this->store()->refresh_token,
             'grant_type'    => 'refresh_token',
         ];
 
@@ -832,10 +776,10 @@ class TiktokShopService
             $updates['refresh_token_expires_at'] = Carbon::createFromTimestamp($data['refresh_token_expire_in']);
         }
 
-        $this->store->update($updates);
+        $this->store()->update($updates);
 
         // Keep the in-memory store in sync so the current request doesn't re-fetch
-        $this->store->refresh();
+        $this->store()->refresh();
     }
 
     // -------------------------------------------------------------------------
@@ -918,18 +862,18 @@ class TiktokShopService
 
     private function getAppKey(): string
     {
-        return (string) config('marketplace.tiktok_shop.app_key');
+        return (string) ($this->store()->api_key ?: config('marketplace.tiktok_shop.app_key'));
     }
 
     private function getAppSecret(): string
     {
-        return (string) config('marketplace.tiktok_shop.app_secret');
+        return (string) ($this->store()->client_secret ?: config('marketplace.tiktok_shop.app_secret'));
     }
 
 	private function getAuthCode(): string
 	{
 		// Prefer the DB value, fall back to env
-		return $this->store->auth_code 
+		return $this->store()->auth_code 
 			?: (string) config('marketplace.tiktok_shop.auth_code');
 	}
 

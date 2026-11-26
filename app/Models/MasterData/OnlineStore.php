@@ -66,6 +66,23 @@ class OnlineStore extends Model
     }
 
     /**
+     * Active TikTok Shop stores that have been authorised.
+     */
+    public function scopeActiveTiktok($query)
+    {
+        return $query
+            ->whereHas('marketplace', function ($marketplace) {
+                $marketplace->where(function ($match) {
+                    $match->where('code', 'tiktok_shop')
+                        ->orWhereIn('alias', ['tiktok_shop', 'tiktok-shop']);
+                });
+            })
+            ->where('is_active', true)
+            ->whereNotNull('refresh_token')
+            ->where('refresh_token', '!=', '');
+    }
+
+    /**
      * Check if the access token is expired.
      */
     public function isTokenExpired(): bool

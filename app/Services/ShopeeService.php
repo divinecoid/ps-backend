@@ -60,13 +60,12 @@ class ShopeeService
             $partnerId,
             $timestamp,
             $sign,
-            urlencode($redirectUrl . "?state=" . $partnerId),
+            urlencode($redirectUrl . "?state=" . $this->makeAuthState($store)),
         );
 
         Log::info('Generated Shopee Auth URL', [
             'store_id' => $store->id,
             'store_name' => $store->store_name,
-            'url' => $url
         ]);
         return $url;
     }
@@ -560,6 +559,44 @@ class ShopeeService
         return $this->request('GET', $path);
     }
 
+    /** How long a seller has to finish logging in and approving. */
+    private const AUTH_STATE_TTL = 3600;
+
+    /**
+     * State sent through Shopee and back: names the store that started the
+     * authorization, with an expiry, signed so that it cannot be forged.
+     */
+    public function makeAuthState(OnlineStore $store): string
+    {
+        $payload = $store->id . '.' . (now()->timestamp + self::AUTH_STATE_TTL);
+
+        return $payload . '.' . $this->signAuthState($payload);
+    }
+
+    /**
+     * Returns the store named by a state we issued, or null if it is forged or expired.
+     */
+    public function storeFromAuthState(string $state): ?OnlineStore
+    {
+        $parts = explode('.', $state);
+        if (count($parts) !== 3) {
+            return null;
+        }
+
+        [$storeId, $expires, $signature] = $parts;
+
+        if (!hash_equals($this->signAuthState($storeId . '.' . $expires), $signature) || (int) $expires < now()->timestamp) {
+            return null;
+        }
+
+        return OnlineStore::find($storeId);
+    }
+
+    private function signAuthState(string $payload): string
+    {
+        return hash_hmac('sha256', 'shopee-auth-state|' . $payload, (string) config('app.key'));
+    }
+
     public function refreshAccessToken()
     {
         $store = $this->getStore();
@@ -672,9 +709,9 @@ class ShopeeService
 
         $response = Http::post($host . $path . '?' . http_build_query($params), $data);
 
+        // The response body holds the tokens, so only the status is logged
         Log::info('Shopee exchangeAuthCodeForToken HTTP response status', [
             'status' => $response->status(),
-            'body' => $response->body()
         ]);
 
         if ($response->failed()) {
@@ -683,12 +720,8 @@ class ShopeeService
         }
 
         $json = $response->json();
-        Log::info('Shopee exchangeAuthCodeForToken parsed JSON', [
-            'json' => $json
-        ]);
-
-        if (isset($json['error']) && !empty($json['error'])) {
-            throw new \Exception($json['message'] ?? 'Exchange auth code failed');
+        if (!empty($json['error']) || empty($json['access_token'])) {
+            throw new \Exception(($json['message'] ?? '') ?: 'Exchange auth code failed');
         }
 
         $accessExpireIn = isset($json['expire_in']) ? (int) $json['expire_in'] : null;
@@ -707,7 +740,6 @@ class ShopeeService
             'store_id' => $store->id,
             'shop_id' => $shopId,
             'db_update_result' => $updated,
-            'saved_access_token_prefix' => substr($store->access_token, 0, 15) . '...',
             'access_token_expires_at' => $store->access_token_expires_at,
             'refresh_token_expires_at' => $store->refresh_token_expires_at,
         ]);

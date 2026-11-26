@@ -21,10 +21,14 @@ class RefreshTiktokTokenJob implements ShouldQueue
     {
         Log::info('[RefreshTiktokTokenJob] Starting token refresh for all active stores...');
 
-        Artisan::call('tiktok:refresh-token');
+        $exitCode = Artisan::call('tiktok:refresh-token');
 
         $output = Artisan::output();
         Log::info('[RefreshTiktokTokenJob] Done.\n' . $output);
+
+        if ($exitCode !== 0) {
+            throw new \RuntimeException("tiktok:refresh-token failed, see log output above.");
+        }
     }
 
     public function failed(\Throwable $e): void

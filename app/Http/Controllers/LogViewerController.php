@@ -10,13 +10,6 @@ class LogViewerController extends Controller
     public function index(Request $request)
     {
         $logPath = storage_path('logs/laravel.log');
-        
-        if ($request->query('clear') === '1' || $request->query('clear') === 'true') {
-            if (file_exists($logPath)) {
-                file_put_contents($logPath, '');
-            }
-            return redirect('/logs');
-        }
 
         $content = 'laravel.log does not exist.';
         if (file_exists($logPath)) {
@@ -43,6 +36,7 @@ class LogViewerController extends Controller
         }
         
         $escapedContent = htmlspecialchars($content, ENT_QUOTES, 'UTF-8');
+        $csrfToken = csrf_token();
         
         $html = <<<HTML
 <!DOCTYPE html>
@@ -64,8 +58,8 @@ class LogViewerController extends Controller
     <div class="container">
         <div class="header">
             <h1>Laravel Log Viewer</h1>
-            <form method="GET" action="/logs" onsubmit="return confirm('Clear all logs?');">
-                <input type="hidden" name="clear" value="true">
+            <form method="POST" action="/logs/clear" onsubmit="return confirm('Clear all logs?');">
+                <input type="hidden" name="_token" value="{$csrfToken}">
                 <button type="submit" class="btn">Clear Log</button>
             </form>
         </div>
@@ -76,5 +70,16 @@ class LogViewerController extends Controller
 HTML;
 
         return response($html, 200, ['Content-Type' => 'text/html; charset=UTF-8']);
+    }
+
+    public function clear()
+    {
+        $logPath = storage_path('logs/laravel.log');
+
+        if (file_exists($logPath)) {
+            file_put_contents($logPath, '');
+        }
+
+        return redirect('/logs');
     }
 }

@@ -122,55 +122,42 @@ class ShopeeController extends Controller
 
     public function handleCallback(Request $request)
     {
-        Log::info('Shopee Callback Received', $request->all());
+        $state = (string) $request->query('state');
+        $code = (string) $request->query('code');
+        $shopId = (string) $request->query('shop_id');
 
-        $state = $request->query('state'); // Partner ID
-        $code = $request->query('code');
-        $shopId = $request->query('shop_id');
+        // The authorization code is a secret, so it is not logged
+        Log::info('Shopee Callback Received', ['shop_id' => $shopId, 'has_code' => $code !== '']);
 
-        if (!$state || !$code || !$shopId) {
-             Log::error('Shopee Callback Missing Parameters', ['state' => $state, 'code' => $code, 'shopId' => $shopId]);
-             return response()->json(['error' => 'Missing required parameters (state/code/shop_id). Please regenerate auth URL.'], 400);
+        if ($state === '' || $code === '' || !ctype_digit($shopId)) {
+            Log::warning('Shopee Callback Missing Parameters', ['shop_id' => $shopId]);
+            return response()->json(['error' => 'Missing required parameters (state/code/shop_id). Please regenerate auth URL.'], 400);
         }
 
-        // Find store by Partner ID (state)
-        // User requested to use state (PartnerID) to identify.
-        // We try to find a store that matches this PartnerID.
-        // Ideally we should also check shop_id if it exists, but for initial auth it might be null.
-        $store = OnlineStore::where('client_id', $state)
-                    ->where(function($q) use ($shopId) {
-                        $q->where('shop_id', $shopId)
-                          ->orWhereNull('shop_id')
-                          ->orWhere('shop_id', '');
-                    })
-                    ->first();
+        // This route is public: only a state we signed may touch a store
+        $store = $this->shopeeService->storeFromAuthState($state);
 
         if (!$store) {
-            // Fallback: Find any store with this Partner ID (Caution: ambiguous if multiple stores)
-            $store = OnlineStore::where('client_id', $state)->first();
+            Log::warning('Shopee Callback Rejected: invalid or expired state', ['shop_id' => $shopId]);
+            return response()->json(['error' => 'Invalid or expired authorization link. Please click Connect again.'], 403);
         }
 
-        if (!$store) {
-            return response()->json(['error' => 'Store not found for Partner ID: ' . $state], 404);
-        }
-
-        // Set store context
         $this->shopeeService->setStore($store);
 
-        // Update Auth Code and Shop ID as requested
-        $store->update([
-            'auth_code' => $code,
-            'shop_id' => $shopId
-        ]);
-
-        // Exchange for Token
+        // Shopee verifies the code first; nothing is saved unless it is accepted
         try {
-            $this->shopeeService->exchangeAuthCodeForToken($code, (int)$shopId);
-            return response('Shopee Auth Success! Token has been generated. You can close this window.');
+            $this->shopeeService->exchangeAuthCodeForToken($code, (int) $shopId);
         } catch (\Exception $e) {
-            Log::error('Shopee Auth Failed', ['error' => $e->getMessage()]);
+            Log::error('Shopee Auth Failed', ['store_id' => $store->id, 'error' => $e->getMessage()]);
             return response('Auth Failed: ' . $e->getMessage(), 500);
         }
+
+        $store->update([
+            'auth_code' => $code,
+            'shop_id' => $shopId,
+        ]);
+
+        return response('Shopee Auth Success! Token has been generated. You can close this window.');
     }
 
     public function generateAuthUrl()

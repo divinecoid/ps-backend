@@ -24,6 +24,9 @@ x-app: &app
     DB_USERNAME: ${DB_USERNAME}
     DB_PASSWORD: ${DB_PASSWORD}
     JWT_SECRET: ${JWT_SECRET}
+    # Login for /logs and /seed-product; both are disabled (404) while the password is empty.
+    LOG_VIEWER_USER: ${LOG_VIEWER_USER:-admin}
+    LOG_VIEWER_PASSWORD: ${LOG_VIEWER_PASSWORD:-}
     SESSION_DRIVER: database
     QUEUE_CONNECTION: database
     # Must exceed the longest job timeout (GenerateBarcodePdfJob = 900s) or a slow PDF job gets re-queued mid-run.

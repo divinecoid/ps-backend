@@ -57,6 +57,7 @@ Route::middleware('checkrole:admin')->post('/register', RegisterController::clas
 // Marketplace Generic Auth
 Route::prefix('marketplace-auth')->middleware('checkrole:admin')->group(function () {
     Route::post('/refresh-token', [MarketplaceAuthController::class, 'refreshToken']);
+    Route::post('/connect-url', [MarketplaceAuthController::class, 'connectUrl']);
 });
 
 Route::prefix('tiktok-shop')->middleware('checkrole:admin')->group(function () {
@@ -569,7 +570,8 @@ Route::prefix('lazada')->middleware('checkrole:admin')->group(function() {
 });
 
 Route::get('shopee/callback', [ShopeeController::class, 'handleCallback']);
-Route::get('shopee/fetch-orders', [ShopeeController::class, 'fetchOrders']);
+Route::get('shopee/fetch-orders', [ShopeeController::class, 'fetchOrders'])
+    ->middleware(['checkrole', 'acm:pesanan,read']);
 
 //Request CMT (Permintaan)
 Route::prefix('request')->middleware(['checkrole', 'acm:permintaan,read'])->group(function () {

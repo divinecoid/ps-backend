@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Services\TiktokShopService;
+use App\Jobs\FetchTiktokOrdersJob;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Throwable;
@@ -42,17 +43,27 @@ class TiktokShopController extends Controller
         }
     }
 
+    /**
+     * Queues an order sync and answers immediately; the sync itself can take longer
+     * than the web app is willing to wait.
+     */
     public function getOrderList(Request $request)
     {
-        $pageSize = $request->integer('page_size');
+        $days = min(30, max(1, $request->integer('days', 7)));
 
         try {
-            return response()->json($this->tiktokShopService->getOrderList($pageSize > 0 ? $pageSize : null));
+            FetchTiktokOrdersJob::dispatch($days);
         } catch (Throwable $e) {
             return response()->json([
-                'error' => $e->getMessage(),
+                'success' => false,
+                'message' => 'Gagal memulai penarikan order TikTok: ' . $e->getMessage(),
             ], 500);
         }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Penarikan order TikTok sedang diproses. Muat ulang daftar pesanan beberapa saat lagi.',
+        ], 202);
     }
 
     public function getOrder(string $orderId)

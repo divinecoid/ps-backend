@@ -8,6 +8,8 @@ use App\Services\LazadaService;
 use App\Services\ShopeeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\URL;
 
 class MarketplaceAuthController extends Controller
 {
@@ -18,6 +20,35 @@ class MarketplaceAuthController extends Controller
     {
         $this->shopeeService = $shopeeService;
         $this->lazadaService = $lazadaService;
+    }
+
+    /**
+     * Returns a short-lived signed path that starts the marketplace authorization.
+     */
+    public function connectUrl(Request $request)
+    {
+        $request->validate([
+            'online_store_id' => 'required|exists:mdx_online_stores,id',
+        ]);
+
+        $store = OnlineStore::with('marketplace')->findOrFail($request->online_store_id);
+        $alias = strtolower($store->marketplace->alias ?? $store->marketplace->name ?? '');
+        $route = "oauth.login.{$alias}";
+
+        if (!Route::has($route)) {
+            return response()->json([
+                'success' => false,
+                'message' => "Marketplace '{$alias}' belum mendukung Connect.",
+            ], 400);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                // Signed relative to the path so it stays valid behind a reverse proxy
+                'path' => URL::temporarySignedRoute($route, now()->addMinutes(5), ['id' => $store->id], false),
+            ],
+        ]);
     }
 
     /**
