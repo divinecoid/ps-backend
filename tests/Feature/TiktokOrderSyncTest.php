@@ -44,7 +44,9 @@ class TiktokOrderSyncTest extends TestCase
         Schema::create('trx_orders', function ($t) {
             $t->uuid('id')->primary();
             $t->string('order_sn');
-            foreach (['online_store_id', 'marketplace_id', 'status', 'total_price', 'total_shipping', 'total_amount', 'customer_name', 'customer_phone', 'customer_address', 'awb_code', 'readytoship_marketplace'] as $column) {
+            // Constrained like the live column, so a status the database rejects fails here too
+            $t->enum('status', $this->liveStatusValues());
+            foreach (['online_store_id', 'marketplace_id', 'total_price', 'total_shipping', 'total_amount', 'customer_name', 'customer_phone', 'customer_address', 'awb_code', 'readytoship_marketplace'] as $column) {
                 $t->string($column)->nullable();
             }
             $t->integer('item_count')->nullable();
@@ -68,6 +70,16 @@ class TiktokOrderSyncTest extends TestCase
         \DB::table('mdx_marketplaces')->insert(['id' => $this->marketplaceId, 'code' => 'tiktok_shop', 'alias' => 'tiktok-shop']);
 
         Http::preventStrayRequests();
+    }
+
+    /** The values allowed by the newest migration that redefines trx_orders.status. */
+    private function liveStatusValues(): array
+    {
+        $migration = file_get_contents(database_path('migrations/2026_05_02_000001_update_trx_orders_status_enum.php'));
+        preg_match('/function up.*?ENUM\((.*?)\)/s', $migration, $enum);
+        preg_match_all("/'([a-z_]+)'/", $enum[1], $values);
+
+        return $values[1];
     }
 
     private function store(array $overrides = []): OnlineStore
@@ -157,6 +169,42 @@ class TiktokOrderSyncTest extends TestCase
         $this->assertSame(OrderStatus::READ, $status('B1'));
         $this->assertSame(OrderStatus::RETURNED, $status('B2'));
         $this->assertSame(OrderStatus::CANCELLED, $status('B3'));
+    }
+
+    public function test_every_tiktok_status_can_be_stored(): void
+    {
+        $this->store();
+        $expected = [
+            'AWAITING_SHIPMENT' => OrderStatus::READY_TO_SHIP,
+            'AWAITING_COLLECTION' => OrderStatus::READY_TO_PICKUP,
+            'PARTIALLY_SHIPPING' => OrderStatus::PENDING,
+            'IN_TRANSIT' => OrderStatus::SHIPPED,
+            'DELIVERED' => OrderStatus::SHIPPED,
+            'COMPLETED' => OrderStatus::COMPLETED,
+            'CANCELLED' => OrderStatus::CANCELLED,
+            'ON_HOLD' => OrderStatus::PENDING,
+        ];
+        $this->fakeShopAndOrders(array_map(fn (string $status) => $this->order($status, $status), array_keys($expected)));
+
+        $this->artisan('tiktok:fetch-orders')->assertExitCode(0);
+
+        foreach ($expected as $tiktokStatus => $status) {
+            $this->assertSame($status, Order::where('order_sn', $tiktokStatus)->first()?->status, $tiktokStatus);
+        }
+    }
+
+    public function test_delivery_updates_never_move_a_completed_order_back(): void
+    {
+        $store = $this->store();
+        foreach (['C1' => OrderStatus::COMPLETED, 'C2' => OrderStatus::SHIPPED] as $sn => $status) {
+            Order::create(['order_sn' => $sn, 'online_store_id' => $store->id, 'status' => $status, 'customer_name' => 'x']);
+        }
+        $this->fakeShopAndOrders([$this->order('C1', 'DELIVERED'), $this->order('C2', 'COMPLETED')]);
+
+        $this->artisan('tiktok:fetch-orders')->assertExitCode(0);
+
+        $this->assertSame(OrderStatus::COMPLETED, Order::where('order_sn', 'C1')->first()->status);
+        $this->assertSame(OrderStatus::COMPLETED, Order::where('order_sn', 'C2')->first()->status);
     }
 
     public function test_api_error_fails_the_command(): void

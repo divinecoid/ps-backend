@@ -630,8 +630,9 @@ class TiktokShopService
         return match ($normalized) {
             'AWAITING_SHIPMENT' => OrderStatus::READY_TO_SHIP,
             'AWAITING_COLLECTION', 'READY_TO_SHIP' => OrderStatus::READY_TO_PICKUP,
-            'IN_TRANSIT', 'SHIPPED' => OrderStatus::SHIPPED,
-            'DELIVERED' => OrderStatus::DELIVERED,
+            // The status column has no "delivered": as with Shopee, an order stays shipped until completed
+            'IN_TRANSIT', 'SHIPPED', 'DELIVERED' => OrderStatus::SHIPPED,
+            'COMPLETED' => OrderStatus::COMPLETED,
             'CANCELLED', 'CANCELED' => OrderStatus::CANCELLED,
             'RETURNED' => OrderStatus::RETURNED,
             default => OrderStatus::PENDING,
@@ -648,8 +649,8 @@ class TiktokShopService
             $current === OrderStatus::RETURNED => $current,
             $incoming === OrderStatus::PENDING => $current,
             $incoming === OrderStatus::READY_TO_SHIP && $current !== OrderStatus::PENDING => $current,
-            $incoming === OrderStatus::READY_TO_PICKUP && in_array($current, [OrderStatus::WAIT_COURIER, OrderStatus::SHIPPED, OrderStatus::DELIVERED, OrderStatus::COMPLETED], true) => $current,
-            $incoming === OrderStatus::DELIVERED && $current === OrderStatus::COMPLETED => $current,
+            $incoming === OrderStatus::READY_TO_PICKUP && in_array($current, [OrderStatus::WAIT_COURIER, OrderStatus::SHIPPED, OrderStatus::COMPLETED], true) => $current,
+            $incoming === OrderStatus::SHIPPED && $current === OrderStatus::COMPLETED => $current,
             default => $incoming,
         };
     }
