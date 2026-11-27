@@ -15,6 +15,9 @@ use Carbon\Carbon;
 
 class FetchShopeeOrders extends Command
 {
+    /** Shopee menolak rentang waktu get_order_list yang lebih dari 15 hari */
+    private const MAX_WINDOW_SECONDS = 15 * 24 * 60 * 60;
+
     /**
      * The name and signature of the console command.
      *
@@ -36,7 +39,7 @@ class FetchShopeeOrders extends Command
     {
         $this->info('Starting Shopee Order Fetch...');
 
-        $days = $this->option('days');
+        $days = max(1, (int) $this->option('days'));
         $timeTo = time();
         $timeFrom = $timeTo - ($days * 24 * 60 * 60);
 
@@ -84,25 +87,12 @@ class FetchShopeeOrders extends Command
                 $this->info("Fetching orders from " . date('Y-m-d H:i:s', $timeFrom) . " to " . date('Y-m-d H:i:s', $timeTo));
 
                 // 1. Get List of Orders
-                $response = $shopeeService->getOrderList($timeFrom, $timeTo);
-
-                // Log response to file
-                $this->saveApiResponse('order_list', $store->store_name, $response);
-
-                if (isset($response['error']) && !empty($response['error'])) {
-                    $this->error('Shopee API Error: ' . ($response['message'] ?? 'Unknown error'));
-                    continue; // Skip to next store
-                }
-
-                $orders = $response['response']['order_list'] ?? [];
-                $count = count($orders);
+                $orderSns = $this->collectOrderSns($shopeeService, $store, $timeFrom, $timeTo);
+                $count = count($orderSns);
 
                 $this->info("Found {$count} orders for store {$store->store_name}.");
 
                 if ($count > 0) {
-                    // Extract all Order SNs
-                    $orderSns = array_column($orders, 'order_sn');
-
                     // Chunk them if necessary (Shopee might have a limit per request, e.g. 50)
                     $snChunks = array_chunk($orderSns, 50);
 
@@ -150,6 +140,40 @@ class FetchShopeeOrders extends Command
 
         $this->info('All stores processed.');
         return 0;
+    }
+
+    /**
+     * Semua order_sn yang berubah dalam rentang waktu, dari semua jendela dan halaman.
+     * Jika satu halaman gagal, order yang sudah terkumpul tetap diproses.
+     */
+    private function collectOrderSns(ShopeeService $shopeeService, OnlineStore $store, int $timeFrom, int $timeTo): array
+    {
+        $orderSns = [];
+
+        for ($from = $timeFrom; $from < $timeTo; $from += self::MAX_WINDOW_SECONDS) {
+            $to = min($from + self::MAX_WINDOW_SECONDS, $timeTo);
+            $cursor = '';
+
+            do {
+                $response = $shopeeService->getOrderList($from, $to, 50, $cursor);
+
+                // Log response to file
+                $this->saveApiResponse('order_list', $store->store_name, $response);
+
+                if (!empty($response['error'])) {
+                    $message = $response['message'] ?? 'Unknown error';
+                    $this->error('Shopee API Error: ' . $message);
+                    Log::error('FetchShopeeOrders order list failed for store ' . $store->store_name, ['error' => $message]);
+                    break 2;
+                }
+
+                array_push($orderSns, ...array_column($response['response']['order_list'] ?? [], 'order_sn'));
+                $cursor = (string) ($response['response']['next_cursor'] ?? '');
+            } while (!empty($response['response']['more']) && $cursor !== '');
+        }
+
+        // Order yang berubah tepat di batas jendela bisa muncul dua kali
+        return array_values(array_unique($orderSns));
     }
 
     private function saveApiResponse($type, $storeName, $data)
@@ -208,6 +232,15 @@ class FetchShopeeOrders extends Command
             // Get Shopee marketplace ID
             $shopeeMarketplace = Marketplace::where('code', 'shopee')->first();
 
+            // Find existing order by order_sn
+            $order = Order::where('order_sn', $detail['order_sn'])->first();
+
+            // PROCESSED = pengiriman sudah diatur. Gudang hanya bisa scan order ready_to_pickup,
+            // jadi order baru boleh menjadi wait_courier setelah di-scan outbound.
+            if ($status === OrderStatus::WAIT_COURIER && !$order?->is_outbounded) {
+                $status = OrderStatus::READY_TO_PICKUP;
+            }
+
             // Prepare order data
             $orderData = [
                 'online_store_id' => $store->id,
@@ -223,9 +256,6 @@ class FetchShopeeOrders extends Command
                 'read_at' => now(),
                 'marketplace_id' => $shopeeMarketplace?->id,
             ];
-
-            // Find existing order by order_sn
-            $order = Order::where('order_sn', $detail['order_sn'])->first();
 
             if ($order) {
                 // Jika order sudah ada, HANYA UPDATE STATUS.

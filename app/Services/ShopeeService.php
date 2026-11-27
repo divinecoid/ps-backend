@@ -281,7 +281,8 @@ class ShopeeService
     {
         $path = "/api/v2/order/get_order_list";
         $params = [
-            'time_range_field' => 'create_time',
+            // update_time: perubahan status order lama ikut terambil, bukan hanya order baru
+            'time_range_field' => 'update_time',
             'time_from' => $timeFrom,
             'time_to' => $timeTo,
             'page_size' => $pageSize,

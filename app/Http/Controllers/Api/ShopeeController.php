@@ -3,13 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\FetchShopeeOrdersJob;
 use App\Models\Transactions\Order;
 use App\Enums\OrderStatus;
 use App\Services\ShopeeService;
 use App\Models\MasterData\OnlineStore;
 use App\Models\MasterData\ShippingLogistic;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 
 class ShopeeController extends Controller
@@ -211,27 +211,28 @@ class ShopeeController extends Controller
         }
     }
 
+    /**
+     * Queues an order sync and answers immediately; the sync itself can take longer
+     * than the web app is willing to wait.
+     */
     public function fetchOrders(Request $request)
     {
-        $days = (int)($request->query('days', 1));
-        if ($days < 1) {
-            $days = 1;
+        $days = min(30, max(1, $request->integer('days', 1)));
+
+        try {
+            FetchShopeeOrdersJob::dispatch($days);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memulai penarikan order Shopee: ' . $e->getMessage(),
+            ], 500);
         }
-
-        // Token validation and refresh (or skip on failure) is handled
-        // per-store inside the Artisan command before each store is processed.
-        Artisan::call('shopee:fetch-orders', [
-            '--days' => $days,
-        ]);
-
-        $output = Artisan::output();
 
         return response()->json([
             'success' => true,
-            'message' => 'Shopee fetch orders executed',
+            'message' => 'Penarikan order Shopee sedang diproses. Muat ulang daftar pesanan beberapa saat lagi.',
             'days' => $days,
-            'raw_output' => $output,
-        ]);
+        ], 202);
     }
 
     public function getShippingParameter(Request $request)
