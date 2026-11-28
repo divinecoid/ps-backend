@@ -56,6 +56,7 @@ class OrderItemController extends Controller
                     'order_sn' => $order->order_sn,
                     'awb_code' => $order->awb_code,
                     'status' => $order->status,
+                    'is_outbounded' => (bool) $order->is_outbounded,
                     'item_count' => $order->item_count,
                     'unique_item_count' => $order->unique_item_count,
                     'total_weight' => $order->total_weight,

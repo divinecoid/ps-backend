@@ -10,6 +10,7 @@ use App\Models\Transactions\OrderItem;
 use App\Support\ShippingClassifier;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class OrderController extends Controller
@@ -258,126 +259,8 @@ class OrderController extends Controller
                 'order_items.*.scanned_barcodes.*' => 'string',
             ]);
 
-            $orderId = $request->input('order_id');
-            $preparedAt = $request->input('prepared_at');
-            $orderItemsInput = $request->input('order_items');
-
-            // Find order
-            $order = Order::find($orderId);
-
-            if (!$order) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Order tidak ditemukan'
-                ], 404);
-            }
-
-            // Validate all barcodes per order item (check for concurrent deletions)
-            $conflictingBarcodes = [];
-            $itemsToProcess = []; // [ ['order_item_id' => ..., 'products' => [...]] ]
-            $totalProductsScanned = 0;
-
-            foreach ($orderItemsInput as $itemInput) {
-                $orderItemId = $itemInput['id'];
-                $scannedBarcodes = $itemInput['scanned_barcodes'];
-
-                // Verify the order item belongs to this order
-                $orderItem = OrderItem::where('id', $orderItemId)
-                    ->where('order_id', $orderId)
-                    ->first();
-
-                if (!$orderItem) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => "Order item tidak ditemukan atau bukan milik order ini: $orderItemId"
-                    ], 404);
-                }
-
-                $productsForItem = [];
-
-                foreach ($scannedBarcodes as $barcode) {
-                    $product = \App\Models\MasterData\Product::withTrashed()->where('barcode', $barcode)->first();
-
-                    if (!$product) {
-                        return response()->json([
-                            'success' => false,
-                            'message' => "Barcode tidak ditemukan: $barcode"
-                        ], 404);
-                    }
-
-                    if ($product->deleted_at !== null) {
-                        $conflictingBarcodes[] = [
-                            'order_item_id' => $orderItemId,
-                            'barcode' => $barcode,
-                            'deleted_at' => $product->deleted_at
-                        ];
-                    } else {
-                        $productsForItem[] = $product;
-                    }
-                }
-
-                $itemsToProcess[] = [
-                    'order_item_id' => $orderItemId,
-                    'order_item' => $orderItem,
-                    'products' => $productsForItem,
-                ];
-                $totalProductsScanned += count($productsForItem);
-            }
-
-            // If there are conflicting barcodes, return error
-            if (count($conflictingBarcodes) > 0) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Terdapat produk yang sudah di-scan oleh user lain. Silakan refresh dan scan ulang.',
-                    'conflicting_barcodes' => $conflictingBarcodes
-                ], 409);
-            }
-
-            // All validations passed, proceed with associating products to order items and soft-delete
-            $readyToShipAt = now();
-
-            foreach ($itemsToProcess as $item) {
-                $orderItem = $item['order_item'];
-
-                foreach ($item['products'] as $product) {
-                    // Associate product to order item
-                    $orderItem->product_id = $product->id;
-                    $orderItem->save();
-
-                    // Soft-delete the product
-                    $product->delete();
-                }
-
-                // Mark order item as prepared
-                $orderItem->item_prepared_at = $readyToShipAt;
-                $orderItem->save();
-            }
-
-            // Calculate prepare_duration in seconds
-            $preparedAtCarbon = \Carbon\Carbon::parse($preparedAt);
-            $readyToShipAtCarbon = \Carbon\Carbon::parse($readyToShipAt);
-            $prepareDuration = $preparedAtCarbon->diffInSeconds($readyToShipAtCarbon);
-
-            // Update order
-            $order->prepared_at = $preparedAt;
-            $order->readytoship_at = $readyToShipAt;
-            $order->prepare_duration = $prepareDuration;
-            $order->is_outbounded = true;
-            $order->save();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Order berhasil diproses dan siap dikirim',
-                'data' => [
-                    'order_id' => $orderId,
-                    'prepared_at' => $order->prepared_at,
-                    'readytoship_at' => $order->readytoship_at,
-                    'prepare_duration' => $order->prepare_duration,
-                    'is_outbounded' => $order->is_outbounded,
-                    'products_scanned' => $totalProductsScanned,
-                    'order_items_processed' => count($itemsToProcess),
-                ]
-            ], 200);
+            // All or nothing: a failure half way must not leave stock taken for part of an order.
+            return DB::transaction(fn() => $this->prepareOrder($request));
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
@@ -387,6 +270,150 @@ class OrderController extends Controller
                 'trace' => $e->getTraceAsString()
             ], 500);
         }
+    }
+
+    /** Takes the scanned pieces out of stock and marks the order ready. Runs inside a transaction. */
+    private function prepareOrder(Request $request)
+    {
+        $orderId = $request->input('order_id');
+        $preparedAt = $request->input('prepared_at');
+        $orderItemsInput = $request->input('order_items');
+
+        // Find order; the lock makes a second submit of the same order wait for this one.
+        $order = Order::lockForUpdate()->find($orderId);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order tidak ditemukan'
+            ], 404);
+        }
+
+        // Validate all barcodes per order item (check for concurrent deletions)
+        $conflictingBarcodes = [];
+        $itemsToProcess = []; // [ ['order_item_id' => ..., 'products' => [...]] ]
+        $totalProductsScanned = 0;
+        $seenBarcodes = [];
+
+        foreach ($orderItemsInput as $itemInput) {
+            $orderItemId = $itemInput['id'];
+            $scannedBarcodes = $itemInput['scanned_barcodes'];
+
+            // Verify the order item belongs to this order
+            $orderItem = OrderItem::where('id', $orderItemId)
+                ->where('order_id', $orderId)
+                ->first();
+
+            if (!$orderItem) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Order item tidak ditemukan atau bukan milik order ini: $orderItemId"
+                ], 404);
+            }
+
+            // Preparing an item again would take a second set of pieces out of stock.
+            if ($orderItem->item_prepared_at !== null) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Order ini sudah disiapkan sebelumnya'
+                ], 409);
+            }
+
+            $productsForItem = [];
+
+            foreach ($scannedBarcodes as $barcode) {
+                if (isset($seenBarcodes[$barcode])) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Barcode dipakai dua kali: $barcode"
+                    ], 422);
+                }
+                $seenBarcodes[$barcode] = true;
+
+                $product = \App\Models\MasterData\Product::withTrashed()->where('barcode', $barcode)->lockForUpdate()->first();
+
+                if (!$product) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Barcode tidak ditemukan: $barcode"
+                    ], 404);
+                }
+
+                if ($product->deleted_at !== null) {
+                    $conflictingBarcodes[] = [
+                        'order_item_id' => $orderItemId,
+                        'barcode' => $barcode,
+                        'deleted_at' => $product->deleted_at
+                    ];
+                } else {
+                    $productsForItem[] = $product;
+                }
+            }
+
+            $itemsToProcess[] = [
+                'order_item_id' => $orderItemId,
+                'order_item' => $orderItem,
+                'products' => $productsForItem,
+            ];
+            $totalProductsScanned += count($productsForItem);
+        }
+
+        // If there are conflicting barcodes, return error
+        if (count($conflictingBarcodes) > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terdapat produk yang sudah di-scan oleh user lain. Silakan refresh dan scan ulang.',
+                'conflicting_barcodes' => $conflictingBarcodes
+            ], 409);
+        }
+
+        // All validations passed, proceed with associating products to order items and soft-delete
+        $readyToShipAt = now();
+
+        foreach ($itemsToProcess as $item) {
+            $orderItem = $item['order_item'];
+
+            foreach ($item['products'] as $product) {
+                // Associate product to order item
+                $orderItem->product_id = $product->id;
+                $orderItem->save();
+
+                // Soft-delete the product
+                $product->delete();
+            }
+
+            // Mark order item as prepared
+            $orderItem->item_prepared_at = $readyToShipAt;
+            $orderItem->save();
+        }
+
+        // Calculate prepare_duration in seconds
+        $preparedAtCarbon = \Carbon\Carbon::parse($preparedAt);
+        $readyToShipAtCarbon = \Carbon\Carbon::parse($readyToShipAt);
+        $prepareDuration = $preparedAtCarbon->diffInSeconds($readyToShipAtCarbon);
+
+        // Update order
+        $order->prepared_at = $preparedAt;
+        $order->readytoship_at = $readyToShipAt;
+        $order->prepare_duration = $prepareDuration;
+        $order->is_outbounded = true;
+        // Without an assignment, whoever prepared it owns it (history and daily statistics).
+        $order->preparist_user_id ??= auth()->id();
+        $order->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Order berhasil diproses dan siap dikirim',
+            'data' => [
+                'order_id' => $orderId,
+                'prepared_at' => $order->prepared_at,
+                'readytoship_at' => $order->readytoship_at,
+                'prepare_duration' => $order->prepare_duration,
+                'is_outbounded' => $order->is_outbounded,
+                'products_scanned' => $totalProductsScanned,
+                'order_items_processed' => count($itemsToProcess),
+            ]
+        ], 200);
     }
 
     /**
