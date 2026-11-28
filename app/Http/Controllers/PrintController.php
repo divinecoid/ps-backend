@@ -68,9 +68,39 @@ class PrintController extends Controller
         return $this->cachedPdf($service, BarcodePdfService::TYPE_REQUEST, $id, $kind);
     }
 
+    /** Polled while an old-stock batch PDF is being made in the background. */
+    public function prepareBatchPdf(BarcodePdfService $service, string $batchId, string $kind)
+    {
+        if ($batchId === 'none') {
+            return $this->noLabels();
+        }
+
+        return $this->preparePdf($service, BarcodePdfService::TYPE_BATCH, $batchId, $kind);
+    }
+
+    /** Polled while a CMT request PDF is being made in the background. */
+    public function prepareRequestPdf(BarcodePdfService $service, string $id, string $kind)
+    {
+        return $this->preparePdf($service, BarcodePdfService::TYPE_REQUEST, $id, $kind);
+    }
+
+    private function preparePdf(BarcodePdfService $service, string $type, string $id, string $kind)
+    {
+        $status = $this->validSource($id, $kind) ? $service->prepare($type, $id, $kind) : null;
+
+        return $status
+            ? response()->json(['success' => true, 'message' => 'OK', 'data' => $status])
+            : $this->noLabels();
+    }
+
+    private function validSource(string $id, string $kind): bool
+    {
+        return in_array($kind, BarcodePdfService::KINDS, true) && preg_match('/^[A-Za-z0-9-]+$/', $id);
+    }
+
     private function cachedPdf(BarcodePdfService $service, string $type, string $id, string $kind)
     {
-        if (!in_array($kind, BarcodePdfService::KINDS, true) || !preg_match('/^[A-Za-z0-9-]+$/', $id)) {
+        if (!$this->validSource($id, $kind)) {
             return $this->noLabels();
         }
 

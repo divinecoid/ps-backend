@@ -17,13 +17,14 @@ class FetchShopeeOrdersJob implements ShouldQueue
     public int $tries = 3;
     public int $timeout = 300; // 5 menit
 
-    public function __construct(public int $days = 1) {}
+    public function __construct(public int $days = 1, public ?int $minutes = null) {}
 
     public function handle(): void
     {
-        Log::info("[FetchShopeeOrdersJob] Starting fetch for last {$this->days} day(s)...");
+        $range = $this->minutes ? "{$this->minutes} minute(s)" : "{$this->days} day(s)";
+        Log::info("[FetchShopeeOrdersJob] Starting fetch for last {$range}...");
 
-        Artisan::call('shopee:fetch-orders', ['--days' => $this->days]);
+        Artisan::call('shopee:fetch-orders', ['--days' => $this->days] + ($this->minutes ? ['--minutes' => $this->minutes] : []));
 
         $output = Artisan::output();
         Log::info("[FetchShopeeOrdersJob] Done.\n" . $output);

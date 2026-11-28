@@ -10,6 +10,7 @@ use App\Models\Transactions\CmtPayroll;
 use App\Models\Transactions\CmtPayrollDetail;
 use App\Models\Transactions\ReceivedlogDetail;
 use App\Services\CmtPayrollCalculator;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -96,6 +97,36 @@ class CmtPayrollController extends Controller
             self::RELATIONS,
             $this->structure()
         );
+    }
+
+    /** A4 pay slip of one CMT's payroll. */
+    public function pdf($id)
+    {
+        $payroll = CmtPayroll::with(self::RELATIONS)->find($id);
+        if (!$payroll) {
+            return $this->errorResponse(404, 'Not found');
+        }
+
+        $rows = ($this->structure())($payroll)['details']
+            ->sortBy([['serial_number', 'asc'], ['model', 'asc']])
+            ->values();
+        [$totalDozen, $totalPiece] = CmtPayrollCalculator::splitDozen((int) $payroll->total_pcs);
+
+        $pdf = Pdf::loadView('print.cmt-payroll', [
+            'payroll' => $payroll,
+            'rows' => $rows,
+            'totalDozen' => $totalDozen,
+            'totalPiece' => $totalPiece,
+            'printedAt' => now()->setTimezone('Asia/Jakarta')->format('d/m/Y H:i'),
+            'printedBy' => auth()->user()?->name ?? '-',
+        ])->setPaper('a4', 'portrait');
+
+        $name = 'gaji-' . Str::slug($payroll->cmt?->code ?: 'cmt') . '-' . $payroll->period_end->format('Ymd') . '.pdf';
+
+        return response($pdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => "inline; filename=\"{$name}\"",
+        ]);
     }
 
     /**

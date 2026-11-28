@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Services\TiktokShopService;
 use App\Jobs\FetchTiktokOrdersJob;
+use App\Models\Transactions\Order;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Throwable;
@@ -66,6 +67,17 @@ class TiktokShopController extends Controller
         ], 202);
     }
 
+    /**
+     * The service bound to the store the order came from. Without this every
+     * call (and the order sync it triggers) used the newest TikTok store.
+     */
+    private function serviceFor(?string $orderSn): TiktokShopService
+    {
+        $store = $orderSn ? Order::with('online_store')->where('order_sn', $orderSn)->first()?->online_store : null;
+
+        return $store ? $this->tiktokShopService->forStore($store) : $this->tiktokShopService;
+    }
+
     public function getOrder(string $orderId)
     {
         if (trim($orderId) === '') {
@@ -75,7 +87,7 @@ class TiktokShopController extends Controller
         }
 
         try {
-            return response()->json($this->tiktokShopService->getOrder($orderId));
+            return response()->json($this->serviceFor($orderId)->getOrder($orderId));
         } catch (Throwable $e) {
             return response()->json([
                 'error' => $e->getMessage(),
@@ -83,7 +95,7 @@ class TiktokShopController extends Controller
         }
     }
 
-    public function getPackageDetail(string $packageId)
+    public function getPackageDetail(string $packageId, Request $request)
     {
         if (trim($packageId) === '') {
             return response()->json([
@@ -93,7 +105,7 @@ class TiktokShopController extends Controller
 
         try {
             return response()->json(
-                $this->tiktokShopService->getPackageDetail($packageId),
+                $this->serviceFor($request->query('order_sn'))->getPackageDetail($packageId),
             );
         } catch (Throwable $e) {
             return response()->json([
@@ -102,7 +114,7 @@ class TiktokShopController extends Controller
         }
     }
 
-    public function getPackageHandoverTimeSlots(string $packageId)
+    public function getPackageHandoverTimeSlots(string $packageId, Request $request)
     {
         if (trim($packageId) === '') {
             return response()->json([
@@ -110,9 +122,11 @@ class TiktokShopController extends Controller
             ], 400);
         }
 
+        $service = $this->serviceFor($request->query('order_sn'));
+
         try {
             return response()->json(
-                $this->tiktokShopService->getPackageHandoverTimeSlots($packageId),
+                $service->getPackageHandoverTimeSlots($packageId),
             );
         } catch (Throwable $e) {
             $errorMessage = $e->getMessage();
@@ -123,9 +137,9 @@ class TiktokShopController extends Controller
                 // Try refreshing the token and retry once
                 try {
                     \Log::info('Attempting token refresh due to scope error', ['package_id' => $packageId]);
-                    $this->tiktokShopService->getAccessToken(true); // Force refresh
+                    $service->getAccessToken(true); // Force refresh
                     return response()->json(
-                        $this->tiktokShopService->getPackageHandoverTimeSlots($packageId),
+                        $service->getPackageHandoverTimeSlots($packageId),
                     );
                 } catch (Throwable $retryException) {
                     \Log::error('Token refresh retry also failed', ['error' => $retryException->getMessage()]);
@@ -154,9 +168,9 @@ class TiktokShopController extends Controller
 
         try {
             return response()->json(
-                $this->tiktokShopService->shipPackage(
+                $this->serviceFor($request->query('order_sn'))->shipPackage(
                     $packageId,
-                    $request->all(),
+                    $request->except('order_sn'),
                 ),
             );
         } catch (Throwable $e) {
@@ -166,7 +180,7 @@ class TiktokShopController extends Controller
         }
     }
 
-    public function getPackageShippingDocuments(string $packageId)
+    public function getPackageShippingDocuments(string $packageId, Request $request)
     {
         if (trim($packageId) === '') {
             return response()->json([
@@ -175,7 +189,7 @@ class TiktokShopController extends Controller
         }
 
         try {
-            $response = $this->tiktokShopService->getPackageShippingDocument($packageId);
+            $response = $this->serviceFor($request->query('order_sn'))->getPackageShippingDocument($packageId);
 
             // TikTok returns JSON for both errors and some document types (e.g. download_url).
             // PDF bytes are returned when document_format=PDF and the order is shipped.

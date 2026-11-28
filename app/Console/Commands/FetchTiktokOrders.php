@@ -10,13 +10,15 @@ use Throwable;
 
 class FetchTiktokOrders extends Command
 {
-    protected $signature = 'tiktok:fetch-orders {--days=1 : Number of days to look back}';
+    protected $signature = 'tiktok:fetch-orders {--days=1 : Number of days to look back}
+        {--minutes= : Look back this many minutes instead (frequent sync for instant orders)}';
 
     protected $description = 'Fetch recently updated TikTok Shop orders and save them to the database';
 
     public function handle(TiktokShopService $tiktok): int
     {
         $days = max(1, (int) $this->option('days'));
+        $minutes = (int) $this->option('minutes') ?: null;
         $stores = OnlineStore::activeTiktok()->get();
 
         if ($stores->isEmpty()) {
@@ -29,7 +31,7 @@ class FetchTiktokOrders extends Command
 
         foreach ($stores as $store) {
             try {
-                $result = $tiktok->forStore($store)->syncRecentOrders($days);
+                $result = $tiktok->forStore($store)->syncRecentOrders($days, $minutes);
                 $this->info("[{$store->store_name}] {$result['orders']} order(s) from {$result['pages']} page(s).");
             } catch (Throwable $e) {
                 $exitCode = self::FAILURE;

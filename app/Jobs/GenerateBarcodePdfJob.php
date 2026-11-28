@@ -7,6 +7,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -24,6 +25,27 @@ class GenerateBarcodePdfJob implements ShouldQueue
 
     public function __construct(public string $type, public string $id)
     {
+    }
+
+    /**
+     * Queues the pre-generation without ever making the caller wait for it.
+     * With the "sync" queue there is no background, so nothing is queued and
+     * the PDF is made when someone prints (with a progress indicator).
+     */
+    public static function queue(string $type, string $id): void
+    {
+        if (config('queue.default') === 'sync') {
+            return;
+        }
+
+        DB::afterCommit(function () use ($type, $id) {
+            try {
+                static::dispatch($type, $id);
+            } catch (\Throwable $e) {
+                // The data is saved; the PDF is simply made at print time instead.
+                Log::warning("[GenerateBarcodePdfJob] could not queue {$type} {$id}: " . $e->getMessage());
+            }
+        });
     }
 
     public function handle(BarcodePdfService $service): void

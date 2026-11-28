@@ -7,6 +7,8 @@ use App\Http\Traits\CrudTrait;
 use App\Http\Traits\MarketplaceApiTrait;
 use App\Models\Transactions\Order;
 use App\Models\Transactions\OrderItem;
+use App\Support\ShippingClassifier;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -43,21 +45,47 @@ class OrderController extends Controller
             'marketplace' => $data->marketplace,
             'is_outbounded' => (bool) $data->is_outbounded,
             'is_label_printed' => (bool) $data->is_label_printed,
+            'service_type' => $data->service_type,
+            'service_type_label' => ShippingClassifier::LABELS[$data->service_type] ?? null,
+            'shipping_courier' => $data->shipping_courier,
+            'delivery_option' => $data->delivery_option,
+            'ship_by_at' => $data->ship_by_at?->utc()->toISOString(),
+            'ordered_at' => ($data->ordered_at ?? $data->created_at)?->utc()->toISOString(),
             'created_at' => $data->created_at?->utc()->toISOString()
         ];
     }
 
     public function index(Request $request)
     {
+        $request->validate([
+            'date_from' => 'nullable|date_format:Y-m-d',
+            'date_to' => 'nullable|date_format:Y-m-d',
+        ]);
+
         return $this->baseIndex(
             $request,
             Order::class,
             [],
-            ["marketplace_id", "order_sn", "awb_code", "status", "online_store_id"],
+            ["marketplace_id", "order_sn", "awb_code", "status", "online_store_id", "service_type", "shipping_courier"],
             $this->structure(),
-            function ($query) {
+            function ($query) use ($request) {
+                // The user picks WIB dates; the database holds UTC.
+                foreach (['date_from' => '>=', 'date_to' => '<='] as $field => $operator) {
+                    if ($date = $request->input($field)) {
+                        $day = Carbon::parse($date, 'Asia/Jakarta');
+                        $moment = $field === 'date_from' ? $day->startOfDay() : $day->endOfDay();
+                        $query->whereRaw("COALESCE(trx_orders.ordered_at, trx_orders.created_at) {$operator} ?", [$moment->utc()->format('Y-m-d H:i:s')]);
+                    }
+                }
+
+                // A column the user sorts by wins over the default order.
+                if ($request->filled('sort')) {
+                    return;
+                }
+
                 // Priority sorting:
-                // 1. ready_to_ship and ready_to_pickup (highest priority)
+                // 1. ready_to_ship and ready_to_pickup (highest priority),
+                //    instant first, then same day, by nearest deadline
                 // 2. Other active statuses (pending, read, prepared, shipped, retry_ship)
                 // 3. Completed/cancelled statuses (delivered, cancelled, returned) at bottom
                 $query->orderByRaw("
@@ -68,9 +96,28 @@ class OrderController extends Controller
                         ELSE 4
                     END ASC
                 ")
-                ->orderByDesc('created_at');
+                ->orderByRaw("
+                    CASE
+                        WHEN status NOT IN ('ready_to_ship', 'retry_ship', 'ready_to_pickup') OR is_outbounded = 1 THEN 3
+                        WHEN service_type = 'instant' THEN 1
+                        WHEN service_type = 'sameday' THEN 2
+                        ELSE 3
+                    END ASC
+                ")
+                ->orderByRaw("
+                    CASE WHEN status IN ('ready_to_ship', 'retry_ship') AND service_type IN ('instant', 'sameday') THEN ship_by_at END ASC
+                ")
+                ->orderByRaw('COALESCE(trx_orders.ordered_at, trx_orders.created_at) DESC');
             },
             null
+        );
+    }
+
+    /** Couriers that appear on orders, for the list filter. */
+    public function couriers()
+    {
+        return $this->successResponse(
+            Order::whereNotNull('shipping_courier')->distinct()->orderBy('shipping_courier')->pluck('shipping_courier')
         );
     }
 

@@ -59,6 +59,11 @@ class ShopeeOrderSyncTest extends TestCase
             $t->integer('item_count')->nullable();
             $t->integer('unique_item_count')->nullable();
             $t->boolean('is_outbounded')->default(false);
+            foreach (['service_type', 'shipping_courier', 'delivery_option'] as $column) {
+                $t->string($column)->nullable();
+            }
+            $t->timestamp('ship_by_at')->nullable();
+            $t->timestamp('ordered_at')->nullable();
             $t->timestamp('read_at')->nullable();
             $t->timestamps();
             $t->softDeletes();
@@ -207,6 +212,27 @@ class ShopeeOrderSyncTest extends TestCase
             ->map(fn (array $pair) => $this->query($pair[0]))
             ->values()
             ->all();
+    }
+
+    public function test_courier_assigned_later_is_added_to_an_existing_order(): void
+    {
+        $this->existing('K1', OrderStatus::READY_TO_SHIP);
+        Http::fake([
+            '*/api/v2/order/get_order_list*' => Http::response($this->listPage(['K1'])),
+            '*/api/v2/order/get_order_detail*' => Http::response(['error' => '', 'response' => ['order_list' => [[
+                'order_sn' => 'K1', 'order_status' => 'READY_TO_SHIP', 'buyer_username' => 'buyer',
+                'create_time' => 1_795_000_000, 'pay_time' => 1_795_000_100, 'ship_by_date' => 1_795_090_000,
+                'checkout_shipping_carrier' => 'Instant', 'shipping_carrier' => 'SPX Instant',
+            ]]]]),
+        ]);
+
+        $this->artisan('shopee:fetch-orders')->assertSuccessful();
+
+        $order = Order::where('order_sn', 'K1')->first();
+        $this->assertSame('instant', $order->service_type);
+        $this->assertSame('Shopee Express (SPX)', $order->shipping_courier);
+        $this->assertSame(1_795_003_700, $order->ship_by_at->timestamp);
+        $this->assertSame(1_795_000_000, $order->ordered_at->timestamp);
     }
 
     public function test_fetch_follows_every_page(): void

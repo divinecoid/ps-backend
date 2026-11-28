@@ -40,6 +40,20 @@ Schedule::job(new RefreshTiktokTokenJob())
     ->name('tiktok-refresh-token')
     ->onOneServer();
 
+// Instant / same-day orders must be arranged within about an hour of coming in,
+// so recent changes are also pulled every 5 minutes.
+Schedule::job(new FetchShopeeOrdersJob(minutes: 30))
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->name('shopee-fetch-recent-orders')
+    ->onOneServer();
+
+Schedule::job(new FetchTiktokOrdersJob(minutes: 30))
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->name('tiktok-fetch-recent-orders')
+    ->onOneServer();
+
 // Delete pre-generated barcode PDFs past their retention period (default 30 days)
 Schedule::command('barcode:prune')
     ->dailyAt('02:00')

@@ -51,6 +51,11 @@ class TiktokOrderSyncTest extends TestCase
             }
             $t->integer('item_count')->nullable();
             $t->integer('unique_item_count')->nullable();
+            foreach (['service_type', 'shipping_courier', 'delivery_option'] as $column) {
+                $t->string($column)->nullable();
+            }
+            $t->timestamp('ship_by_at')->nullable();
+            $t->timestamp('ordered_at')->nullable();
             $t->timestamps();
             $t->softDeletes();
         });
@@ -149,6 +154,27 @@ class TiktokOrderSyncTest extends TestCase
             && !str_contains($r->url(), 'dead.example.test')
             && !str_contains($r->url(), 'access-old')
             && $r['update_time_lt'] - $r['update_time_ge'] === 2 * 86400);
+    }
+
+    public function test_sync_saves_service_type_courier_and_deadline(): void
+    {
+        $this->store();
+        $this->fakeShopAndOrders([$this->order('S1', 'AWAITING_SHIPMENT') + [
+            'fulfillment_priority_level' => 100,
+            'delivery_option_name' => 'Instant',
+            'shipping_provider' => 'GoSend',
+            'create_time' => 1_795_000_000,
+            'rts_sla_time' => 1_795_003_600,
+        ]]);
+
+        $this->artisan('tiktok:fetch-orders')->assertSuccessful();
+
+        $order = Order::where('order_sn', 'S1')->first();
+        $this->assertSame('instant', $order->service_type);
+        $this->assertSame('GoSend', $order->shipping_courier);
+        $this->assertSame('Instant', $order->delivery_option);
+        $this->assertSame(1_795_000_000, $order->ordered_at->timestamp);
+        $this->assertSame(1_795_003_600, $order->ship_by_at->timestamp);
     }
 
     public function test_sync_does_not_undo_warehouse_progress(): void

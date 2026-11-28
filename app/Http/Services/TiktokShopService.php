@@ -6,6 +6,7 @@ use App\Models\MasterData\OnlineStore;
 use App\Models\Transactions\Order;
 use App\Models\Transactions\OrderItem;
 use App\Enums\OrderStatus;
+use App\Support\ShippingClassifier;
 use Carbon\Carbon;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
@@ -88,7 +89,7 @@ class TiktokShopService
      *
      * @return array{orders: int, pages: int}
      */
-    public function syncRecentOrders(int $days = 1): array
+    public function syncRecentOrders(int $days = 1, ?int $minutes = null): array
     {
         $shop = $this->getPrimaryShop();
         $this->rememberShop($shop);
@@ -96,7 +97,7 @@ class TiktokShopService
 
         $now = time();
         $body = [
-            'update_time_ge' => $now - max(1, $days) * 86400,
+            'update_time_ge' => $now - ($minutes ? $minutes * 60 : max(1, $days) * 86400),
             'update_time_lt' => $now,
         ];
 
@@ -482,11 +483,34 @@ class TiktokShopService
                     $orderModel->readytoship_marketplace = $marketplaceStatus;
                 }
 
+                $orderModel->fill($this->shippingInfo($order, $lineItems));
+
                 $orderModel->save();
 
                 $this->syncOrderItemsToDatabase($orderModel, $lineItems);
             }
         });
+    }
+
+    /** Service type, courier and deadlines; only what TikTok actually sent. */
+    private function shippingInfo(array $order, array $lineItems): array
+    {
+        $option = trim((string) ($order['delivery_option_name'] ?? ''));
+        $provider = trim((string) ($order['shipping_provider'] ?? ''));
+        if ($provider === '') {
+            $provider = trim((string) (collect($lineItems)->pluck('shipping_provider_name')->filter()->first() ?? ''));
+        }
+        $priority = isset($order['fulfillment_priority_level']) ? (int) $order['fulfillment_priority_level'] : null;
+        // Deadline to arrange shipment; older payloads only carry the later ones.
+        $shipBy = (int) (($order['rts_sla_time'] ?? 0) ?: ($order['shipping_due_time'] ?? 0) ?: ($order['tts_sla_time'] ?? 0));
+
+        return array_filter([
+            'service_type' => ShippingClassifier::tiktok($priority, $option, $provider),
+            'shipping_courier' => ShippingClassifier::courier($provider),
+            'delivery_option' => $option !== '' ? mb_substr($option, 0, 120) : null,
+            'ship_by_at' => $shipBy ? Carbon::createFromTimestamp($shipBy) : null,
+            'ordered_at' => empty($order['create_time']) ? null : Carbon::createFromTimestamp((int) $order['create_time']),
+        ]);
     }
 
     /**

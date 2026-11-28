@@ -44,6 +44,11 @@ class Order extends Model
         'is_approved',
         'is_outbounded',
         'is_label_printed',
+        'service_type',
+        'shipping_courier',
+        'delivery_option',
+        'ship_by_at',
+        'ordered_at',
     ];
 
     protected $casts = [
@@ -53,6 +58,8 @@ class Order extends Model
         'readytoship_at' => 'datetime',
         'is_outbounded' => 'boolean',
         'is_label_printed' => 'boolean',
+        'ship_by_at' => 'datetime',
+        'ordered_at' => 'datetime',
     ];
 
     // Define relationship with Order Item model

@@ -58,6 +58,9 @@ class RackController extends Controller
             if ($request->filled('warehouse_id')) {
                 $query->where('warehouse_id', $request->input('warehouse_id'));
             }
+            if ($request->filled('warehouse_type')) {
+                $query->whereHas('warehouse', fn($q) => $q->where('type', $request->input('warehouse_type')));
+            }
             if ($request->filled('model_id')) {
                 $query->where('model_id', $request->input('model_id'));
             }

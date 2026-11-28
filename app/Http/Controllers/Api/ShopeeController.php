@@ -284,7 +284,7 @@ class ShopeeController extends Controller
         $request->validate([
             'order_sn' => 'required|string',
             'address_id' => 'required_without:dropoff',
-            'pickup_time_id' => 'required_without:dropoff|string',
+            'pickup_time_id' => 'nullable|string',
             'dropoff' => 'nullable|array',
         ]);
 

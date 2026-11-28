@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\MasterData\Color;
 use App\Models\MasterData\Inventory;
+use App\Models\MasterData\InventoryDetail;
 use App\Models\MasterData\ProductModel;
 use App\Models\MasterData\Size;
 use App\Models\MasterData\Product;
@@ -12,20 +13,27 @@ use Illuminate\Support\Str;
 
 /**
  * "Input Stok Lama": barcodes for stock that already exists but never went
- * through a CMT request. Such stock goes straight into the BIG warehouse
- * (Inventory/InventoryDetail) without having to be scanned in first — a D
- * (dozen) barcode adds 12 pcs, a P (piece) barcode adds 1 pc — and is
- * deducted later when a P barcode is moved to the small warehouse through
- * Mutasi (see MutationController).
+ * through a CMT request. Such stock always goes straight into the BIG
+ * warehouse (Inventory/InventoryDetail) without having to be scanned in
+ * first — a D (dozen) barcode adds 12 pcs, a P (piece) barcode adds 1 pc —
+ * and is deducted later when a P barcode is moved to the small warehouse
+ * through Mutasi (see MutationController).
  *
  * The Product row is kept as the barcode registry (batch listing, "already
  * used" check) but carries NO rack while the stock sits in the big
  * warehouse: small-warehouse stock is counted from Products that have a
  * rack, so giving it one now would count the same stock twice.
+ *
+ * A batch can hold thousands of rows, so everything here works in bulk: rows
+ * are read once, stock changes are summed per series and written once.
+ *
+ * This service never renders labels; barcode PDFs are a separate background
+ * step (see GenerateBarcodePdfJob).
  */
 class LegacyStockService
 {
     public const DOZEN_QTY = 12;
+    private const CHUNK = 500;
 
     /**
      * Registers one old-stock barcode.
@@ -33,35 +41,67 @@ class LegacyStockService
      * @param array{model_id:string,color_id:string,size_id:string,rack_id:?string,
      *              series:string,barcode:string,type:string,batch_id:string} $line
      */
-    public function register(array $line): Product
+    public function register(array $line): void
     {
-        $rack = $line['rack_id'] ? Rack::with('warehouse')->find($line['rack_id']) : null;
-        // Only "no rack" or a rack in a BESAR warehouse goes to the big
-        // warehouse. A rack in a KECIL warehouse — or in a warehouse with no
-        // type set — keeps the old behaviour: the product is placed straight
-        // into that rack (small-warehouse stock).
-        $toBig = !$rack || $rack->warehouse?->type === 'BESAR';
+        $this->registerMany([$line]);
+    }
 
-        $product = Product::create([
-            'id' => (string) Str::uuid(),
-            'model_id' => $line['model_id'],
-            'rack_id' => $toBig ? null : $rack->id,
-            'color_id' => $line['color_id'],
-            'size_id' => $line['size_id'],
-            'series' => $line['series'],
-            'barcode' => $line['barcode'],
-            'stock_batch_id' => $line['batch_id'],
-        ]);
-
-        if ($toBig) {
-            $this->addToBigWarehouse($line, $rack);
-
-            if ($line['type'] === 'D') {
-                $this->registerDozenPieces($line);
+    /**
+     * Registers old-stock barcodes into the big warehouse. `rack_id` is
+     * optional and, when given, must be a big-warehouse rack.
+     *
+     * @param array<int,array{model_id:string,color_id:string,size_id:string,rack_id:?string,
+     *              series:string,barcode:string,type:string,batch_id:string}> $lines
+     * @throws \InvalidArgumentException when a rack is not in the big warehouse
+     */
+    public function registerMany(array $lines): void
+    {
+        $racks = Rack::with('warehouse')
+            ->whereIn('id', collect($lines)->pluck('rack_id')->filter()->unique()->values())
+            ->get()
+            ->keyBy('id');
+        foreach ($racks as $rack) {
+            if ($rack->warehouse?->type !== 'BESAR') {
+                throw new \InvalidArgumentException("Rak {$rack->name} bukan rak gudang besar. Stok lama hanya bisa masuk ke gudang besar.");
             }
         }
 
-        return $product;
+        $now = now();
+        $rows = [];
+        $moves = [];
+        $preferredRacks = [];
+        foreach ($lines as $line) {
+            $rows[] = $this->productRow($line, $line['barcode'], $now);
+            $units = 1;
+            if ($line['type'] === 'D') {
+                $units = self::DOZEN_QTY;
+                array_push($rows, ...$this->dozenPieceRows($line, [], $now));
+            }
+            $key = $this->stockKey($line['model_id'], $line['color_id'], $line['size_id'], $line['series']);
+            $moves[$key] = ($moves[$key] ?? 0) + $units;
+            if ($line['rack_id']) {
+                $preferredRacks[$this->comboKey($line['model_id'], $line['color_id'], $line['size_id'])] ??= $line['rack_id'];
+            }
+        }
+
+        $this->insertRows($rows);
+        $this->addStock($moves, $preferredRacks);
+    }
+
+    private function productRow(array $line, string $barcode, $now): array
+    {
+        return [
+            'id' => (string) Str::uuid(),
+            'model_id' => $line['model_id'],
+            'rack_id' => null,
+            'color_id' => $line['color_id'],
+            'size_id' => $line['size_id'],
+            'series' => $line['series'],
+            'barcode' => $barcode,
+            'stock_batch_id' => $line['batch_id'],
+            'created_at' => $now,
+            'updated_at' => $now,
+        ];
     }
 
     /**
@@ -69,38 +109,51 @@ class LegacyStockService
      * can be scanned later when it moves to the small warehouse (Mutasi only
      * accepts P barcodes). They are registry rows only: no rack and no
      * stock of their own — the dozen barcode already added the 12 pcs.
-     * Piece numbers continue across dozens: dozen n owns pieces
-     * (n-1)*12+1 .. n*12.
      */
-    private function registerDozenPieces(array $line, array $existingNumbers = []): void
+    private function dozenPieceRows(array $line, array $existingBarcodes, $now): array
     {
-        $parts = explode('|', $line['barcode']);
+        $rows = [];
+        foreach ($this->pieceBarcodesOf($line['barcode']) as $barcode) {
+            if (!isset($existingBarcodes[$barcode])) {
+                $rows[] = $this->productRow($line, $barcode, $now);
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * The 12 piece barcodes owned by a dozen barcode. Piece numbers continue
+     * across dozens: dozen n owns pieces (n-1)*12+1 .. n*12.
+     *
+     * @return string[]
+     */
+    public function pieceBarcodesOf(string $dozenBarcode): array
+    {
+        $parts = explode('|', $dozenBarcode);
         $dozenNumber = (int) array_pop($parts);
         array_pop($parts); // the "D" group
-        $now = now();
-
-        $rows = [];
+        $barcodes = [];
         for ($j = 1; $j <= self::DOZEN_QTY; $j++) {
-            $number = ($dozenNumber - 1) * self::DOZEN_QTY + $j;
-            if (in_array($number, $existingNumbers, true)) {
-                continue;
-            }
-            $rows[] = [
-                'id' => (string) Str::uuid(),
-                'model_id' => $line['model_id'],
-                'rack_id' => null,
-                'color_id' => $line['color_id'],
-                'size_id' => $line['size_id'],
-                'series' => $line['series'],
-                'barcode' => implode('|', [...$parts, 'P', $number]),
-                'stock_batch_id' => $line['batch_id'],
-                'created_at' => $now,
-                'updated_at' => $now,
-            ];
+            $barcodes[] = implode('|', [...$parts, 'P', ($dozenNumber - 1) * self::DOZEN_QTY + $j]);
         }
-        if ($rows) {
-            Product::insert($rows);
+
+        return $barcodes;
+    }
+
+    /** The dozen barcode a piece barcode would belong to. */
+    private function dozenBarcodeOf(string $pieceBarcode): ?string
+    {
+        $parts = explode('|', $pieceBarcode);
+        if (count($parts) < 3) {
+            return null;
         }
+        $number = (int) array_pop($parts);
+        if (array_pop($parts) !== 'P' || $number < 1) {
+            return null;
+        }
+
+        return implode('|', [...$parts, 'D', intdiv($number - 1, self::DOZEN_QTY) + 1]);
     }
 
     /**
@@ -111,55 +164,125 @@ class LegacyStockService
      */
     public function backfillDozenPieces(string $batchId): int
     {
-        $created = 0;
-        $dozens = Product::where('stock_batch_id', $batchId)->whereNull('rack_id')->where('barcode', 'like', '%|D|%')->get();
-        foreach ($dozens as $dozen) {
-            if ($this->group($dozen) !== 'D') {
+        $products = Product::where('stock_batch_id', $batchId)->get();
+        $existing = $products->pluck('barcode')->flip()->all();
+        $now = now();
+        $rows = [];
+        foreach ($products as $dozen) {
+            if ($dozen->rack_id !== null || $this->group($dozen) !== 'D') {
                 continue;
             }
-            $existing = Product::where('stock_batch_id', $batchId)
-                ->where('series', $dozen->series)
-                ->where('barcode', 'like', '%|P|%')
-                ->pluck('barcode')
-                ->map(fn($b) => (int) substr((string) strrchr($b, '|'), 1))
-                ->all();
-            if (count($existing) >= self::DOZEN_QTY) {
-                continue;
-            }
-            $this->registerDozenPieces([
+            array_push($rows, ...$this->dozenPieceRows([
                 'model_id' => $dozen->model_id,
                 'color_id' => $dozen->color_id,
                 'size_id' => $dozen->size_id,
                 'series' => $dozen->series,
                 'barcode' => $dozen->barcode,
                 'batch_id' => $batchId,
-            ], $existing);
-            $created += self::DOZEN_QTY - count($existing);
+            ], $existing, $now));
         }
+        $this->insertRows($rows);
 
-        return $created;
+        return count($rows);
     }
 
-    private function addToBigWarehouse(array $line, ?Rack $rack): void
+    private function insertRows(array $rows): void
     {
-        $inventory = Inventory::firstOrCreate([
-            'model_id' => $line['model_id'],
-            'color_id' => $line['color_id'],
-            'size_id' => $line['size_id'],
-        ]);
+        foreach (array_chunk($rows, self::CHUNK) as $chunk) {
+            Product::insert($chunk);
+        }
+    }
 
-        if ($inventory->rack_id === null) {
-            $rackId = $rack?->id ?? $this->defaultBigRackId($line['model_id'], $line['color_id']);
-            if ($rackId) {
-                $inventory->update(['rack_id' => $rackId]);
+    private function comboKey(string $modelId, string $colorId, string $sizeId): string
+    {
+        return implode('|', [$modelId, $colorId, $sizeId]);
+    }
+
+    private function stockKey(string $modelId, string $colorId, string $sizeId, string $series): string
+    {
+        // Series never contains "|" (validated on input).
+        return implode('|', [$modelId, $colorId, $sizeId, $series]);
+    }
+
+    /** @return array<string,array<string,int>> combo key => [series => units] */
+    private function byCombo(array $moves): array
+    {
+        $grouped = [];
+        foreach ($moves as $key => $units) {
+            [$modelId, $colorId, $sizeId, $series] = explode('|', $key, 4);
+            $grouped[$this->comboKey($modelId, $colorId, $sizeId)][$series] = $units;
+        }
+
+        return $grouped;
+    }
+
+    /**
+     * Puts stock into the big warehouse.
+     *
+     * @param array<string,int> $moves stock key => pieces
+     * @param array<string,string> $preferredRacks combo key => rack for a combo that has none yet
+     */
+    private function addStock(array $moves, array $preferredRacks = []): void
+    {
+        foreach ($this->byCombo(array_filter($moves)) as $combo => $series) {
+            [$modelId, $colorId, $sizeId] = explode('|', $combo);
+            $inventory = Inventory::firstOrCreate([
+                'model_id' => $modelId,
+                'color_id' => $colorId,
+                'size_id' => $sizeId,
+            ]);
+
+            if ($inventory->rack_id === null) {
+                $rackId = $preferredRacks[$combo] ?? $this->defaultBigRackId($modelId, $colorId);
+                if ($rackId) {
+                    $inventory->update(['rack_id' => $rackId]);
+                }
+            }
+
+            $details = $inventory->detail()->whereIn('series', array_map('strval', array_keys($series)))->get()->keyBy('series');
+            foreach ($series as $name => $units) {
+                if ($detail = $details->get($name)) {
+                    $detail->increment('quantity', $units);
+                } else {
+                    $inventory->detail()->create(['series' => (string) $name, 'quantity' => $units]);
+                }
+            }
+        }
+    }
+
+    /**
+     * Takes stock out of the big warehouse, never going below zero.
+     *
+     * @param array<string,int> $moves stock key => pieces
+     * @return array<string,int> stock key => pieces actually taken
+     */
+    private function removeStock(array $moves): array
+    {
+        $taken = [];
+        foreach ($this->byCombo(array_filter($moves)) as $combo => $series) {
+            [$modelId, $colorId, $sizeId] = explode('|', $combo);
+            // A combo can have more than one inventory row (see InventoryController).
+            $inventoryIds = Inventory::where(['model_id' => $modelId, 'color_id' => $colorId, 'size_id' => $sizeId])->pluck('id');
+            $details = InventoryDetail::whereIn('inventory_id', $inventoryIds)
+                ->whereIn('series', array_map('strval', array_keys($series)))
+                ->orderBy('created_at')
+                ->get()
+                ->groupBy('series');
+
+            foreach ($series as $name => $units) {
+                $left = $units;
+                foreach ($details->get($name, []) as $detail) {
+                    $take = min($left, max(0, (int) $detail->quantity));
+                    if ($take > 0) {
+                        $detail->decrement('quantity', $take);
+                        $left -= $take;
+                    }
+                }
+                $taken["{$combo}|{$name}"] = $units - $left;
             }
         }
 
-        $detail = $inventory->detail()->firstOrCreate(
-            ['series' => $line['series']],
-            ['quantity' => 0]
-        );
-        $detail->increment('quantity', $line['type'] === 'D' ? self::DOZEN_QTY : 1);
+        return $taken;
     }
 
     /** Same fallback order the CMT receive flow uses to pick a big-warehouse rack. */
@@ -205,64 +328,100 @@ class LegacyStockService
     }
 
     /**
-     * Pieces this row accounts for in the big warehouse: a dozen barcode 12,
-     * a lone piece barcode 1, and 0 for the registry-only piece barcodes of
-     * a dozen (their stock is already inside the dozen) or for rows that
-     * already sit in a small-warehouse rack.
+     * Big-warehouse pieces each row accounts for: a dozen barcode 12, a lone
+     * piece barcode 1, and 0 for the registry-only piece barcodes of a dozen
+     * (their stock is already inside the dozen) or for rows that sit in a
+     * small-warehouse rack.
+     *
+     * @param \Illuminate\Support\Collection<int,Product> $products
+     * @return array<string,int> product id => pieces
      */
-    public function stockUnits(Product $product): int
+    public function stockUnits($products): array
     {
-        if ($product->stock_batch_id === null || $product->rack_id !== null) {
-            return 0;
-        }
-        if ($this->group($product) === 'D') {
-            return self::DOZEN_QTY;
-        }
-
-        $belongsToDozen = Product::withTrashed()
-            ->where('stock_batch_id', $product->stock_batch_id)
-            ->where('series', $product->series)
+        $batchIds = $products->pluck('stock_batch_id')->filter()->unique()->values();
+        $dozens = Product::withTrashed()
+            ->whereIn('stock_batch_id', $batchIds)
             ->where('barcode', 'like', '%|D|%')
-            ->exists();
+            ->get(['stock_batch_id', 'barcode'])
+            ->mapWithKeys(fn($d) => ["{$d->stock_batch_id}#{$d->barcode}" => true])
+            ->all();
 
-        return $belongsToDozen ? 0 : 1;
+        $units = [];
+        foreach ($products as $product) {
+            if ($product->stock_batch_id === null || $product->rack_id !== null) {
+                $units[$product->id] = 0;
+            } elseif ($this->group($product) === 'D') {
+                $units[$product->id] = self::DOZEN_QTY;
+            } else {
+                $dozen = $this->dozenBarcodeOf((string) $product->barcode);
+                $units[$product->id] = $dozen !== null && isset($dozens["{$product->stock_batch_id}#{$dozen}"]) ? 0 : 1;
+            }
+        }
+
+        return $units;
     }
 
-    /** Takes the row's stock back out of the big warehouse (delete / before an attribute change). */
-    public function release(Product $product): void
+    /** @return array<string,int> stock key => pieces held by these rows */
+    private function stockOf($products, array $units): array
     {
-        $units = $this->stockUnits($product);
-        if ($units === 0) {
-            return;
+        $moves = [];
+        foreach ($products as $product) {
+            if ($count = $units[$product->id] ?? 0) {
+                $key = $this->stockKey($product->model_id, $product->color_id, $product->size_id, (string) $product->series);
+                $moves[$key] = ($moves[$key] ?? 0) + $count;
+            }
         }
 
-        $inventory = Inventory::where([
-            'model_id' => $product->model_id,
-            'color_id' => $product->color_id,
-            'size_id' => $product->size_id,
-        ])->first();
-        $detail = $inventory?->detail()->where('series', $product->series)->first();
-
-        if ($detail) {
-            $detail->update(['quantity' => max(0, $detail->quantity - $units)]);
-        }
+        return $moves;
     }
 
-    /** Puts the row's stock (back) into the big warehouse (restore / after an attribute change). */
-    public function reclaim(Product $product): void
+    /** Takes the rows' stock back out of the big warehouse (delete). */
+    public function release($products): void
     {
-        $units = $this->stockUnits($product);
-        if ($units === 0) {
-            return;
+        $this->removeStock($this->stockOf($products, $this->stockUnits($products)));
+    }
+
+    /** Puts the rows' stock back into the big warehouse (restore). */
+    public function reclaim($products): void
+    {
+        $this->addStock($this->stockOf($products, $this->stockUnits($products)));
+    }
+
+    /**
+     * The given rows plus, for each dozen (D) barcode among them, its own 12
+     * piece barcodes. Matched by barcode, not by series: a series typed by
+     * the user is shared by every dozen of a batch.
+     */
+    public function withDozenPieces($products, bool $trashed = false)
+    {
+        $extra = collect();
+        $dozens = $products->filter(fn($p) => $p->stock_batch_id !== null && $this->group($p) === 'D');
+        foreach ($dozens->groupBy('stock_batch_id') as $batchId => $rows) {
+            $barcodes = $rows->flatMap(fn($d) => $this->pieceBarcodesOf($d->barcode))->values();
+            foreach ($barcodes->chunk(self::CHUNK) as $chunk) {
+                $extra = $extra->concat(Product::query()
+                    ->when($trashed, fn($q) => $q->onlyTrashed())
+                    ->where('stock_batch_id', $batchId)
+                    ->whereIn('barcode', $chunk->all())
+                    ->get());
+            }
         }
 
-        $inventory = Inventory::firstOrCreate([
-            'model_id' => $product->model_id,
-            'color_id' => $product->color_id,
-            'size_id' => $product->size_id,
-        ]);
-        $detail = $inventory->detail()->firstOrCreate(['series' => $product->series], ['quantity' => 0]);
-        $detail->increment('quantity', $units);
+        return $products->concat($extra)->unique('id')->values();
+    }
+
+    /** One row's whole dozen (the D barcode and its pieces), or just the row if it is a lone piece. */
+    public function dozenFamily(Product $product)
+    {
+        if ($this->group($product) === 'P') {
+            $dozenBarcode = $this->dozenBarcodeOf((string) $product->barcode);
+            $dozen = $dozenBarcode === null ? null : Product::where('stock_batch_id', $product->stock_batch_id)
+                ->where('barcode', $dozenBarcode)
+                ->first();
+            $product = $dozen ?? $product;
+        }
+
+        return $this->withDozenPieces(collect([$product]));
     }
 
     /**
@@ -277,40 +436,62 @@ class LegacyStockService
     public function updateRows($products, array $attributes, ?string $rackId = null): void
     {
         $attributes = array_filter($attributes);
-        $model = isset($attributes['model_id']) ? ProductModel::find($attributes['model_id']) : null;
-        $color = isset($attributes['color_id']) ? Color::find($attributes['color_id']) : null;
-        $size = isset($attributes['size_id']) ? Size::find($attributes['size_id']) : null;
+        $units = $this->stockUnits($products);
 
-        foreach ($products as $product) {
-            if ($attributes) {
-                $this->release($product);
+        if ($attributes) {
+            $model = isset($attributes['model_id']) ? ProductModel::find($attributes['model_id']) : null;
+            $color = isset($attributes['color_id']) ? Color::find($attributes['color_id']) : null;
+            $size = isset($attributes['size_id']) ? Size::find($attributes['size_id']) : null;
 
-                $changes = $attributes;
+            // Only what is really on the shelf moves to the new item, so an
+            // edit can neither create stock nor lose it.
+            $taken = $this->removeStock($this->stockOf($products, $units));
+            $incoming = [];
+            foreach ($taken as $key => $count) {
+                [$modelId, $colorId, $sizeId, $series] = explode('|', $key, 4);
+                $target = $this->stockKey(
+                    $attributes['model_id'] ?? $modelId,
+                    $attributes['color_id'] ?? $colorId,
+                    $attributes['size_id'] ?? $sizeId,
+                    $series
+                );
+                $incoming[$target] = ($incoming[$target] ?? 0) + $count;
+            }
+
+            $now = now();
+            $rows = [];
+            foreach ($products as $product) {
                 $parts = explode('|', (string) $product->barcode);
                 if (count($parts) === 7) {
                     $parts[2] = $model?->sku ?? $parts[2];
                     $parts[3] = $color?->code ?? $parts[3];
                     $parts[4] = $size?->code ?? $parts[4];
-                    $changes['barcode'] = implode('|', $parts);
+                    $product->barcode = implode('|', $parts);
                 }
-                $product->update($changes);
+                $product->forceFill($attributes);
+                $product->updated_at = $now;
+                $rows[] = $product->getAttributes();
+                $product->syncOriginal();
             }
+            foreach (array_chunk($rows, self::CHUNK) as $chunk) {
+                Product::upsert($chunk, ['id'], ['model_id', 'color_id', 'size_id', 'barcode', 'updated_at']);
+            }
+            $this->addStock($incoming);
+        }
 
-            if ($rackId !== null) {
-                if ($product->rack_id !== null) {
-                    $product->update(['rack_id' => $rackId]);
-                } elseif ($this->stockUnits($product) > 0) {
-                    Inventory::firstOrCreate([
-                        'model_id' => $product->model_id,
-                        'color_id' => $product->color_id,
-                        'size_id' => $product->size_id,
-                    ])->update(['rack_id' => $rackId]);
-                }
+        if ($rackId !== null) {
+            $racked = $products->whereNotNull('rack_id');
+            if ($racked->isNotEmpty()) {
+                Product::whereIn('id', $racked->pluck('id'))->update(['rack_id' => $rackId]);
             }
-
-            if ($attributes) {
-                $this->reclaim($product);
-            }
+            $products
+                ->filter(fn($p) => ($units[$p->id] ?? 0) > 0)
+                ->unique(fn($p) => $this->comboKey($p->model_id, $p->color_id, $p->size_id))
+                ->each(fn($p) => Inventory::firstOrCreate([
+                    'model_id' => $p->model_id,
+                    'color_id' => $p->color_id,
+                    'size_id' => $p->size_id,
+                ])->update(['rack_id' => $rackId]));
         }
     }
 
@@ -348,74 +529,97 @@ class LegacyStockService
             throw new \InvalidArgumentException('Jumlah tidak bisa diubah: format barcode batch tidak dikenali.');
         }
 
-        if ($isDozen) {
-            $this->backfillDozenPieces($batchId);
-        }
-
-        $main = $rows->filter(fn($p) => $this->group($p) === ($isDozen ? 'D' : 'P'))
-            ->sortBy(fn($p) => (int) substr((string) strrchr($p->barcode, '|'), 1))
+        $type = $isDozen ? 'D' : 'P';
+        $main = $rows->filter(fn($p) => $this->group($p) === $type)
+            ->sortBy(fn($p) => $this->number($p->barcode))
             ->values();
         $current = $main->count();
         if ($qty === $current) {
             return;
         }
 
+        if ($isDozen) {
+            $this->backfillDozenPieces($batchId);
+        }
+
         if ($qty > $current) {
-            $this->growBatch($main->last(), $rows, $qty - $current, $isDozen ? 'D' : 'P');
+            $this->growBatch($main, $qty - $current, $type);
 
             return;
         }
 
-        $victims = $this->withDozenPiecesOf($main->slice($qty)->values());
-        foreach ($victims as $row) {
-            $this->release($row);
-            $row->delete();
+        $victims = $this->withDozenPieces($main->slice($qty)->values());
+        $this->release($victims);
+        foreach ($victims->pluck('id')->chunk(self::CHUNK) as $ids) {
+            Product::whereIn('id', $ids->values()->all())->delete();
         }
     }
 
-    /** Registers `$count` more barcodes after `$last`, the batch's highest-numbered one. */
-    private function growBatch(Product $last, $rows, int $count, string $type): void
+    private function number(string $barcode): int
     {
+        return (int) substr((string) strrchr($barcode, '|'), 1);
+    }
+
+    /**
+     * Registers `$count` more barcodes after the batch's highest-numbered one.
+     * A series typed by the user stays the same; automatic (timestamp) series
+     * get a new one per barcode.
+     */
+    private function growBatch($main, int $count, string $type): void
+    {
+        $last = $main->last();
         $parts = explode('|', (string) $last->barcode);
         if (count($parts) !== 7) {
             throw new \InvalidArgumentException('Jumlah tidak bisa diubah: format barcode batch tidak dikenali.');
         }
-        $number = (int) $parts[6];
-        $usedSeries = $rows->pluck('series')->all();
+
+        $series = $main->pluck('series')->unique();
+        $typed = $series->count() === 1 && !preg_match('/^\d{14}$/', (string) $series->first())
+            ? (string) $series->first()
+            : null;
+        $number = $this->number($last->barcode);
+        if ($typed !== null) {
+            // Don't reissue numbers of barcodes removed from this batch earlier.
+            $prefix = implode('|', array_slice($parts, 0, 6)) . '|';
+            Product::withTrashed()
+                ->where('stock_batch_id', $last->stock_batch_id)
+                ->where('series', $typed)
+                ->pluck('barcode')
+                ->each(function ($barcode) use ($prefix, &$number) {
+                    if (str_starts_with($barcode, $prefix)) {
+                        $number = max($number, $this->number($barcode));
+                    }
+                });
+        }
+
+        $used = Product::withTrashed()->where('stock_batch_id', $last->stock_batch_id)->pluck('series')->flip()->all();
         $base = now();
         $offset = 0;
-
+        $lines = [];
         for ($i = 1; $i <= $count; $i++) {
-            do {
-                $series = $base->copy()->addSeconds($offset++)->format('YmdHis');
-            } while (in_array($series, $usedSeries, true));
-            $usedSeries[] = $series;
+            $name = $typed;
+            if ($name === null) {
+                do {
+                    $name = $base->copy()->addSeconds($offset++)->format('YmdHis');
+                } while (isset($used[$name]));
+            }
 
             $line = $parts;
-            $line[1] = $series;
+            $line[1] = $name;
             $line[5] = $type;
             $line[6] = $number + $i;
 
-            $this->register([
+            $lines[] = [
                 'model_id' => $last->model_id,
                 'color_id' => $last->color_id,
                 'size_id' => $last->size_id,
                 'rack_id' => null,
-                'series' => $series,
+                'series' => $name,
                 'barcode' => implode('|', $line),
                 'type' => $type,
                 'batch_id' => $last->stock_batch_id,
-            ]);
+            ];
         }
-    }
-
-    /** The given rows plus, for each dozen (D) barcode, the piece barcodes that share its series. */
-    private function withDozenPiecesOf($products)
-    {
-        $siblings = $products
-            ->filter(fn($p) => $this->group($p) === 'D')
-            ->flatMap(fn($d) => Product::where('stock_batch_id', $d->stock_batch_id)->where('series', $d->series)->get());
-
-        return $products->concat($siblings)->unique('id')->values();
+        $this->registerMany($lines);
     }
 }

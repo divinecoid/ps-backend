@@ -306,7 +306,7 @@ class ShopeeService
         $path = "/api/v2/order/get_order_detail";
         $params = [
             'order_sn_list' => implode(',', $orderSnList),
-            'response_optional_fields' => 'item_list,message_to_seller,buyer_username,total_amount,recipient_address,estimated_shipping_fee,actual_shipping_fee,shipping_carrier'
+            'response_optional_fields' => 'item_list,message_to_seller,buyer_username,total_amount,recipient_address,estimated_shipping_fee,actual_shipping_fee,shipping_carrier,checkout_shipping_carrier,package_list,pay_time'
         ];
 
         return $this->request('GET', $path, $params);
@@ -354,12 +354,14 @@ class ShopeeService
     public function shipOrder($orderSn, $pickupData)
     {
         $path = "/api/v2/logistics/ship_order";
+        $pickup = ['address_id' => (int) $pickupData['address_id']];
+        // Instant couriers may offer no time slot: they come once the order is arranged.
+        if (!empty($pickupData['pickup_time_id'])) {
+            $pickup['pickup_time_id'] = $pickupData['pickup_time_id'];
+        }
         $data = [
             'order_sn' => $orderSn,
-            'pickup' => [
-                'address_id' => (int) $pickupData['address_id'],
-                'pickup_time_id' => $pickupData['pickup_time_id']
-            ]
+            'pickup' => $pickup,
         ];
 
         return $this->request('POST', $path, [], $data);

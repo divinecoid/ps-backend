@@ -307,76 +307,64 @@ class ProductController extends Controller
      */
     private function deleteLegacyProducts($products)
     {
-        $rows = $this->withDozenPieces($products);
+        $stock = app(LegacyStockService::class);
+        $rows = $stock->withDozenPieces($products);
         $moved = $rows->first(fn($p) => $p->rack_id !== null);
         if ($moved) {
             return $this->errorResponse(422, "Barcode {$moved->barcode} sudah berada di rak gudang kecil (sudah dimutasi), tidak bisa dihapus.");
         }
 
-        $stock = app(LegacyStockService::class);
         DB::transaction(function () use ($rows, $stock) {
-            foreach ($rows as $row) {
-                $stock->release($row);
-                $row->delete();
+            $stock->release($rows);
+            foreach ($rows->pluck('id')->chunk(500) as $ids) {
+                Product::whereIn('id', $ids->values()->all())->delete();
             }
         });
-        \App\Support\AuditLogger::log(
-            \App\Support\AuditLogger::mapModelToModule(Product::class),
-            'DELETE',
-            'Menghapus stok lama dengan ID: ' . $rows->pluck('id')->implode(', ')
-        );
+        $this->auditLegacy('DELETE', 'Menghapus stok lama', $rows);
 
         $this->refreshBatchPdfs($rows);
 
-        return $this->successResponse($rows->values(), 'Success delete data');
+        return $this->successResponse($rows->count(), 'Success delete data');
     }
 
-    /** Re-queue the pre-generated label PDFs of every batch touched by an edit/delete. */
+    private function auditLegacy(string $action, string $what, $rows, string $note = ''): void
+    {
+        $ids = $rows->pluck('id');
+        \App\Support\AuditLogger::log(
+            \App\Support\AuditLogger::mapModelToModule(Product::class),
+            $action,
+            "{$what} ({$ids->count()} barcode){$note} dengan ID: " . $ids->take(500)->implode(', ') . ($ids->count() > 500 ? ', ...' : '')
+        );
+    }
+
+    /**
+     * Queues a rebuild of the label PDFs of every batch touched by an
+     * edit/delete. Rendering is a separate background step: the stock change
+     * never waits for it.
+     */
     private function refreshBatchPdfs($rows): void
     {
         $rows->pluck('stock_batch_id')->filter()->unique()->each(
-            fn($batchId) => \App\Jobs\GenerateBarcodePdfJob::dispatch('batch', (string) $batchId)
+            fn($batchId) => \App\Jobs\GenerateBarcodePdfJob::queue('batch', (string) $batchId)
         );
     }
 
     private function restoreLegacyProducts($products)
     {
-        $rows = $this->withDozenPieces($products, true);
-
         $stock = app(LegacyStockService::class);
+        $rows = $stock->withDozenPieces($products, true);
+
         DB::transaction(function () use ($rows, $stock) {
-            foreach ($rows as $row) {
-                $row->restore();
-                $stock->reclaim($row);
+            foreach ($rows->pluck('id')->chunk(500) as $ids) {
+                Product::onlyTrashed()->whereIn('id', $ids->values()->all())->restore();
             }
+            $stock->reclaim($rows);
         });
-        \App\Support\AuditLogger::log(
-            \App\Support\AuditLogger::mapModelToModule(Product::class),
-            'RESTORE',
-            'Mengembalikan stok lama dengan ID: ' . $rows->pluck('id')->implode(', ')
-        );
+        $this->auditLegacy('RESTORE', 'Mengembalikan stok lama', $rows);
 
         $this->refreshBatchPdfs($rows);
 
-        return $this->successResponse($rows->values());
-    }
-
-    /**
-     * Adds every sibling that shares a dozen's series (same batch) for each
-     * dozen (D) barcode in the list; piece barcodes alone stay alone.
-     */
-    private function withDozenPieces($products, bool $trashed = false)
-    {
-        $stock = app(LegacyStockService::class);
-        $siblings = $products
-            ->filter(fn($p) => $stock->group($p) === 'D')
-            ->flatMap(fn($d) => Product::query()
-                ->when($trashed, fn($q) => $q->onlyTrashed())
-                ->where('stock_batch_id', $d->stock_batch_id)
-                ->where('series', $d->series)
-                ->get());
-
-        return $products->concat($siblings)->unique('id')->values();
+        return $this->successResponse($rows->count());
     }
 
     /** Edit every active product of an old-stock batch (model / color / size / rack). */
@@ -398,11 +386,7 @@ class ProductController extends Controller
             return $this->errorResponse(404, 'Produk stok lama tidak ditemukan');
         }
 
-        $rows = Product::where('stock_batch_id', $product->stock_batch_id)
-            ->where('series', $product->series)
-            ->get();
-
-        return $this->updateLegacyProducts($request, $rows);
+        return $this->updateLegacyProducts($request, app(LegacyStockService::class)->dozenFamily($product));
     }
 
     private function updateLegacyProducts(Request $request, $products, bool $withQty = false)
@@ -421,7 +405,11 @@ class ProductController extends Controller
             return $this->errorResponse(422, 'Tidak ada perubahan yang diisi.');
         }
 
-        $rows = $this->withDozenPieces($products);
+        // A large batch must finish even on a slow server.
+        @set_time_limit(300);
+
+        $stock = app(LegacyStockService::class);
+        $rows = $stock->withDozenPieces($products);
         if ($attributes && ($moved = $rows->first(fn($p) => $p->rack_id !== null))) {
             return $this->errorResponse(422, "Barcode {$moved->barcode} sudah berada di rak gudang kecil (sudah dimutasi), model/warna/ukuran tidak bisa diubah.");
         }
@@ -432,7 +420,6 @@ class ProductController extends Controller
             }
         }
 
-        $stock = app(LegacyStockService::class);
         try {
             DB::transaction(function () use ($stock, $rows, $attributes, $rackId, $qty, $products) {
                 if ($attributes || $rackId) {
@@ -445,12 +432,7 @@ class ProductController extends Controller
         } catch (\InvalidArgumentException $e) {
             return $this->errorResponse(422, $e->getMessage());
         }
-        \App\Support\AuditLogger::log(
-            \App\Support\AuditLogger::mapModelToModule(Product::class),
-            'UPDATE',
-            'Mengubah stok lama dengan ID: ' . $rows->pluck('id')->implode(', ')
-                . ($qty !== null ? " (jumlah menjadi {$qty})" : '')
-        );
+        $this->auditLegacy('UPDATE', 'Mengubah stok lama', $rows, $qty !== null ? ", jumlah menjadi {$qty}" : '');
 
         $this->refreshBatchPdfs($rows);
 
@@ -518,6 +500,7 @@ class ProductController extends Controller
         $colors = Color::pluck('id', 'code');
         $sizes = Size::pluck('id', 'code');
         $racks = Rack::pluck('id', 'code');
+        $bigRackIds = Rack::whereHas('warehouse', fn($q) => $q->where('type', 'BESAR'))->pluck('id')->flip();
 
         $parsed = [];
         foreach ($rows as $i => $row) {
@@ -551,6 +534,9 @@ class ProductController extends Controller
             if ($rackCode && !$rackId) {
                 return $this->errorResponse(422, "Baris {$rowNumber}: kode rak '{$rackCode}' tidak ditemukan.");
             }
+            if ($rackId && !isset($bigRackIds[$rackId])) {
+                return $this->errorResponse(422, "Baris {$rowNumber}: rak '{$rackCode}' bukan rak gudang besar. Stok lama langsung masuk gudang besar; kosongkan kode_rak atau isi rak gudang besar.");
+            }
             if (!in_array($type, ['D', 'P'])) {
                 return $this->errorResponse(422, "Baris {$rowNumber}: tipe harus D atau P.");
             }
@@ -581,30 +567,31 @@ class ProductController extends Controller
             return $this->errorResponse(422, 'Tidak ada baris data yang valid untuk diproses.');
         }
 
+        @set_time_limit(300);
         $batchId = (string) Str::uuid();
         $created = DB::transaction(function () use ($parsed, $batchId) {
             $baseTime = now();
-            $count = 0;
+            $lines = [];
+
+            $cmts = CMT::pluck('code', 'id');
+            $models = ProductModel::pluck('sku', 'id');
+            $colors = Color::pluck('code', 'id');
+            $sizes = Size::pluck('code', 'id');
 
             foreach ($parsed as $line) {
-                $cmt = CMT::find($line['cmt_id']);
-                $model = ProductModel::find($line['model_id']);
-                $color = Color::find($line['color_id']);
-                $size = Size::find($line['size_id']);
-
                 for ($i = 0; $i < $line['qty']; $i++) {
-                    $series = $line['series'] !== '' ? $line['series'] : $baseTime->copy()->addSeconds($count)->format('YmdHis');
+                    $series = $line['series'] !== '' ? $line['series'] : $baseTime->copy()->addSeconds(count($lines))->format('YmdHis');
                     $barcode = implode('|', [
-                        $cmt->code,
+                        $cmts[$line['cmt_id']],
                         $series,
-                        $model->sku,
-                        $color->code,
-                        $size->code,
+                        $models[$line['model_id']],
+                        $colors[$line['color_id']],
+                        $sizes[$line['size_id']],
                         $line['type'],
                         $line['number'] + $i,
                     ]);
 
-                    app(LegacyStockService::class)->register([
+                    $lines[] = [
                         'model_id' => $line['model_id'],
                         'color_id' => $line['color_id'],
                         'size_id' => $line['size_id'],
@@ -613,16 +600,15 @@ class ProductController extends Controller
                         'barcode' => $barcode,
                         'type' => $line['type'],
                         'batch_id' => $batchId,
-                    ]);
-
-                    $count++;
+                    ];
                 }
             }
+            app(LegacyStockService::class)->registerMany($lines);
 
-            return $count;
+            return count($lines);
         });
 
-        \App\Jobs\GenerateBarcodePdfJob::dispatch('batch', $batchId);
+        \App\Jobs\GenerateBarcodePdfJob::queue('batch', $batchId);
 
         return $this->successResponse(['created' => $created], "Berhasil membuat {$created} produk stok lama.");
     }

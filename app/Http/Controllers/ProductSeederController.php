@@ -14,13 +14,24 @@ use Illuminate\Support\Str;
 
 class ProductSeederController extends Controller
 {
+    /** Old stock only goes into the big warehouse. */
+    private function bigRackRule(): \Closure
+    {
+        return function (string $attribute, $value, \Closure $fail) {
+            $isBig = Rack::whereKey($value)->whereHas('warehouse', fn($q) => $q->where('type', 'BESAR'))->exists();
+            if (!$isBig) {
+                $fail('Rak harus rak gudang besar.');
+            }
+        };
+    }
+
     public function index()
     {
         $models = ProductModel::orderBy('name')->get();
         $colors = Color::orderBy('name')->get();
         $sizes = Size::orderBy('name')->get();
         $cmts = CMT::orderBy('name')->get();
-        $racks = Rack::orderBy('name')->get();
+        $racks = Rack::whereHas('warehouse', fn($q) => $q->where('type', 'BESAR'))->orderBy('name')->get();
 
         $html = $this->viewSeederForm($models, $colors, $sizes, $cmts, $racks);
         return response($html, 200, ['Content-Type' => 'text/html; charset=UTF-8']);
@@ -33,7 +44,7 @@ class ProductSeederController extends Controller
             'color_id' => 'required|exists:mdx_colors,id',
             'size_id' => 'required|exists:mdx_sizes,id',
             'cmt_id' => 'required|exists:mdx_cmts,id',
-            'rack_id' => 'nullable|exists:mdx_racks,id',
+            'rack_id' => ['nullable', $this->bigRackRule()],
             'type' => 'required|in:D,P',
             'number' => 'required|integer|min:1',
             'qty' => 'required|integer|min:1',
@@ -50,6 +61,7 @@ class ProductSeederController extends Controller
 
         // Product rows + big-warehouse stock must be saved together.
         \Illuminate\Support\Facades\DB::transaction(function () use ($request, $model, $color, $size, $cmt, &$barcodes, $baseTime, $batchId) {
+        $lines = [];
         for ($i = 0; $i < $request->qty; $i++) {
             $series = $baseTime->copy()->addSeconds($i)->format('YmdHis');
             $barcode = implode('|', [
@@ -62,7 +74,7 @@ class ProductSeederController extends Controller
                 $request->number + $i // Increment piece/dozen number for multiple items
             ]);
 
-            app(LegacyStockService::class)->register([
+            $lines[] = [
                 'model_id' => $request->model_id,
                 'color_id' => $request->color_id,
                 'size_id' => $request->size_id,
@@ -71,19 +83,20 @@ class ProductSeederController extends Controller
                 'barcode' => $barcode,
                 'type' => $request->type,
                 'batch_id' => $batchId,
-            ]);
+            ];
 
             $barcodes[] = $barcode;
         }
+        app(LegacyStockService::class)->registerMany($lines);
         });
 
-        \App\Jobs\GenerateBarcodePdfJob::dispatch('batch', $batchId);
+        \App\Jobs\GenerateBarcodePdfJob::queue('batch', $batchId);
 
         $models = ProductModel::orderBy('name')->get();
         $colors = Color::orderBy('name')->get();
         $sizes = Size::orderBy('name')->get();
         $cmts = CMT::orderBy('name')->get();
-        $racks = Rack::orderBy('name')->get();
+        $racks = Rack::whereHas('warehouse', fn($q) => $q->where('type', 'BESAR'))->orderBy('name')->get();
 
         $html = $this->viewSeederForm($models, $colors, $sizes, $cmts, $racks, $barcodes);
         return response($html, 200, ['Content-Type' => 'text/html; charset=UTF-8']);
@@ -111,7 +124,7 @@ class ProductSeederController extends Controller
             $cmtOpts .= "<option value='{$cmt->id}'>{$cmt->name} ({$cmt->code})</option>";
         }
 
-        $rackOpts = "<option value=''>-- Tanpa Rak --</option>";
+        $rackOpts = "<option value=''>-- Otomatis (Gudang Besar) --</option>";
         foreach ($racks as $r) {
             $rackOpts .= "<option value='{$r->id}'>{$r->name}</option>";
         }
@@ -193,7 +206,7 @@ class ProductSeederController extends Controller
             </div>
 
             <div class="form-group">
-                <label>Pilih Lokasi Rak (Optional)</label>
+                <label>Rak Gudang Besar (Opsional)</label>
                 <select name="rack_id">
                     {$rackOpts}
                 </select>
@@ -249,7 +262,7 @@ HTML;
             'color_id' => 'required|exists:mdx_colors,id',
             'size_id' => 'required|exists:mdx_sizes,id',
             'cmt_id' => 'required|exists:mdx_cmts,id',
-            'rack_id' => 'nullable|exists:mdx_racks,id',
+            'rack_id' => ['nullable', $this->bigRackRule()],
             'type' => 'required|in:D,P',
             'number' => 'required|integer|min:1',
             'qty' => 'required|integer|min:1',
@@ -268,6 +281,7 @@ HTML;
         \Illuminate\Support\Facades\DB::transaction(function () use ($request, $model, $color, $size, $cmt, &$barcodes, $baseTime, $batchId) {
             // A series typed by the user is shared by the whole batch; blank = auto timestamp per item.
             $customSeries = trim((string) $request->series);
+            $lines = [];
             for ($i = 0; $i < $request->qty; $i++) {
                 $series = $customSeries !== '' ? $customSeries : $baseTime->copy()->addSeconds($i)->format('YmdHis');
                 $barcode = implode('|', [
@@ -280,7 +294,7 @@ HTML;
                     $request->number + $i
                 ]);
 
-                app(LegacyStockService::class)->register([
+                $lines[] = [
                     'model_id' => $request->model_id,
                     'color_id' => $request->color_id,
                     'size_id' => $request->size_id,
@@ -289,23 +303,19 @@ HTML;
                     'barcode' => $barcode,
                     'type' => $request->type,
                     'batch_id' => $batchId,
-                ]);
+                ];
 
                 $barcodes[] = $barcode;
             }
+            app(LegacyStockService::class)->registerMany($lines);
         });
 
         // Pre-generate the label PDFs in the background so printing is instant.
-        \App\Jobs\GenerateBarcodePdfJob::dispatch('batch', $batchId);
-
-        $rack = $request->rack_id ? Rack::with('warehouse')->find($request->rack_id) : null;
-        $toBig = !$rack || $rack->warehouse?->type === 'BESAR';
+        \App\Jobs\GenerateBarcodePdfJob::queue('batch', $batchId);
 
         return response()->json([
             'success' => true,
-            'message' => 'Berhasil membuat ' . count($barcodes) . ' produk stok lama.'
-                . ($toBig ? '' : " PERHATIAN: rak {$rack->name} bukan gudang BESAR, stok TIDAK masuk gudang besar."),
-            'to_big_warehouse' => $toBig,
+            'message' => 'Berhasil memasukkan ' . count($barcodes) . ' barcode stok lama ke gudang besar.',
             'data' => $barcodes
         ]);
     }

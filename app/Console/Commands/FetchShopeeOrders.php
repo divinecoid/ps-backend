@@ -9,6 +9,7 @@ use App\Models\MasterData\Marketplace;
 use App\Models\Transactions\Order;
 use App\Models\Transactions\OrderItem;
 use App\Enums\OrderStatus;
+use App\Support\ShippingClassifier;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -23,7 +24,8 @@ class FetchShopeeOrders extends Command
      *
      * @var string
      */
-    protected $signature = 'shopee:fetch-orders {--days=1 : Number of days to look back}';
+    protected $signature = 'shopee:fetch-orders {--days=1 : Number of days to look back}
+        {--minutes= : Look back this many minutes instead (frequent sync for instant orders)}';
 
     /**
      * The console command description.
@@ -41,7 +43,8 @@ class FetchShopeeOrders extends Command
 
         $days = max(1, (int) $this->option('days'));
         $timeTo = time();
-        $timeFrom = $timeTo - ($days * 24 * 60 * 60);
+        $minutes = (int) $this->option('minutes');
+        $timeFrom = $timeTo - ($minutes > 0 ? $minutes * 60 : $days * 24 * 60 * 60);
 
         // Fetch all active Shopee stores
         $stores = OnlineStore::whereHas('marketplace', function ($q) {
@@ -258,17 +261,19 @@ class FetchShopeeOrders extends Command
             ];
 
             if ($order) {
-                // Jika order sudah ada, HANYA UPDATE STATUS.
+                // Jika order sudah ada, HANYA UPDATE STATUS dan info pengiriman
+                // (kurir sering baru ditentukan setelah order masuk).
                 // Jangan timpa data lain seperti customer_address, awb_code, dll yang mungkin sudah diubah manual/sistem lain.
                 $order->update([
                     'status' => $status,
                     'read_at' => now(), // Update waktu terakhir ditarik
-                ]);
+                ] + $this->shippingInfo($detail));
 
                 $this->info("   Updating Order Status only: " . $detail['order_sn'] . " -> " . $detail['order_status']);
             } else {
                 // Jika order belum ada (baru), buat data lengkap
                 $orderData['order_sn'] = $detail['order_sn'];
+                $orderData += $this->shippingInfo($detail);
 
                 $order = Order::create($orderData);
                 $this->info("   Creating New Order: " . $detail['order_sn']);
@@ -319,6 +324,32 @@ class FetchShopeeOrders extends Command
                 'data' => $detail
             ]);
         }
+    }
+
+    /** Service type, courier and deadlines; only what Shopee actually sent. */
+    private function shippingInfo(array $detail): array
+    {
+        $package = $detail['package_list'][0] ?? [];
+        // What the buyer picked at checkout, and the courier actually assigned.
+        $chosen = $detail['checkout_shipping_carrier'] ?? null;
+        $carrier = ($detail['shipping_carrier'] ?? '') ?: ($package['shipping_carrier'] ?? null);
+
+        $type = ShippingClassifier::fromNames($chosen, $carrier);
+        $option = trim((string) ($chosen ?: $carrier));
+        $paidAt = (int) ($detail['pay_time'] ?? $detail['create_time'] ?? 0);
+
+        return array_filter([
+            'service_type' => $type,
+            'shipping_courier' => ShippingClassifier::courier($carrier, $chosen),
+            'delivery_option' => $option !== '' ? mb_substr($option, 0, 120) : null,
+            'ship_by_at' => ShippingClassifier::shopeeShipBy(
+                $type,
+                "{$chosen} {$carrier}",
+                (int) ($detail['ship_by_date'] ?? 0) ?: null,
+                $paidAt ?: null
+            ),
+            'ordered_at' => empty($detail['create_time']) ? null : Carbon::createFromTimestamp((int) $detail['create_time']),
+        ]);
     }
 
     private function formatAddress($recipient)

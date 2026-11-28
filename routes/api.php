@@ -241,6 +241,7 @@ Route::prefix('product')->middleware(['checkrole:admin', 'acm:master_product,rea
     Route::get('/batches', [ProductController::class, 'batches']);
     Route::get('/batch-items', [ProductController::class, 'batchItems']);
     Route::get('batch/{batchId}/print/{kind}', [PrintController::class, 'batchPdf']);
+    Route::post('batch/{batchId}/print/{kind}/prepare', [PrintController::class, 'prepareBatchPdf']);
     Route::get('/seed-dummy/template', [ProductController::class, 'downloadSeedTemplate']);
     Route::get('{id}', [ProductController::class, 'show']);
 });
@@ -381,6 +382,16 @@ Route::prefix('inventory')->middleware(['checkrole', 'acm:gudang_besar,force_del
 //Cek Stok Rak (mobile)
 Route::get('/rack-stock', [RackStockController::class, 'byCode'])->middleware('checkrole');
 
+//Stock Opname (mobile)
+Route::prefix('stock-opname')->middleware('checkrole')->group(function () {
+    $c = \App\Http\Controllers\Transaction\StockOpnameController::class;
+    Route::get('/', [$c, 'index']);
+    Route::get('/rack', [$c, 'rack']);
+    Route::post('/check', [$c, 'check']);
+    Route::post('/', [$c, 'store']);
+    Route::get('/{id}', [$c, 'show']);
+});
+
 //Rack
 // Light-weight picker for the mobile app; must be registered before the {id} routes below.
 Route::get('/rack/options', [RackController::class, 'options'])->middleware('checkrole');
@@ -499,10 +510,19 @@ Route::prefix('sequence')->middleware('checkrole:admin')->group(function () {
 //Order (Pesanan Toko Online)
 Route::prefix('order')->middleware(['checkrole', 'acm:pesanan,read'])->group(function () {
     Route::get('/', [OrderController::class, 'index']);
+    Route::get('/couriers', [OrderController::class, 'couriers']);
     Route::get('/{id}', [OrderController::class, 'show']);
     Route::get('/lazada/{id}', [OrderController::class, 'getLazadaOrder']);
     Route::get('/tiktokshop/{id}', [OrderController::class, 'getTiktokShopOrder']);
     Route::get('/shopee/{id}', [OrderController::class, 'getShopeeOrder']);
+});
+
+// Laporan Barang Keluar Online
+Route::prefix('report/online-outbound')->middleware(['checkrole', 'acm:pesanan,read'])->group(function () {
+    $c = \App\Http\Controllers\Transaction\OnlineOutboundReportController::class;
+    Route::get('/', [$c, 'index']);
+    Route::get('/export', [$c, 'export']);
+    Route::get('/options', [$c, 'options']);
 });
 
 // Return Receipts
@@ -580,6 +600,7 @@ Route::prefix('request')->middleware(['checkrole', 'acm:permintaan,read'])->grou
     Route::get('/{id}', [RequestController::class, 'show']);
     Route::get('/barcode/{id}', [RequestController::class, 'barcode']);
     Route::get('/barcode/{id}/pdf/{kind}', [PrintController::class, 'requestPdf']);
+    Route::post('/barcode/{id}/pdf/{kind}/prepare', [PrintController::class, 'prepareRequestPdf']);
 });
 Route::prefix('request')->middleware(['checkrole', 'acm:permintaan,create'])->group(function () {
     Route::post('/', [RequestController::class, 'store']);
@@ -629,6 +650,7 @@ Route::prefix('inbound')->middleware(['checkrole', 'acm:penerimaan,create'])->gr
 Route::prefix('cmt-payroll')->middleware(['checkrole', 'acm:cmt_payroll,read'])->group(function () {
     Route::get('/', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'index']);
     Route::get('/{id}', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'show']);
+    Route::get('/{id}/pdf', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'pdf']);
 });
 Route::prefix('cmt-payroll')->middleware(['checkrole', 'acm:cmt_payroll,create'])->group(function () {
     Route::post('/generate', [\App\Http\Controllers\Transaction\CmtPayrollController::class, 'generate']);
