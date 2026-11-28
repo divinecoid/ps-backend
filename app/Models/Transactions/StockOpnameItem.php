@@ -13,5 +13,7 @@ class StockOpnameItem extends Model
 
     public $timestamps = false;
 
-    protected $fillable = ['model', 'color', 'size', 'system_qty', 'counted_qty'];
+    protected $fillable = ['model', 'color', 'size', 'system_qty', 'counted_qty', 'is_manual'];
+
+    protected $casts = ['is_manual' => 'boolean'];
 }

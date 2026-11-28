@@ -55,9 +55,9 @@ class StockOpnameTest extends TestCase
         DB::table('mdx_products')->insert(['id' => md5($barcode), 'model_id' => 'm', 'color_id' => 'c', 'size_id' => 's', 'rack_id' => $rack, 'barcode' => $barcode]);
     }
 
-    private function compare(string $rack, array $barcodes): array
+    private function compare(string $rack, array $barcodes, array $manual = []): array
     {
-        $result = app(StockOpnameService::class)->compare(Rack::with('warehouse')->find($rack), $barcodes);
+        $result = app(StockOpnameService::class)->compare(Rack::with('warehouse')->find($rack), $barcodes, $manual);
         $result['results'] = array_column($result['barcodes'], 'result', 'barcode');
 
         return $result;
@@ -91,6 +91,41 @@ class StockOpnameTest extends TestCase
         $result = $this->compare('K2', ['C|1|LP|RED|M|P|3', 'C|1|LP|RED|M|D|9']);
 
         $this->assertSame([2, 2], [$result['system_qty'], $result['counted_qty']]);
+    }
+
+    private function typed(int $quantity, string $model = 'm'): array
+    {
+        return ['model_id' => $model, 'color_id' => 'c', 'size_id' => 's', 'quantity' => $quantity];
+    }
+
+    public function test_typed_quantity_is_the_total_of_an_item_and_its_barcodes_are_not_missing(): void
+    {
+        $result = $this->compare('K1', ['C|1|LP|RED|M|P|1'], [$this->typed(5)]);
+
+        $this->assertSame([2, 5], [$result['system_qty'], $result['counted_qty']]);
+        $this->assertTrue($result['items'][0]['is_manual']);
+        $this->assertSame(['C|1|LP|RED|M|P|1' => 'found'], $result['results']);
+    }
+
+    public function test_typed_zero_means_the_item_is_not_there(): void
+    {
+        $result = $this->compare('B1', [], [$this->typed(0)]);
+
+        $this->assertSame([24, 0], [$result['system_qty'], $result['counted_qty']]);
+        $this->assertTrue($result['items'][0]['is_manual']);
+    }
+
+    public function test_typed_quantity_can_add_an_item_the_system_does_not_have_there(): void
+    {
+        DB::table('mdx_models')->insert(['id' => 'x', 'sku' => 'TS', 'name' => 'T-Shirt']);
+
+        $result = $this->compare('K1', [], [$this->typed(7, 'x')]);
+
+        $this->assertSame([2, 7], [$result['system_qty'], $result['counted_qty']]);
+        $items = array_column($result['items'], null, 'model');
+        $this->assertSame([0, 7, true], [$items['T-Shirt']['system_qty'], $items['T-Shirt']['counted_qty'], $items['T-Shirt']['is_manual']]);
+        // The item that was neither scanned nor typed is still reported.
+        $this->assertSame(['missing', 'missing'], array_values($result['results']));
     }
 
     public function test_counting_never_changes_stock(): void

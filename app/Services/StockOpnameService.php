@@ -115,13 +115,21 @@ class StockOpnameService
     }
 
     /**
-     * Compares everything scanned on a rack with the system.
+     * Compares what was counted on a rack with the system. An item is counted
+     * either by scanning (dozen or piece barcodes) or by typing its quantity;
+     * a typed quantity is that item's total, whatever was scanned for it.
      *
      * @param string[] $scanned
+     * @param array<int,array{model_id:string,color_id:string,size_id:string,quantity:int}> $manual
      * @return array{items:array<int,array>,barcodes:array<int,array>,system_qty:int,counted_qty:int}
      */
-    public function compare(Rack $rack, array $scanned): array
+    public function compare(Rack $rack, array $scanned, array $manual = []): array
     {
+        $typed = [];
+        foreach ($manual as $line) {
+            $typed["{$line['model_id']}|{$line['color_id']}|{$line['size_id']}"] = (int) $line['quantity'];
+        }
+
         $scanned = array_values(array_unique(array_filter(array_map('trim', $scanned))));
         $identified = array_map(fn($b) => $this->identify($rack, $b), $scanned);
         $covered = array_flip(array_merge([], ...array_column($identified, 'covers')));
@@ -130,7 +138,7 @@ class StockOpnameService
         foreach ($this->expected($rack) as $key => $item) {
             $items[$key] = [
                 'model' => $item['model'], 'color' => $item['color'], 'size' => $item['size'],
-                'system_qty' => $item['quantity'], 'counted_qty' => 0,
+                'system_qty' => $item['quantity'], 'counted_qty' => 0, 'is_manual' => false,
             ];
         }
 
@@ -143,18 +151,30 @@ class StockOpnameService
             if ($row['key'] !== null) {
                 $items[$row['key']] ??= [
                     'model' => $row['model'], 'color' => $row['color'], 'size' => $row['size'],
-                    'system_qty' => 0, 'counted_qty' => 0,
+                    'system_qty' => 0, 'counted_qty' => 0, 'is_manual' => false,
                 ];
                 $items[$row['key']]['counted_qty'] += $row['units'];
             }
             $barcodes[] = ['barcode' => $row['barcode'], 'result' => $row['result'], 'note' => $row['note']];
         }
 
-        // Piece barcodes the system has on this rack that nobody scanned.
+        foreach ($typed as $key => $quantity) {
+            if (!isset($items[$key])) {
+                [$modelId, $colorId, $sizeId] = explode('|', $key);
+                $items[$key] = $this->labels(
+                    ProductModel::find($modelId), Color::find($colorId), Size::find($sizeId),
+                ) + ['system_qty' => 0];
+            }
+            $items[$key]['counted_qty'] = $quantity;
+            $items[$key]['is_manual'] = true;
+        }
+
+        // Piece barcodes the system has on this rack that nobody scanned. Items
+        // whose quantity was typed are not expected to be scanned one by one.
         $seen = array_flip($scanned) + $covered;
-        foreach (Product::where('rack_id', $rack->id)->pluck('barcode') as $barcode) {
-            if (!isset($seen[$barcode])) {
-                $barcodes[] = ['barcode' => $barcode, 'result' => self::MISSING, 'note' => null];
+        foreach (Product::where('rack_id', $rack->id)->get(['barcode', 'model_id', 'color_id', 'size_id']) as $product) {
+            if (!isset($seen[$product->barcode]) && !isset($typed["{$product->model_id}|{$product->color_id}|{$product->size_id}"])) {
+                $barcodes[] = ['barcode' => $product->barcode, 'result' => self::MISSING, 'note' => null];
             }
         }
 

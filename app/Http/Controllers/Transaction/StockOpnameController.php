@@ -4,7 +4,10 @@ namespace App\Http\Controllers\Transaction;
 
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CrudTrait;
+use App\Models\MasterData\Color;
+use App\Models\MasterData\ProductModel;
 use App\Models\MasterData\Rack;
+use App\Models\MasterData\Size;
 use App\Models\Transactions\StockOpname;
 use App\Services\StockOpnameService;
 use App\Support\AuditLogger;
@@ -13,7 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
-/** Stock opname (mobile): count a rack by scanning, then save the differences. */
+/** Stock opname: count a rack by scanning or typing quantities, then save the differences. */
 class StockOpnameController extends Controller
 {
     use CrudTrait;
@@ -102,6 +105,23 @@ class StockOpnameController extends Controller
         ]);
     }
 
+    /** Lists for typing the quantity of an item the system does not have on the rack. */
+    public function options()
+    {
+        $list = fn($query, string $label, string $fallback) => $query->orderBy($label)->get(['id', $label, $fallback])
+            ->map(fn($row) => ['id' => $row->id, 'name' => $row->{$label} ?: $row->{$fallback}])
+            ->values();
+
+        return $this->successResponse([
+            'models' => $list(ProductModel::query(), 'name', 'sku'),
+            'colors' => $list(Color::query(), 'name', 'code'),
+            // Sizes read best by their code (S, M, XL) in the order they were made.
+            'sizes' => Size::orderBy('created_at')->get(['id', 'code', 'name'])
+                ->map(fn($s) => ['id' => $s->id, 'name' => $s->code ?: $s->name])
+                ->values(),
+        ]);
+    }
+
     /** Checks one scan so the counter sees at once what it is. */
     public function check(Request $request, StockOpnameService $service)
     {
@@ -124,13 +144,18 @@ class StockOpnameController extends Controller
             'rack_id' => ['required', Rule::exists('mdx_racks', 'id')->whereNull('deleted_at')],
             'barcodes' => 'present|array|max:20000',
             'barcodes.*' => 'string|max:255',
+            'manual' => 'nullable|array|max:2000',
+            'manual.*.model_id' => ['required', Rule::exists('mdx_models', 'id')],
+            'manual.*.color_id' => ['required', Rule::exists('mdx_colors', 'id')],
+            'manual.*.size_id' => ['required', Rule::exists('mdx_sizes', 'id')],
+            'manual.*.quantity' => 'required|integer|min:0|max:1000000',
             'notes' => 'nullable|string|max:1000',
         ]);
 
         @set_time_limit(300);
 
         $opname = DB::transaction(function () use ($data, $service) {
-            $result = $service->compare(Rack::with('warehouse')->findOrFail($data['rack_id']), $data['barcodes']);
+            $result = $service->compare(Rack::with('warehouse')->findOrFail($data['rack_id']), $data['barcodes'], $data['manual'] ?? []);
 
             $opname = StockOpname::create([
                 'rack_id' => $data['rack_id'],
@@ -160,6 +185,7 @@ class StockOpnameController extends Controller
                 'system_qty' => $i->system_qty,
                 'counted_qty' => $i->counted_qty,
                 'difference' => $i->counted_qty - $i->system_qty,
+                'manual' => $i->is_manual,
             ])->sortBy([['model', 'asc'], ['color', 'asc'], ['size', 'asc']])->values(),
             // Only what needs attention; matching barcodes are just counted.
             'problems' => $opname->barcodes->where('result', '!=', StockOpnameService::FOUND)

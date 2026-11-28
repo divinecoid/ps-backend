@@ -382,11 +382,12 @@ Route::prefix('inventory')->middleware(['checkrole', 'acm:gudang_besar,force_del
 //Cek Stok Rak (mobile)
 Route::get('/rack-stock', [RackStockController::class, 'byCode'])->middleware('checkrole');
 
-//Stock Opname (mobile)
+//Stock Opname (web and mobile)
 Route::prefix('stock-opname')->middleware('checkrole')->group(function () {
     $c = \App\Http\Controllers\Transaction\StockOpnameController::class;
     Route::get('/', [$c, 'index']);
     Route::get('/rack', [$c, 'rack']);
+    Route::get('/options', [$c, 'options']);
     Route::post('/check', [$c, 'check']);
     Route::post('/', [$c, 'store']);
     Route::get('/{id}', [$c, 'show']);
