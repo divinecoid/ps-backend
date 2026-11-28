@@ -4,12 +4,16 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Sleep;
 use App\Models\MasterData\OnlineStore;
 use App\Models\MasterData\Marketplace;
 use Carbon\Carbon;
 
 class ShopeeService
 {
+    /** How often to ask Shopee whether a label is ready, one second apart. */
+    private const LABEL_ATTEMPTS = 15;
+
     protected ?OnlineStore $store = null;
 
     public function setStore(OnlineStore $store)
@@ -398,12 +402,36 @@ class ShopeeService
     }
 
     /**
+     * The label format Shopee recommends for this order. It differs per courier,
+     * e.g. NORMAL_AIR_WAYBILL or THERMAL_AIR_WAYBILL.
+     */
+    public function getShippingDocumentType($orderSn): string
+    {
+        $res = $this->request('POST', '/api/v2/logistics/get_shipping_document_parameter', [], [
+            'order_list' => [['order_sn' => $orderSn]],
+        ]);
+
+        return $res['response']['result_list'][0]['suggest_shipping_document_type'] ?? 'NORMAL_AIR_WAYBILL';
+    }
+
+    /** Progress of a label Shopee is creating: status READY, PROCESSING or FAILED. */
+    public function getShippingDocumentResult($orderSn, string $type): array
+    {
+        $res = $this->request('POST', '/api/v2/logistics/get_shipping_document_result', [], [
+            'order_list' => [['order_sn' => $orderSn, 'shipping_document_type' => $type]],
+        ]);
+
+        return $res['response']['result_list'][0] ?? [];
+    }
+
+    /**
      * Create Shipping Document
      *
      * @param string $orderSn
+     * @param string|null $shippingDocumentType null = the format Shopee recommends
      * @return array
      */
-    public function createShippingDocument($orderSn)
+    public function createShippingDocument($orderSn, $shippingDocumentType = null)
     {
         $res = $this->getTrackingNumber($orderSn);
         if (isset($res['error']) && !empty($res['error'])) {
@@ -417,12 +445,13 @@ class ShopeeService
 
         $tracking_number = $response['tracking_number'];
         $path = "/api/v2/logistics/create_shipping_document";
+        // Shopee reads the type per order; anywhere else it is ignored.
         $data = [
-            'shipping_document_type' => 'NORMAL_AIR_WAYBILL',
             'order_list' => [
                 [
                     'order_sn' => $orderSn,
-                    'tracking_number' => $tracking_number
+                    'tracking_number' => $tracking_number,
+                    'shipping_document_type' => $shippingDocumentType ?: $this->getShippingDocumentType($orderSn),
                 ]
             ]
         ];
@@ -443,15 +472,54 @@ class ShopeeService
 
 
     /**
+     * Shopee creates labels in the background, so one can only be downloaded
+     * after it reports READY. Creates the label first when there is none.
+     */
+    private function prepareShippingDocument($orderSn, string $type): void
+    {
+        $result = $this->getShippingDocumentResult($orderSn, $type);
+        $status = $result['status'] ?? null;
+        if ($status === 'READY') {
+            return;
+        }
+
+        if ($status !== 'PROCESSING') {
+            $created = $this->createShippingDocument($orderSn, $type);
+            if (!empty($created['error'])) {
+                throw new \Exception('Gagal membuat dokumen resi Shopee: ' . ($created['message'] ?? $created['error']));
+            }
+        }
+
+        for ($attempt = 1; $attempt <= self::LABEL_ATTEMPTS; $attempt++) {
+            Sleep::for(1)->second();
+
+            $result = $this->getShippingDocumentResult($orderSn, $type);
+            $status = $result['status'] ?? null;
+            if ($status === 'READY') {
+                return;
+            }
+            if ($status === 'FAILED') {
+                $reason = $result['fail_message'] ?? $result['fail_error'] ?? 'tanpa keterangan';
+                throw new \Exception("Shopee gagal membuat resi pesanan {$orderSn}: {$reason}");
+            }
+        }
+
+        Log::warning('Shopee shipping document not ready in time', ['order_sn' => $orderSn, 'type' => $type, 'result' => $result]);
+        throw new \Exception('Resi masih diproses Shopee. Coba cetak lagi beberapa saat lagi.');
+    }
+
+    /**
      * Download Shipping Document
      * 
      * @param string $orderSn
-     * @param string|null $shippingDocumentType
+     * @param string|null $shippingDocumentType null = the format Shopee recommends
      * @return string (Binary content of the PDF)
      */
-    public function downloadShippingDocument($orderSn, $shippingDocumentType = 'NORMAL_AIR_WAYBILL')
+    public function downloadShippingDocument($orderSn, $shippingDocumentType = null)
     {
         $store = $this->getStore();
+        $shippingDocumentType = $shippingDocumentType ?: $this->getShippingDocumentType($orderSn);
+        $this->prepareShippingDocument($orderSn, $shippingDocumentType);
 
         $execute = function () use ($store, $orderSn, $shippingDocumentType) {
             $host = $store->marketplace->base_api_url;
@@ -518,24 +586,6 @@ class ShopeeService
                 $response = $execute();
                 $body = $response->body();
                 // Re-evaluate JSON after retry
-                if (strpos($response->header('Content-Type'), 'application/json') !== false || substr(trim($body), 0, 1) === '{') {
-                    $json = $response->json();
-                    $isJson = true;
-                }
-            }
-
-            if ($isJson && isset($json['error']) && $json['error'] === 'logistics.shipping_document_should_print_first') {
-                Log::info("Shopee shipping document needs to be created first. Creating document for order: " . $orderSn);
-                $createRes = $this->createShippingDocument($orderSn);
-                Log::info("Shopee createShippingDocument response:", ['response' => $createRes]);
-
-                // Wait 1 second for Shopee to process
-                sleep(1);
-
-                // Retry execution
-                $response = $execute();
-                $body = $response->body();
-                $isJson = false;
                 if (strpos($response->header('Content-Type'), 'application/json') !== false || substr(trim($body), 0, 1) === '{') {
                     $json = $response->json();
                     $isJson = true;

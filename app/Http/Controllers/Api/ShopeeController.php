@@ -466,7 +466,7 @@ class ShopeeController extends Controller
     {
         $request->validate([
             'order_sn' => 'required|string',
-            'shipping_document_type' => 'nullable|string' // Default NORMAL_AIR_WAYBILL
+            'shipping_document_type' => 'nullable|string' // Default: Shopee's recommendation for the order
         ]);
 
         try {
@@ -497,8 +497,7 @@ class ShopeeController extends Controller
                 ], 422);
             }
 
-            $type = $request->shipping_document_type ?? 'NORMAL_AIR_WAYBILL';
-            $fileContent = $this->shopeeService->downloadShippingDocument($request->order_sn, $type);
+            $fileContent = $this->shopeeService->downloadShippingDocument($request->order_sn, $request->shipping_document_type);
 
             // Robust check: PDF files MUST start with %PDF-
             if (strpos($fileContent, '%PDF-') !== 0) {
