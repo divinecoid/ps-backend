@@ -545,11 +545,14 @@ class TiktokShopService
             $productName = (string) ($lineItem['product_name'] ?? '');
             $skuName = (string) ($lineItem['sku_name'] ?? '');
 
-            $itemName = trim($productName);
             $skuNameTrimmed = trim($skuName);
-            if ($skuNameTrimmed !== '' && strcasecmp($skuNameTrimmed, 'default') !== 0) {
-                $itemName = trim($itemName . ' - ' . $skuNameTrimmed);
-            }
+            $variant = $skuNameTrimmed !== '' && strcasecmp($skuNameTrimmed, 'default') !== 0
+                ? ' - ' . $skuNameTrimmed
+                : '';
+            // item_name holds 255 characters; one longer title failed the whole
+            // page of orders. Shorten the title so the variant stays readable.
+            $itemName = trim(mb_substr(trim($productName), 0, max(0, 255 - mb_strlen($variant))) . $variant);
+            $itemName = mb_substr($itemName, 0, 255);
 
             // Optional: try to infer color/size from sku_name when it uses Shopee-like "Color,Size".
             [$color, $size] = $this->extractColorAndSizeFromSkuName($skuNameTrimmed);

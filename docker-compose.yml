@@ -27,6 +27,9 @@ x-app: &app
     LOG_VIEWER_PASSWORD: ${LOG_VIEWER_PASSWORD:-}
     SESSION_DRIVER: database
     QUEUE_CONNECTION: database
+    # Own queue name: any other worker on this database listens on "default" and
+    # would otherwise run these jobs with its older code.
+    DB_QUEUE: ${DB_QUEUE:-ps-docker}
     # Must exceed the longest job timeout (GenerateBarcodePdfJob = 900s) or a slow PDF job gets re-queued mid-run.
     DB_QUEUE_RETRY_AFTER: 1000
     CACHE_STORE: database

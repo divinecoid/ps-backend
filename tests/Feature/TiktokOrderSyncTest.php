@@ -177,6 +177,20 @@ class TiktokOrderSyncTest extends TestCase
         $this->assertSame(1_795_003_600, $order->ship_by_at->timestamp);
     }
 
+    public function test_long_product_titles_are_shortened_but_keep_the_variant(): void
+    {
+        $this->store();
+        $order = $this->order('L1', 'AWAITING_SHIPMENT');
+        $order['line_items'][0]['product_name'] = str_repeat('Kaos Polos Premium ', 30);
+        $this->fakeShopAndOrders([$order]);
+
+        $this->artisan('tiktok:fetch-orders')->assertSuccessful();
+
+        $name = \App\Models\Transactions\OrderItem::first()->item_name;
+        $this->assertLessThanOrEqual(255, mb_strlen($name));
+        $this->assertStringEndsWith(' - Merah, L', $name);
+    }
+
     public function test_sync_does_not_undo_warehouse_progress(): void
     {
         $store = $this->store();
